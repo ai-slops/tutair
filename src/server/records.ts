@@ -1,0 +1,160 @@
+import { z } from "zod";
+import { riskScopes } from "./types.js";
+
+export const learnerRecord = z.object({
+  id: z.string(),
+  display_name: z.string(),
+  created_at: z.string(),
+});
+export const sessionRecord = z.object({
+  id: z.string(),
+  learner_id: z.string(),
+  token_hash: z.string(),
+  created_at: z.string(),
+  expires_at: z.string(),
+});
+export const conversationRecord = z.object({
+  id: z.string(),
+  learner_id: z.string(),
+  title: z.string(),
+  goal: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export const messageRecord = z.object({
+  id: z.string(),
+  learner_id: z.string(),
+  conversation_id: z.string(),
+  role: z.enum(["learner", "tutor"]),
+  content: z.string(),
+  synthetic: z.number(),
+  tombstoned_at: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export const threadRecord = z.object({
+  id: z.string(),
+  learner_id: z.string(),
+  conversation_id: z.string().nullable(),
+  title: z.string(),
+  goal: z.string(),
+  status: z.enum(["open", "paused", "resolved"]),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export const knowledgeRecord = z.object({
+  id: z.string(),
+  learner_id: z.string().nullable(),
+  canonical_key: z.string().nullable(),
+  scope: z.enum(["canonical", "provisional"]),
+  risk_scope: z.enum(riskScopes),
+  title: z.string(),
+  kind: z.enum([
+    "term_sense",
+    "concept",
+    "claim",
+    "procedure",
+    "skill",
+    "distinction",
+    "misconception",
+  ]),
+  aliases_json: z.string(),
+  current_revision: z.number(),
+  mastery: z.number(),
+  confidence: z.number(),
+  created_at: z.string(),
+});
+export const revisionRecord = z.object({
+  id: z.string(),
+  knowledge_id: z.string(),
+  revision: z.number(),
+  statement: z.string(),
+  semantic_scope: z.string(),
+  distinguishing_features_json: z.string(),
+  claims_json: z.string(),
+  source_refs_json: z.string(),
+  source_type: z.string(),
+  source_ref: z.string().nullable(),
+  model_run_id: z.string().nullable(),
+  conversation_id: z.string().nullable(),
+  source_message_ids_json: z.string(),
+  source_message_event_ids_json: z.string(),
+  created_at: z.string(),
+});
+export const evidenceRecord = z.object({
+  id: z.string(),
+  learner_id: z.string(),
+  knowledge_id: z.string(),
+  knowledge_revision_id: z.string(),
+  revision: z.number(),
+  conversation_id: z.string(),
+  message_id: z.string(),
+  message_event_id: z.string(),
+  assessment_id: z.string().nullable(),
+  dimension: z.enum([
+    "recognition",
+    "recall",
+    "explanation",
+    "application",
+    "discrimination",
+    "transfer",
+  ]),
+  evidence_type: z.enum([
+    "self_report",
+    "recognition_response",
+    "free_explanation",
+    "application",
+    "contrast",
+    "prediction",
+    "artifact",
+    "execution_result",
+  ]),
+  score: z.number(),
+  polarity: z.enum(["positive", "negative", "ambiguous"]),
+  strength: z.number(),
+  evaluator_confidence: z.number(),
+  evaluator_type: z.string(),
+  evaluator_model_run_id: z.string().nullable(),
+  rubric_version: z.string(),
+  hints: z.number(),
+  answer_visible: z.number(),
+  open_book: z.number(),
+  copied_from_recent_context: z.number(),
+  supporting_spans_json: z.string(),
+  limitations_json: z.string(),
+  related_unit_ids_json: z.string(),
+  thread_id: z.string().nullable(),
+  difficulty: z.number().nullable(),
+  context_discount: z.number(),
+  weight: z.number(),
+  created_at: z.string(),
+});
+export const learnerStateRecord = z.object({
+  id: z.string(),
+  learner_id: z.string(),
+  knowledge_id: z.string(),
+  knowledge_revision_id: z.string(),
+  revision: z.number(),
+  dimension: z.enum([
+    "recognition",
+    "recall",
+    "explanation",
+    "application",
+    "discrimination",
+    "transfer",
+  ]),
+  estimate: z.number(),
+  uncertainty: z.number(),
+  status: z.enum(["unknown", "exposed", "tentative", "supported", "stale"]),
+  effective_evidence: z.number(),
+  last_observation: z.string().nullable(),
+  evidence_ids_json: z.string(),
+  projection_version: z.string(),
+  projected_at: z.string(),
+});
+export const genericRecord = z.record(z.string(), z.union([z.string(), z.number(), z.null()]));
+
+export type ConversationRecord = z.infer<typeof conversationRecord>;
+export type MessageRecord = z.infer<typeof messageRecord>;
+export type ThreadRecord = z.infer<typeof threadRecord>;
+export type KnowledgeRecord = z.infer<typeof knowledgeRecord>;
