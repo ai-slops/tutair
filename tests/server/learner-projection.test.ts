@@ -128,4 +128,31 @@ describe("revision-scoped learner state projection", () => {
     const input = { ...base, evidence: [evidence] };
     expect(projectKnowledge(input)).toEqual(projectKnowledge(input));
   });
+
+  it("never marks unverified contested or high-stakes knowledge supported", () => {
+    for (const riskScope of ["current-contested", "high-stakes"] as const) {
+      const state = projectKnowledge({
+        ...base,
+        authority: "provisional",
+        riskScope,
+        evidence: Array.from({ length: 20 }, (_, index) => ({ ...evidence, id: `e${index}` })),
+      });
+      expect(state.dimensions.explanation.status).toBe("tentative");
+      expect(state.dimensions.explanation.uncertainty).toBeGreaterThanOrEqual(0.6);
+      expect(state.evidenceIds).toHaveLength(20);
+    }
+  });
+
+  it("weakly acknowledges a knowledge claim without inventing mastery evidence", () => {
+    const state = projectKnowledge({
+      ...base,
+      corrections: [{ type: "claims_more_knowledge", createdAt: base.now }],
+    });
+    expect(state.dimensions.recognition.uncertainty).toBe(0.95);
+    expect(state.dimensions.recognition.estimate).toBe(0.5);
+    expect(state.dimensions.recognition.status).toBe("unknown");
+    expect(state.dimensions.recognition.effectiveEvidence).toBe(0);
+    expect(state.evidenceIds).toEqual([]);
+    expect(state.dimensions.explanation.uncertainty).toBe(1);
+  });
 });

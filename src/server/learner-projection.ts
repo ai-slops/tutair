@@ -43,6 +43,8 @@ export type ProjectionCorrection =
 
 export type ProjectionInput = {
   readonly knowledgeRevisionId: string;
+  readonly authority?: "canonical" | "provisional";
+  readonly riskScope?: "stable" | "definition-sensitive" | "current-contested" | "high-stakes";
   readonly evidence: readonly ProjectionEvidence[];
   readonly exposures: readonly {
     readonly knowledgeRevisionId: string;
@@ -60,7 +62,7 @@ export type DimensionState = {
   readonly lastObservedAt?: string;
 };
 
-export const projectionVersion = "weighted-revision-dimensions-v1";
+export const projectionVersion = "weighted-revision-dimensions-v2-risk";
 
 const typeWeights = {
   self_report: 0.2,
@@ -96,6 +98,7 @@ export function projectKnowledge(input: ProjectionInput) {
   const invalid = new Set<string>();
   let mismatchAfter = "";
   let confidenceCorrectionAfter = "";
+  let confidenceClaimAfter = "";
   for (const correction of input.corrections) {
     switch (correction.type) {
       case "evidence_invalid":
@@ -110,6 +113,8 @@ export function projectKnowledge(input: ProjectionInput) {
         }
         break;
       case "claims_more_knowledge":
+        if (correction.createdAt > confidenceClaimAfter)
+          confidenceClaimAfter = correction.createdAt;
         break;
       default: {
         const unreachable: never = correction;
@@ -138,11 +143,23 @@ export function projectKnowledge(input: ProjectionInput) {
     const estimate = (1 + positive) / (2 + effectiveEvidence);
     const lastObservedAt = observations.at(-1)?.createdAt;
     const corrected = lastObservedAt !== undefined && confidenceCorrectionAfter >= lastObservedAt;
-    const uncertainty = Math.max(1 / (1 + effectiveEvidence), corrected ? 0.6 : 0);
+    const restricted =
+      input.authority === "provisional" &&
+      (input.riskScope === "current-contested" || input.riskScope === "high-stakes");
+    const recentClaim =
+      dimension === "recognition" &&
+      confidenceClaimAfter > confidenceCorrectionAfter &&
+      confidenceClaimAfter > (lastObservedAt ?? "") &&
+      Date.parse(input.now) - Date.parse(confidenceClaimAfter) <= 90 * 86400_000;
+    const uncertainty = Math.max(
+      1 / (1 + effectiveEvidence) - (recentClaim ? 0.05 : 0),
+      corrected || restricted ? 0.6 : 0,
+    );
     let status: DimensionState["status"] = "unknown";
     if (dimension === "recognition" && exposures.length > 0) status = "exposed";
     if (effectiveEvidence > 0) status = "tentative";
-    if (effectiveEvidence >= 1.2 && estimate >= 0.65 && !corrected) status = "supported";
+    if (effectiveEvidence >= 1.2 && estimate >= 0.65 && !corrected && !restricted)
+      status = "supported";
     if (lastObservedAt && Date.parse(input.now) - Date.parse(lastObservedAt) > 90 * 86400_000) {
       status = "stale";
     }
