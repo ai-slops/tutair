@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f3efe4" />
+    <title>Model setup — Tutair</title>
+    <style>
+      :root { --canvas:#f3efe4; --paper:#fffdf7; --ink:#1e2922; --muted:#687069; --forest:#174d37; --wash:#e0e9df; --rule:#d8d2c5; }
+      * { box-sizing: border-box; }
+      body { margin:0; color:var(--ink); background:var(--canvas); font:1rem/1.65 "Avenir Next",Avenir,"Segoe UI",sans-serif; }
+      main { inline-size:min(100% - 2rem, 48rem); margin:3rem auto; padding:clamp(1.5rem,5vw,3rem); background:var(--paper); border:1px solid var(--rule); border-radius:1rem; }
+      h1,h2 { font-family:Georgia,"Times New Roman",serif; font-weight:400; line-height:1.15; }
+      h1 { font-size:clamp(2rem,6vw,3.5rem); letter-spacing:-.03em; }
+      h2 { margin-block-start:2rem; }
+      p,li { max-inline-size:68ch; }
+      .notice { padding:1rem; background:var(--wash); border-radius:.625rem; }
+      code { padding:.15rem .35rem; background:var(--wash); border-radius:.375rem; overflow-wrap:anywhere; }
+      pre { padding:1rem; overflow:auto; background:var(--ink); color:var(--paper); border-radius:.625rem; }
+      pre code { padding:0; background:transparent; }
+      a { color:var(--forest); font-weight:700; }
+      a:focus-visible { outline:2px solid var(--forest); outline-offset:3px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a href="/">Return to Tutair</a>
+      <h1>Connect a tutor model</h1>
+      <p class="notice"><strong>Keep model keys on the server.</strong> Tutair never asks for or stores provider credentials in your browser.</p>
+      <h2>Choose a mode</h2>
+      <ul>
+        <li><strong>Disabled</strong> keeps the learning workspace local without generation.</li>
+        <li><strong>Demo</strong> exercises the workflow with an explicit synthetic banner. It is not presented as a real model.</li>
+        <li><strong>OpenAI-compatible</strong> connects a provider that supports the required structured-output schema.</li>
+      </ul>
+      <h2>Configure the server</h2>
+      <p>Set environment variables where the Tutair server runs, then restart it. Do not paste these values into browser storage or a conversation.</p>
+      <pre><code># Synthetic workflow demo
+TUTOR_PROVIDER=demo
+
+# OpenAI-compatible provider
+TUTOR_PROVIDER=openai
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_API_KEY=your-provider-key
+TUTOR_MODEL=gpt-4.1-mini
+
+# Optional provider embedding model
+TUTOR_EMBEDDING_MODEL=text-embedding-3-small
+
+# Or use local embeddings
+TUTOR_EMBEDDING_PROVIDER=local</code></pre>
+      <h2>Check the connection</h2>
+      <p>Return to Tutair and open <strong>Settings → Session &amp; model</strong>. The status identifies the configured model, synthetic mode, or unavailable generation. A real-provider failure never silently falls back to synthetic output.</p>
+      <h2>Privacy note</h2>
+      <p>Your configured provider may receive learning context needed for a tutor turn. Review that provider’s retention policy before using sensitive learning material.</p>
+    </main>
+  </body>
+</html>
