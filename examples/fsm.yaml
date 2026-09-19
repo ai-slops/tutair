@@ -1,0 +1,27 @@
+source: "Illustrative FSM definitions; review before importing"
+generated: false
+items:
+  - key: cs.state
+    title: state
+    kind: concept
+    statement: A modeled configuration containing the information relevant to future behavior.
+    semanticScope: finite-state machine modeling
+    aliases: []
+    distinguishingFeatures: [relevant configuration]
+    claims: []
+    riskScope: stable
+    relations:
+      - to: cs.fsm
+        kind: prerequisite
+        necessity: helpful
+        scaffoldable: true
+  - key: cs.fsm
+    title: finite-state machine
+    kind: concept
+    statement: A model with finitely many states and rules for transitions in response to events.
+    semanticScope: finite-state machine modeling
+    aliases: [FSM]
+    distinguishingFeatures: [finite states, explicit transition rules]
+    claims: [The state set is finite.]
+    riskScope: stable
+    relations: []
