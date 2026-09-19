@@ -1,0 +1,204 @@
+import { z } from "zod";
+import type { StructuredCall } from "./provider.js";
+import {
+  candidate,
+  ceremonialFormal,
+  fsm,
+  knownSchema,
+  state,
+  technicalFormal,
+  transition,
+  values,
+} from "./tutor-demo-data.js";
+import { candidateSchema } from "./tutor-schemas.js";
+
+export function demoCall(call: StructuredCall): unknown {
+  const message = typeof call.data["message"] === "string" ? call.data["message"] : "";
+  switch (call.stage) {
+    case "extraction":
+      return {
+        goal: message || "Understand finite-state machines",
+        targets: [fsm],
+        prerequisites: [state, transition],
+        terms: [technicalFormal, ceremonialFormal],
+        distinctions: [
+          candidate(
+            "formal-distinction",
+            "technical versus ceremonial formality",
+            "Technical formality means explicit specification; ceremonial formality means convention.",
+            "distinction",
+            ["same label", "different semantic scopes"],
+          ),
+        ],
+        misconceptions: [],
+        claims: [],
+        relations: [
+          {
+            fromKey: "state",
+            toKey: "fsm",
+            type: "prerequisite",
+            necessity: 0.7,
+            scaffoldable: true,
+          },
+          { fromKey: "transition", toKey: "fsm", type: "part", necessity: 0.9, scaffoldable: true },
+          {
+            fromKey: "formal-specified",
+            toKey: "formal-ceremonial",
+            type: "contrast",
+            necessity: 0.4,
+            scaffoldable: true,
+          },
+        ],
+      };
+    case "resolution": {
+      const candidates = z.array(candidateSchema).safeParse(call.data["candidates"]);
+      const known = z.array(knownSchema).safeParse(call.data["resolutionCandidates"]);
+      const existing = known.success ? known.data : [];
+      const pending = candidates.success ? candidates.data : [];
+      return {
+        matches: pending.flatMap((item) => {
+          const found = existing.find(
+            (knownItem) =>
+              knownItem.title.toLocaleLowerCase() === item.label.toLocaleLowerCase() &&
+              knownItem.semanticScope === item.semanticScope,
+          );
+          return found === undefined
+            ? []
+            : [
+                {
+                  candidateKey: item.key,
+                  knowledgeId: found.id,
+                  revision: found.revision,
+                  confidence: 1,
+                  decision: "exact" as const,
+                  reasonCodes: ["same_label_same_scope"],
+                },
+              ];
+        }),
+        provisional: pending
+          .filter(
+            (item) =>
+              !existing.some(
+                (knownItem) =>
+                  knownItem.title.toLocaleLowerCase() === item.label.toLocaleLowerCase() &&
+                  knownItem.semanticScope === item.semanticScope,
+              ),
+          )
+          .map((item) => ({ ...item, reasonCodes: ["no_compatible_existing_unit"] })),
+      };
+    }
+    case "planning":
+      return {
+        move: "answer_then_apply",
+        currentGoal: String(call.data["currentGoal"] ?? message),
+        intent: "teach",
+        targetUnits: values(call.data, "knowledgeIds"),
+        assumedUnits: [],
+        introducedUnits: values(call.data, "knowledgeIds").slice(0, 3),
+        deferredUnits: [],
+        deferredQuestions: [],
+        assessmentOpportunities: [
+          {
+            prompt: "Add the next state and transition for a jammed door.",
+            targetKnowledgeIds: values(call.data, "knowledgeIds").slice(0, 3),
+            dimensions: ["application"],
+            naturalAfter: "the door-controller example",
+          },
+        ],
+        responseStrategy: "concrete_model_then_check",
+        interruptionJustified: false,
+      };
+    case "draft":
+      return {
+        text: "An FSM (finite-state machine) models behavior using a finite set of states and transitions. A state is the situation relevant to what can happen next; a transition is a rule for moving to another state after an event.\n\nFor a door: Locked --coin--> Unlocked, then Unlocked --push--> Locked. Here ‘formal’ means explicitly specified, not ceremonial.\n\nWhat state and transition would you add for a jammed door?",
+      };
+    case "lint":
+      return {
+        safe: true,
+        issues: [],
+        generatedCandidates: [],
+        lintSkipped: false,
+        concepts: [
+          {
+            concept: "state",
+            centrality: 1,
+            learnerUncertainty: 0.7,
+            misunderstandingCost: 0.8,
+            action: "define_inline",
+            knownKnowledgeId: null,
+          },
+          {
+            concept: "transition",
+            centrality: 1,
+            learnerUncertainty: 0.7,
+            misunderstandingCost: 0.8,
+            action: "give_example",
+            knownKnowledgeId: null,
+          },
+          {
+            concept: "ceremonial formality",
+            centrality: 0.2,
+            learnerUncertainty: 0.7,
+            misunderstandingCost: 0.1,
+            action: "allow",
+            knownKnowledgeId: null,
+          },
+        ],
+      };
+    case "final": {
+      const text = String(call.data["draft"] ?? "");
+      const parsed = z.array(knownSchema).safeParse(call.data["knowledge"]);
+      const allowed = new Set(values(call.data, "allowedKnowledgeIds"));
+      return {
+        text,
+        exposures: parsed.success
+          ? parsed.data.flatMap((item) => {
+              const start = text.toLocaleLowerCase().indexOf(item.title.toLocaleLowerCase());
+              return allowed.has(item.id) && start >= 0
+                ? [
+                    {
+                      knowledgeId: item.id,
+                      sourceSpan: { start, end: start + item.title.length },
+                    },
+                  ]
+                : [];
+            })
+          : [],
+      };
+    }
+    case "evaluation": {
+      const parsed = z.array(knownSchema).safeParse(call.data["knowledge"]);
+      const known = parsed.success ? parsed.data : [];
+      const application = /locked|unlocked|door|--.*-->/iu.test(message);
+      const explanation =
+        /\b(?:fsm|finite-state machine)\b.{0,30}\b(?:is|means|models|has)\b/iu.test(message);
+      const target = known.find((item) => item.title === "finite-state machine");
+      return {
+        evidence:
+          target === undefined || (!application && !explanation)
+            ? []
+            : [
+                {
+                  knowledgeId: target.id,
+                  knowledgeRevisionId: target.revisionId,
+                  revision: target.revision,
+                  dimension: application ? "application" : "explanation",
+                  evidenceType: application ? "application" : "free_explanation",
+                  polarity: "positive",
+                  score: 0.82,
+                  evaluatorConfidence: 0.72,
+                  ambiguous: false,
+                  copied: false,
+                  sourceSpans: [{ start: 0, end: Math.max(message.length, 1) }],
+                  limitations: application ? ["single familiar application"] : [],
+                  relatedKnowledgeIds: [],
+                  assessmentId: null,
+                  threadId: null,
+                  difficulty: 0.45,
+                },
+              ],
+        openQuestion: message ? "What transition should happen from the new state?" : null,
+      };
+    }
+  }
+}
