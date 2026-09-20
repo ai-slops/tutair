@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { ModelRunner } from "./model-runner.js";
+import { type ModelRunner, StructuredOutputError } from "./model-runner.js";
 import type { TurnInput } from "./tutor-schemas.js";
 
 export type StageResult<T> = { readonly runId: string; readonly value: T };
@@ -17,20 +17,29 @@ export class TutorStageRunner {
     readonly input: TurnInput,
   ) {}
 
-  stage<T>(request: RunRequest<T>): Promise<StageResult<T>> {
-    return this.runner
-      .stage(
+  async stage<T>(request: RunRequest<T>): Promise<StageResult<T>> {
+    const run = (data: Readonly<Record<string, unknown>>) =>
+      this.runner.stage(
         this.input.owner,
         this.input.conversationId,
         this.input.messageId,
         request.stage,
-        request.data,
+        data,
         request.schema,
-      )
-      .then((result) => {
-        this.runIds.push(result.runId);
-        return result;
+      );
+    let result: StageResult<T>;
+    try {
+      result = await run(request.data);
+    } catch (error) {
+      if (!(error instanceof StructuredOutputError)) throw error;
+      result = await run({
+        ...request.data,
+        repairOfRunId: error.runId,
+        outputCorrection: { previousOutput: error.output, issues: error.issues },
       });
+    }
+    this.runIds.push(result.runId);
+    return result;
   }
 
   async withFallback<T>(request: FallbackRequest<T>): Promise<StageResult<T>> {
