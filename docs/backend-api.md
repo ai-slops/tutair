@@ -11,6 +11,9 @@ Clients never send learner IDs. Error bodies are
 - `GET /api/session` -> `{ learner }`
 - `GET /api/capabilities` -> `{ provider, model, generation, embedding, search, synthetic }`
 
+OpenAI providers also report `outputMode: "strict" | "compatibility"`. The mode
+is explicitly configured on the server, never silently selected after a failure.
+
 ## Conversations and messages
 
 - `GET /api/conversations` -> `{ conversations: Conversation[] }`
@@ -22,6 +25,12 @@ Clients never send learner IDs. Error bodies are
 - `POST /api/conversations/:id/tutor-turn` `{ content: string, assistance?: "none"|"hint"|"worked_example", confidence?: number, selfReport?: "unsure"|"neutral"|"confident" }` -> `201 { userMessage, tutorMessage?, run, thread?, knowledgeChanges, synthetic }`. Input is persisted even when generation fails.
 
 Messages retain immutable edit events; deletion is a tombstone.
+
+Turn `run.exposureTrackingSkipped` is true when a model supplied exposure
+annotations that could not be grounded in its final text. The reply is retained,
+only verified exposures are stored, and `exposure_grounding_skipped` traces link
+the discarded declarations to their original model run. This never creates
+learner mastery evidence.
 
 ## Threads
 

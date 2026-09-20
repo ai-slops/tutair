@@ -73,3 +73,30 @@ review passed with no remaining product or screenshot-evidence blockers.
 
 The original `.dim` files were not changed. Environment networking repair is
 separate from application correctness; see `docs/operations.md`.
+
+## Compatibility verification: September 20, 2026
+
+After credentials were supplied, the configured `claude-haiku-4` endpoint was
+tested directly. It accepted streaming chat completions but rejected
+non-streaming requests, JSON response formats, and forced tool calls. Explicit
+`TUTOR_OPENAI_MODE=compatibility` support was added without changing strict mode.
+
+Two consecutive real API-backed tutor turns, a Korean FSM question and a learner
+explanation, returned HTTP 201 in an isolated learning session. The session
+recorded 31 provisional units, four verified exposures, and five learner evidence
+records. Invalid schema enums were regenerated once; failed attempts remained in
+the model-run history. These counts demonstrate persistence, not extraction
+precision or calibrated educational quality. The two turns took approximately
+262 seconds combined, so browser tutor submissions now have a five-minute limit.
+
+Live testing also found inaccurate model-generated source offsets. Final output
+can now supply a verbatim quote, which the server locates itself. Invalid or
+ambiguous exposure annotations are excluded with an audit trace and an explicit
+tracking-skipped flag; raw model output is retained. No learner evidence is
+invented to compensate for missing annotations.
+
+The deployed HTTPS interface was also exercised in Chromium with a fresh QA
+session. A Korean FSM question completed with HTTP 201 after approximately
+100 seconds and its answer appeared in the conversation, confirming that the
+longer browser submission timeout is active. QA used isolated test learners;
+existing learner conversations and API credentials were not modified.
