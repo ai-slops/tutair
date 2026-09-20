@@ -25,6 +25,7 @@ export const coreRoutes = (services: Services): Hono => {
   app.get("/capabilities", (c) =>
     c.json({
       provider: services.provider.state.provider,
+      outputMode: services.provider.state.outputMode ?? null,
       model: services.provider.state.model,
       generation: services.provider.state.generation,
       embedding: services.provider.state.embedding === "configured",

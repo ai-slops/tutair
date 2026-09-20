@@ -41,8 +41,15 @@ TUTOR_MODEL=gpt-4.1-mini
 TUTOR_EMBEDDING_PROVIDER=local
 ```
 
-Use a provider/model that supports the structured-output schema required by the
-runtime. A compatible local inference service can use its own base URL and model.
+By default, use a provider/model supporting strict JSON Schema structured output.
+For streaming-only gateways that reject `response_format` and tool calls, set
+`TUTOR_OPENAI_MODE=compatibility`. This mode sends the schema in the model prompt,
+receives SSE text deltas, and still validates the resulting JSON against the same
+runtime schemas. A single outer JSON code block is accepted as transport
+formatting; prose surrounding JSON, malformed JSON, incomplete streams, and
+truncated output are rejected. It does not provide API-level constrained
+generation and never activates as a hidden fallback.
+A compatible local inference service can use its own base URL and model.
 Provider credentials stay on the server. Model requests contain relevant private
 learning context: configure only a provider you trust with that data.
 
@@ -57,6 +64,17 @@ Demo output is explicitly synthetic. It exercises the persistence and tracking
 pipeline; it is not a general-purpose model, a knowledge authority, or a measure
 of educational quality. A failed real-provider request never silently switches
 to demo mode.
+
+Compatibility mode may take longer because each tutor turn performs several
+independent model calls. Tutor submissions allow up to five minutes; other
+browser requests retain their shorter timeout. A schema-invalid stage receives
+at most one regeneration request containing the validation issues. Both attempts
+remain in the model-run history; the schema itself is never relaxed.
+
+Exposure annotations use exact source quotes when possible. Unverifiable
+annotations are omitted and audited with `exposureTrackingSkipped`, rather than
+fabricating evidence or discarding an otherwise usable answer. Verified
+annotations and learner-evidence validation remain strict.
 
 ### Semantic retrieval
 
