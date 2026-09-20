@@ -182,10 +182,15 @@ export const lintedSchema = z.object({
 export const finalSchema = generatedSchema.extend({
   exposures: z
     .array(
-      z.object({
-        knowledgeId: z.string().uuid(),
-        sourceSpan: sourceSpanSchema,
-      }),
+      z
+        .object({
+          knowledgeId: z.string().uuid(),
+          sourceSpan: sourceSpanSchema.nullish(),
+          sourceQuote: z.string().min(1).max(20_000).nullish(),
+        })
+        .refine((value) => value.sourceSpan != null || value.sourceQuote != null, {
+          message: "An exposure requires an exact source quote or source span",
+        }),
     )
     .max(24),
 });
