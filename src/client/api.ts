@@ -186,7 +186,10 @@ export const api: WorkspaceApi = {
     }
     selectConversation(generation, id);
     await request(
-      () => client.post(`conversations/${id}/tutor-turn`, { json: { content } }).json(),
+      () =>
+        client
+          .post(`conversations/${id}/tutor-turn`, { json: { content }, timeout: 300_000 })
+          .json(),
       TutorTurnSchema,
     );
     return snapshot(id);

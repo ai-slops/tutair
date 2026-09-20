@@ -38,7 +38,7 @@ const http = vi.hoisted(() => {
         throw new TypeError(`Unexpected GET ${path}`);
       },
     })),
-    post: vi.fn((path: string) => ({
+    post: vi.fn((path: string, _options?: unknown) => ({
       json: () => {
         requests.push(`POST ${path}`);
         if (path === "threads/thread-empty/resume") return Promise.resolve({ conversation });
@@ -74,6 +74,14 @@ describe("thread resume and learner state", () => {
 
     expect(result.activeThreadId).toBe("conversation-linked");
     expect(http.requests).toContain("POST threads/thread-empty/resume");
+  });
+
+  it("allows a multi-stage tutor turn to exceed the ordinary request timeout", async () => {
+    http.client.post.mockImplementationOnce(() => {
+      throw new Error("Request observed");
+    });
+    await expect(api.sendMessage("conversation-linked", "Explain FSM")).rejects.toThrow();
+    expect(http.client.post.mock.calls.at(-1)?.[1]).toMatchObject({ timeout: 300_000 });
   });
 
   it("renders six current-revision projection states without a mastery score", () => {
