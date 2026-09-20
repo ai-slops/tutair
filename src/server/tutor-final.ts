@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import { type DiscardedExposure, exposureGroundingFailure } from "./exposure-grounding.js";
 import type { KnowledgeRepository } from "./repository-knowledge.js";
 import { knowledgeContext } from "./tutor-knowledge.js";
 import { boundModelContext } from "./tutor-model-context.js";
@@ -21,7 +22,9 @@ type FinalReviewRequest = {
 };
 
 type ReviewedFinal = {
-  readonly final: StageResult<z.infer<typeof finalSchema>>;
+  readonly final: StageResult<z.infer<typeof finalSchema>> & {
+    readonly discardedExposures: readonly DiscardedExposure[];
+  };
   readonly allowedKnowledgeIds: readonly string[];
   readonly lintSkipped: boolean;
 };
@@ -79,17 +82,23 @@ export class TutorFinalReviewer {
       .map((item) => item.id);
     const allowed = new Set(allowedKnowledgeIds);
     const lintSkipped = request.initialLint.lintSkipped || checked.value.lintSkipped;
+    const discardedExposures: DiscardedExposure[] = [];
+    const exposures = request.final.value.exposures.filter((exposure) => {
+      const reason = exposureGroundingFailure(request.final.value.text, exposure, allowed);
+      if (reason === null) return true;
+      discardedExposures.push({ knowledgeId: exposure.knowledgeId, reason });
+      return false;
+    });
     return {
       allowedKnowledgeIds,
       lintSkipped,
       final: {
         ...request.final,
+        discardedExposures,
         value: {
           ...request.final.value,
           text: markLintSkipped(request.final.value.text, lintSkipped),
-          exposures: request.final.value.exposures.filter((exposure) =>
-            allowed.has(exposure.knowledgeId),
-          ),
+          exposures,
         },
       },
     };

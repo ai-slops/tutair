@@ -241,6 +241,7 @@ export class TutorPipeline {
         extractionFallback: extracted.runId === "fallback",
         lintSkipped: reviewed.lintSkipped,
         retrievalMode: retrieval.mode,
+        exposureTrackingSkipped: reviewed.final.discardedExposures.length > 0,
       },
       thread,
       knowledgeChanges: [...first.changes, ...lintChanges],

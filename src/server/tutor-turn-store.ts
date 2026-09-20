@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Database } from "./database.js";
+import { type DiscardedExposure, exposureGroundingFailure } from "./exposure-grounding.js";
 import type { CoreRepository } from "./repository-core.js";
 import type { KnowledgeRepository } from "./repository-knowledge.js";
 import type {
@@ -111,19 +112,16 @@ export class TutorTurnStore {
 
   reply(
     input: TurnInput,
-    final: StageResult<z.infer<typeof finalSchema>>,
+    final: StageResult<z.infer<typeof finalSchema>> & {
+      readonly discardedExposures?: readonly DiscardedExposure[];
+    },
     allowedIds: readonly string[],
     synthetic: boolean,
   ): unknown {
     const approved = new Set(allowedIds);
     const exposed = new Map<string, { readonly revision: number }>();
     for (const declaration of final.value.exposures) {
-      const { start, end } = declaration.sourceSpan;
-      if (
-        !approved.has(declaration.knowledgeId) ||
-        end > final.value.text.length ||
-        final.value.text.slice(start, end).trim().length === 0
-      )
+      if (exposureGroundingFailure(final.value.text, declaration, approved) !== null)
         throw new ApiError(
           422,
           "invalid_exposure_grounding",
@@ -158,6 +156,22 @@ export class TutorTurnStore {
           isoNow(),
         ]);
         this.knowledge.rebuild(input.owner, id);
+      }
+      if (final.discardedExposures?.length) {
+        this.db.run("INSERT INTO traces VALUES(?,?,?,?,?,?)", [
+          newId(),
+          input.owner,
+          final.runId,
+          "exposure_grounding_skipped",
+          JSON.stringify({
+            conversationId: input.conversationId,
+            messageId: input.messageId,
+            tutorMessageId,
+            sourceModelRunId: final.runId,
+            discarded: final.discardedExposures,
+          }),
+          isoNow(),
+        ]);
       }
       return tutorMessage;
     });
