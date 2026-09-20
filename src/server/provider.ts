@@ -1,6 +1,7 @@
 import ky from "ky";
 import { z } from "zod";
 import { embedLocal, localEmbeddingProfile } from "./local-embeddings.js";
+import { streamJsonCompletion } from "./openai-compatibility.js";
 import { strictOutputSchema } from "./strict-output-schema.js";
 import { demoCall } from "./tutor-demo.js";
 import type { ProviderState } from "./types.js";
@@ -57,31 +58,46 @@ class OpenAiProvider implements TutorProvider {
   readonly client: typeof ky;
   readonly embeddingProfile: string;
   constructor(
-    readonly model: string,
-    baseUrl: string,
-    apiKey: string,
-    readonly embeddingModel: string | null,
+    readonly config: {
+      readonly model: string;
+      readonly baseUrl: string;
+      readonly apiKey: string;
+      readonly embeddingModel: string | null;
+      readonly outputMode: "strict" | "compatibility";
+    },
   ) {
     this.state = {
       provider: "openai",
-      model,
+      model: config.model,
       generation: true,
       synthetic: false,
-      embedding: embeddingModel === null ? "disabled" : "configured",
+      embedding: config.embeddingModel === null ? "disabled" : "configured",
+      outputMode: config.outputMode,
     };
-    this.embeddingProfile = embeddingModel === null ? "disabled:v1" : `openai:${embeddingModel}:v1`;
+    this.embeddingProfile =
+      config.embeddingModel === null ? "disabled:v1" : `openai:${config.embeddingModel}:v1`;
     this.client = ky.create({
-      prefixUrl: baseUrl.replace(/\/$/, ""),
-      headers: { authorization: `Bearer ${apiKey}` },
+      prefixUrl: config.baseUrl.replace(/\/$/, ""),
+      headers: { authorization: `Bearer ${config.apiKey}` },
       timeout: 30_000,
       retry: { limit: 2, methods: ["post"] },
     });
   }
   async call(call: StructuredCall): Promise<ProviderCallResult> {
+    switch (this.config.outputMode) {
+      case "compatibility":
+        return streamJsonCompletion(this.client, call, this.config.model);
+      case "strict":
+        break;
+      default: {
+        const unreachable: never = this.config.outputMode;
+        return unreachable;
+      }
+    }
     const response: unknown = await this.client
       .post("chat/completions", {
         json: {
-          model: this.model,
+          model: this.config.model,
           messages: [
             {
               role: "system",
@@ -127,10 +143,10 @@ class OpenAiProvider implements TutorProvider {
     };
   }
   async embed(texts: readonly string[]): Promise<readonly (readonly number[])[]> {
-    if (this.embeddingModel === null)
+    if (this.config.embeddingModel === null)
       throw new ApiError(503, "embedding_disabled", "Embedding provider is not configured");
     const response: unknown = await this.client
-      .post("embeddings", { json: { model: this.embeddingModel, input: texts } })
+      .post("embeddings", { json: { model: this.config.embeddingModel, input: texts } })
       .json();
     return embeddingResponse.parse(response).data.map((item) => item.embedding);
   }
@@ -199,7 +215,16 @@ export const createProvider = (env: NodeJS.ProcessEnv): TutorProvider => {
         "provider_configuration",
         "OpenAI provider requires OPENAI_API_KEY, OPENAI_BASE_URL, and TUTOR_MODEL",
       );
-    provider = new OpenAiProvider(model, base, key, env["TUTOR_EMBEDDING_MODEL"] ?? null);
+    provider = new OpenAiProvider({
+      model,
+      baseUrl: base,
+      apiKey: key,
+      embeddingModel: env["TUTOR_EMBEDDING_MODEL"] ?? null,
+      outputMode: z
+        .enum(["strict", "compatibility"])
+        .default("strict")
+        .parse(env["TUTOR_OPENAI_MODE"]),
+    });
   }
   const embeddingProvider = env["EMBEDDING_PROVIDER"] ?? env["TUTOR_EMBEDDING_PROVIDER"] ?? "local";
   if (embeddingProvider === "local") return new LocalEmbeddingProvider(provider);

@@ -17,6 +17,7 @@ export type AuthContext = {
 };
 
 export type ProviderState = {
+  readonly outputMode?: "strict" | "compatibility";
   readonly provider: "demo" | "openai" | "disabled";
   readonly model: string | null;
   readonly generation: boolean;
