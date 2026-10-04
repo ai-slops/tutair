@@ -102,6 +102,14 @@
 수동 품질 보고 API의 통계·합성 데이터 제외·학습자 격리는 검증했다.
 [실제 품질 검증 절차](quality-evaluation.md)에 필요한 시나리오와 판정 기준을 분리해 두었다.
 
+## 2026-10-04 프런트엔드 통합 완료 범위
+
+- conversation과 durable learning thread를 분리해 표시하고 생성·목표 수정·상태 전환·명시적 resume를 실제 API에 연결했다.
+- 저장된 턴의 selection/running/unknown/failed recovery 상태를 구분한다. 성공한 recovery는 같은 `requestId`를 이어서 처리하며 learner message를 두 번 만들지 않는다.
+- deferred knowledge, 질문 lifecycle, response별 tracking-skipped 상태, revision별 6차원 projection provenance를 evidence margin에서 검사·조작할 수 있다. 실패 시 입력과 행을 유지하고 alert를 표시한다.
+- 375/768/1280 레이아웃에서 drawer focus/Escape/inert, composer 도달성, CJK wrapping, recovery overflow를 검증했다. 초기 서버 snapshot 전에는 빈 학습 상태를 보여 주지 않고 명시적 loading surface를 표시한다.
+- 이 완료 범위는 synthetic fixture의 UI/API 통합 근거이다. 실제 외부 LLM의 교육 정확도나 장기 효과를 의미하지 않는다.
+
 ## 원래 명세 0~69절 대응표
 
 표의 **구현**은 해당 동작의 코드 경로가 있다는 뜻이며 일반화된 교육 품질 인증이 아니다.
