@@ -8,6 +8,12 @@ database on a network filesystem, or run independent application instances
 against the same file. PostgreSQL is a future deployment alternative, not a
 required external service for this local runtime.
 
+Production fingerprinted files under `/assets/` are compressed when the client
+advertises gzip/deflate support and carry a one-year immutable cache policy. HTML,
+API responses, session state, and private learning data are not covered by that
+immutable policy. A reverse proxy may add Brotli or HTTP/2, but must preserve the
+same separation and must not cache authenticated API responses.
+
 Keep the database, `.env`, model cache, exports, and session cookies private.
 The repository ignores local data and credentials. An exported learning archive
 contains private conversations and assessment evidence; treat it as sensitive.

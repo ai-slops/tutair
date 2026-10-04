@@ -101,7 +101,14 @@ npm run typecheck
 npm run check
 npm test
 npm run build
+npm run test:browser
 ```
+
+The browser suite builds production assets and starts an isolated in-memory,
+synthetic-provider fixture on an ephemeral loopback port. It does not read the
+normal learner database or demonstrate educational effectiveness. Headed browser
+review requires an X server; CI/headless Chrome still exercises the real rendering
+engine and responsive workflows.
 
 Run the real local embedding integration test, including the initial model
 download when needed:
