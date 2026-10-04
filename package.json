@@ -13,10 +13,11 @@
     "build:server": "tsc -p tsconfig.server.json",
     "build:client": "vite build",
     "typecheck": "tsc --noEmit",
-    "check": "biome check src tests app vite.config.ts",
+    "check": "biome check src tests app vite.config.ts playwright.config.ts",
     "check:react": "react-doctor src/client --no-telemetry --no-supply-chain --json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:browser": "npm run build && playwright test",
     "verify": "npm run typecheck && npm run check && npm test && npm run build"
   },
   "dependencies": {

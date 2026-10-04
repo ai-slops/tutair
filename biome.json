@@ -1,6 +1,6 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.4.0/schema.json",
-  "files": { "includes": ["src/**", "tests/**", "app/**", "vite.config.ts"] },
+  "files": { "includes": ["src/**", "tests/**", "app/**", "vite.config.ts", "playwright.config.ts"] },
   "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
   "linter": {
     "enabled": true,
