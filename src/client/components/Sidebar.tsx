@@ -1,37 +1,40 @@
-import {
-  BookOpen,
-  Download,
-  Menu,
-  MessageSquarePlus,
-  Search,
-  Settings,
-  Trash2,
-  X,
-} from "lucide-react";
+import { BookOpen, Download, Menu, Search, Settings, Trash2, X } from "lucide-react";
 import { useRef } from "react";
-import type { SearchResult, Thread } from "../model";
+import type { ConversationSummary, LearningThread, LearningThreadStatus } from "../learning-model";
+import type { SearchResult } from "../model";
 import { useFocusTrap } from "../useFocusTrap";
+import { useMediaMatch } from "../useMediaMatch";
 import type { SearchResponse } from "../workspace";
+import { ThreadPanel } from "./ThreadPanel";
 
 type SidebarProps = {
   readonly open: boolean;
   readonly titleQuery: string;
   readonly learningQuery: string;
-  readonly threads: readonly Thread[];
+  readonly conversations: readonly ConversationSummary[];
+  readonly learningThreads: readonly LearningThread[];
   readonly search: {
     readonly results: readonly SearchResult[];
     readonly mode: SearchResponse["mode"] | null;
     readonly loading: boolean;
     readonly error: string | null;
   };
-  readonly activeThreadId: string | null;
+  readonly activeConversationId: string | null;
+  readonly activeLearningThreadId: string | null;
+  readonly threadStatusBusy: boolean;
   readonly onClose: () => void;
-  readonly onNew: () => void;
+  readonly onNewConversation: () => void;
+  readonly onStartLearningThread: () => void;
   readonly onTitleQuery: (query: string) => void;
   readonly onLearningQuery: (query: string) => void;
   readonly onSearch: () => void;
   readonly onSearchResult: (result: SearchResult) => void;
-  readonly onSelect: (id: string) => void;
+  readonly onSelectConversation: (id: string) => void;
+  readonly onResumeLearningThread: (id: string) => void;
+  readonly onSetLearningThreadStatus: (
+    id: string,
+    status: LearningThreadStatus,
+  ) => Promise<boolean>;
   readonly onSettings: () => void;
   readonly onExport: () => void;
   readonly onDelete: () => void;
@@ -39,16 +42,21 @@ type SidebarProps = {
 
 export function Sidebar(props: SidebarProps) {
   const paneRef = useRef<HTMLElement>(null);
-  useFocusTrap(props.open, paneRef, props.onClose, { mediaQuery: "(max-width: 45rem)" });
-  const visibleThreads = props.threads.filter((thread) =>
-    thread.title.toLocaleLowerCase().includes(props.titleQuery.toLocaleLowerCase()),
+  const overlay = useMediaMatch("(max-width: 45rem)");
+  const overlayDialogProps = overlay ? { role: "dialog" as const, "aria-modal": props.open } : {};
+  useFocusTrap(props.open && overlay, paneRef, props.onClose);
+  const visibleConversations = props.conversations.filter((conversation) =>
+    conversation.title.toLocaleLowerCase().includes(props.titleQuery.toLocaleLowerCase()),
   );
 
   return (
     <aside
+      {...overlayDialogProps}
       ref={paneRef}
       className="thread-pane"
       data-open={props.open}
+      inert={overlay && !props.open}
+      aria-hidden={overlay && !props.open}
       aria-label="Learning threads"
     >
       <div className="pane-header">
@@ -68,10 +76,6 @@ export function Sidebar(props: SidebarProps) {
         </button>
       </div>
       <div className="pane-content">
-        <button className="button button-primary" type="button" onClick={props.onNew}>
-          <MessageSquarePlus className="icon" />
-          New conversation
-        </button>
         <label className="search" style={{ marginBlockStart: "var(--space-4)" }}>
           <Search className="icon" aria-hidden="true" />
           <span className="sr-only">Filter thread titles</span>
@@ -81,29 +85,22 @@ export function Sidebar(props: SidebarProps) {
             placeholder="Filter thread titles"
           />
         </label>
-        <nav className="thread-list" aria-label="Previous conversations">
-          {visibleThreads.length === 0 ? (
-            <p className="muted">
-              {props.threads.length === 0
-                ? "Your conversations will appear here."
-                : "No conversations match that search."}
-            </p>
-          ) : null}
-          {visibleThreads.map((thread) => (
-            <button
-              className="thread-row"
-              type="button"
-              key={thread.id}
-              aria-current={thread.id === props.activeThreadId ? "page" : undefined}
-              onClick={() => props.onSelect(thread.id)}
-            >
-              <span className="thread-row-title">{thread.title}</span>
-              <time className="thread-row-meta" dateTime={thread.updatedAt}>
-                {formatDate(thread.updatedAt)}
-              </time>
-            </button>
-          ))}
-        </nav>
+        {visibleConversations.length === 0 && props.conversations.length > 0 ? (
+          <p className="muted">No conversations match that search.</p>
+        ) : (
+          <ThreadPanel
+            conversations={visibleConversations}
+            learningThreads={props.learningThreads}
+            activeConversationId={props.activeConversationId}
+            activeLearningThreadId={props.activeLearningThreadId}
+            threadStatusBusy={props.threadStatusBusy}
+            onNewConversation={props.onNewConversation}
+            onStartLearningThread={props.onStartLearningThread}
+            onSelectConversation={props.onSelectConversation}
+            onResumeLearningThread={props.onResumeLearningThread}
+            onSetLearningThreadStatus={props.onSetLearningThreadStatus}
+          />
+        )}
         <div className="separator" />
         <form
           className="learning-search"
@@ -188,13 +185,6 @@ function SearchResults({
       })}
     </section>
   );
-}
-
-function formatDate(value: string): string {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? "Recently"
-    : new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(date);
 }
 
 export function ThreadsTrigger({ onClick }: { readonly onClick: () => void }) {
