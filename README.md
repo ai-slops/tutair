@@ -116,11 +116,14 @@ a production service.
 
 ## Documentation
 
+- [Original Phase 1 requirements, condensed with section numbering](docs/phase-one-specification.md)
+- [Phase 1 implementation status, requirement mapping, and next work](docs/phase-one-status.md)
 - [Phase 1 acceptance contract](docs/phase-one-contract.md)
 - [Backend API](docs/backend-api.md)
 - [Operation and privacy](docs/operations.md)
 - [Learner model and resolution policy](docs/learner-model.md)
 - [Verification record and environment limitations](docs/verification.md)
+- [Real-provider quality evaluation and remaining validation](docs/quality-evaluation.md)
 - [Design system](DESIGN.md)
 
 Phase 2 clustering, automatic canonicalization, editorial workflows, public

@@ -1,5 +1,10 @@
 # Phase 1 acceptance contract
 
+The [numbered requirements](phase-one-specification.md) preserve the supplied
+Phase 1 design in condensed form. The [implementation status](phase-one-status.md)
+maps each section to code, validation evidence, and remaining work. This contract
+defines required behavior; it is not a claim that all requirements are complete.
+
 Tutair is a local-first learning runtime, not a prebuilt curriculum and not a
 canonical encyclopedia. It must support a new topic with zero canonical rows.
 The learner's current question or project is the starting point.
@@ -7,12 +12,16 @@ The learner's current question or project is the starting point.
 ## Non-negotiable invariants
 
 1. Tutor statements create exposure, never learner mastery evidence.
+   New exposures identify the generation-time immutable knowledge revision and
+   original tutor message event. Legacy provenance remains explicitly unverified.
 2. Every evidence record identifies the exact immutable knowledge revision
    evaluated, plus its source learner message and evaluation provenance.
 3. Model-generated knowledge remains provisional. Uncertain semantic equivalence
    creates a duplicate rather than silently merging different meanings.
 4. Learner state is a versioned, reproducible projection of evidence, exposures,
    and recorded learner corrections. It is never an independent source of truth.
+   Rebuilding includes historical revisions without transferring their evidence
+   to the current definition; tutor context uses current-revision state.
 5. Unknown prerequisites do not automatically block the current goal.
 6. Original messages and edit events are preserved. Search indexes, summaries,
    embeddings, and learner projections are disposable derived data.
@@ -22,6 +31,10 @@ The learner's current question or project is the starting point.
 Privacy erasure is an explicit exception to preservation. It must invalidate
 derived records as well as source content. Deleting a normal message instead
 creates a tombstone and preserves its history.
+
+Exposure records reject ordinary updates, deletions, and replacement writes.
+Legacy migration preserves source rows and never invents missing message events
+or promotes historical exposure to a verified generation snapshot.
 
 ## Knowledge and provenance
 
