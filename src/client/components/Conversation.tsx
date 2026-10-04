@@ -1,6 +1,9 @@
 import { ArrowRight, BookMarked, RefreshCcw, Send, Sparkles } from "lucide-react";
+import type { ReactNode } from "react";
 import { useEffect, useRef } from "react";
 import type { Message, ProviderStatus } from "../model";
+import { useMediaMatch } from "../useMediaMatch";
+import { TrackingNotice } from "./TrackingNotice";
 
 const PROMPTS = [
   "Help me understand a difficult idea",
@@ -18,18 +21,21 @@ type ConversationProps = {
   readonly onSubmit: () => void;
   readonly onRetry: () => void;
   readonly onKnowledge: () => void;
+  readonly recovery: ReactNode;
 };
 
 export function Conversation(props: ConversationProps) {
   const endRef = useRef<HTMLDivElement>(null);
+  const reducedMotion = useMediaMatch("(prefers-reduced-motion: reduce)");
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  });
+    endRef.current?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "end" });
+  }, [reducedMotion]);
 
   return (
     <>
       <div className="conversation-scroll" aria-live="polite">
         <div className="conversation">
+          {props.recovery}
           {props.provider.mode === "synthetic" ? (
             <div className="notice notice-demo">
               <Sparkles className="icon" aria-hidden="true" />
@@ -48,7 +54,7 @@ export function Conversation(props: ConversationProps) {
               <span>{props.error}</span>
               <button className="button button-secondary" type="button" onClick={props.onRetry}>
                 <RefreshCcw className="icon" />
-                Retry
+                Refresh
               </button>
             </div>
           )}
@@ -95,7 +101,7 @@ export function Conversation(props: ConversationProps) {
               onClick={props.onKnowledge}
             >
               <BookMarked className="icon" />
-              Knowledge
+              Overview
             </button>
           </div>
         </div>
@@ -134,17 +140,21 @@ function MessageList({ messages }: { readonly messages: readonly Message[] }) {
   return (
     <div className="message-list">
       {messages.map((message) => (
-        <article
-          className={`message ${message.role === "user" ? "message-user" : "message-tutor"}`}
-          key={message.id}
-        >
-          <div className="message-meta">
-            <span>{message.role === "user" ? "You" : "Tutair"}</span>
-            {message.status === "sending" ? <span>Thinking…</span> : null}
-            {message.status === "failed" ? <span>Not sent</span> : null}
-          </div>
-          <p>{message.content}</p>
-        </article>
+        <div className="message-with-tracking" key={message.id}>
+          <article
+            className={`message ${message.role === "user" ? "message-user" : "message-tutor"}`}
+          >
+            <div className="message-meta">
+              <span>{message.role === "user" ? "You" : "Tutair"}</span>
+              {message.status === "sending" ? <span>Thinking…</span> : null}
+              {message.status === "failed" ? <span>Not sent</span> : null}
+            </div>
+            <p>{message.content}</p>
+          </article>
+          {message.role === "assistant" && message.tracking !== undefined ? (
+            <TrackingNotice status={message.tracking} />
+          ) : null}
+        </div>
       ))}
     </div>
   );
