@@ -110,7 +110,20 @@ export const registerConversationRoutes = (app: Hono, services: Services): void 
       );
       const messageId = z.object({ id: z.string() }).parse(userMessage).id;
       try {
-        const result = await services.tutor.turn({ owner, conversationId, messageId, ...body });
+        const result = await services.tutor.turn({
+          owner,
+          conversationId,
+          messageId,
+          content: body.content,
+          assistance: body.assistance,
+          selfReport: body.selfReport,
+          ...(body.confidence === undefined ? {} : { confidence: body.confidence }),
+          ...(body.threadId === undefined ? {} : { threadId: body.threadId }),
+          ...(body.newThread === undefined ? {} : { newThread: body.newThread }),
+          ...(body.origin === undefined ? {} : { origin: body.origin }),
+          ...(body.whyNow === undefined ? {} : { whyNow: body.whyNow }),
+          ...(body.desiredOutcome === undefined ? {} : { desiredOutcome: body.desiredOutcome }),
+        });
         return c.json(
           { userMessage, ...result, synthetic: services.provider.state.synthetic },
           201,

@@ -1,6 +1,13 @@
 import { z } from "zod";
+import { evidenceEvaluatorSchema } from "./knowledge-contracts.js";
 import { evidenceTypes } from "./knowledge-inputs.js";
-import { riskScopes } from "./types.js";
+import { threadOrigins } from "./thread-schemas.js";
+
+export {
+  canonicalKnowledgeYamlSchema as canonicalYamlSchema,
+  knowledgeCreateBoundarySchema as knowledgeCreateSchema,
+} from "./knowledge-contracts.js";
+export { resumeSchema, threadCreateSchema, threadUpdateSchema } from "./thread-schemas.js";
 
 export const signupSchema = z
   .object({ displayName: z.string().trim().min(1).max(80).optional() })
@@ -17,48 +24,16 @@ export const tutorTurnSchema = messageSchema
     assistance: z.enum(["none", "hint", "worked_example"]).default("none"),
     confidence: z.number().min(0).max(1).optional(),
     selfReport: z.enum(["unsure", "neutral", "confident"]).default("neutral"),
-  })
-  .strict();
-export const threadCreateSchema = z
-  .object({
-    title: z.string().trim().min(1).max(160),
-    goal: z.string().trim().min(1).max(1000),
-    conversationId: z.string().uuid().optional(),
-  })
-  .strict();
-export const threadUpdateSchema = z
-  .object({
-    title: z.string().trim().min(1).max(160).optional(),
-    goal: z.string().trim().min(1).max(1000).optional(),
-    status: z.enum(["open", "paused", "resolved"]).optional(),
+    threadId: z.string().uuid().optional(),
+    newThread: z.boolean().optional(),
+    origin: z.enum(threadOrigins).optional(),
+    whyNow: z.string().trim().min(1).max(2000).optional(),
+    desiredOutcome: z.string().trim().min(1).max(2000).optional(),
   })
   .strict()
-  .refine((value) => Object.keys(value).length > 0);
-export const resumeSchema = z.object({ conversationId: z.string().uuid().optional() }).strict();
-export const knowledgeCreateSchema = z
-  .object({
-    title: z.string().trim().min(1).max(200),
-    statement: z.string().trim().min(1).max(10_000),
-    scope: z.literal("provisional").default("provisional"),
-    riskScope: z.enum(riskScopes).default("stable"),
-    confidence: z.number().min(0).max(1).default(0.5),
-    kind: z
-      .enum([
-        "term_sense",
-        "concept",
-        "claim",
-        "procedure",
-        "skill",
-        "distinction",
-        "misconception",
-      ])
-      .default("claim"),
-    aliases: z.array(z.string().trim().min(1)).default([]),
-    semanticScope: z.string().default(""),
-    distinguishingFeatures: z.array(z.string()).default([]),
-    claims: z.array(z.string()).default([]),
-  })
-  .strict();
+  .refine((value) => !(value.threadId !== undefined && value.newThread === true), {
+    message: "Choose an existing thread or a new thread, not both",
+  });
 export const importSchema = z
   .object({ format: z.literal("yaml"), content: z.string().min(1).max(1_000_000) })
   .strict();
@@ -79,14 +54,7 @@ export const evidenceSchema = z
     polarity: z.enum(["positive", "negative", "ambiguous"]),
     strength: z.number().min(0).max(1).default(0.5),
     evaluatorConfidence: z.number().min(0).max(1).optional(),
-    evaluator: z
-      .object({
-        type: z.enum(["model", "human", "rule"]),
-        modelRunId: z.string().uuid().nullable().optional(),
-        rubricVersion: z.string().min(1),
-      })
-      .strict()
-      .optional(),
+    evaluator: evidenceEvaluatorSchema.optional(),
     assistance: z
       .union([
         z.enum(["none", "hint", "worked_example"]),
@@ -127,59 +95,5 @@ export const correctionSchema = z
     evidenceIds: z.array(z.string().uuid()).default([]),
     targetType: z.enum(["knowledge", "revision", "evidence", "meaning"]).default("knowledge"),
     targetId: z.string().uuid().optional(),
-  })
-  .strict();
-export const canonicalYamlSchema = z
-  .object({
-    source: z.string().trim().min(1),
-    generated: z.literal(false).optional(),
-    items: z
-      .array(
-        z
-          .object({
-            key: z.string().trim().min(1),
-            title: z.string().trim().min(1),
-            statement: z.string().trim().min(1),
-            kind: z
-              .enum([
-                "term_sense",
-                "concept",
-                "claim",
-                "procedure",
-                "skill",
-                "distinction",
-                "misconception",
-              ])
-              .default("claim"),
-            aliases: z.array(z.string()).default([]),
-            semanticScope: z.string().default(""),
-            distinguishingFeatures: z.array(z.string()).default([]),
-            claims: z.array(z.string()).default([]),
-            riskScope: z.enum(riskScopes).default("stable"),
-            relations: z
-              .array(
-                z
-                  .object({
-                    to: z.string(),
-                    kind: z.enum([
-                      "prerequisite",
-                      "subtype",
-                      "part",
-                      "entailment",
-                      "contrast",
-                      "common_confusion",
-                      "example",
-                      "relatedness",
-                    ]),
-                    necessity: z.enum(["required", "helpful", "optional"]).optional(),
-                    scaffoldable: z.boolean().optional(),
-                  })
-                  .strict(),
-              )
-              .default([]),
-          })
-          .strict(),
-      )
-      .min(1),
   })
   .strict();

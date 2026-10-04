@@ -1,6 +1,10 @@
 import { z } from "zod";
+import { definitionScopeSchema, relationNecessitySchema } from "./knowledge-contracts.js";
+import type { threadOrigins } from "./thread-schemas.js";
 import type { LearnerId } from "./types.js";
 import { riskScopes } from "./types.js";
+
+export { evaluatedSchema } from "./evaluation-schema.js";
 
 export const knowledgeKinds = [
   "term_sense",
@@ -21,6 +25,7 @@ export const candidateSchema = z.object({
   label: z.string().min(1).max(200),
   definition: z.string().min(1).max(4_000),
   semanticScope: z.string().max(1_000),
+  definitionScope: definitionScopeSchema.optional(),
   kind: z.enum(knowledgeKinds),
   aliases: z.array(z.string().max(200)).max(16),
   distinguishingFeatures: z.array(z.string().max(1_000)).max(16),
@@ -55,7 +60,7 @@ export const extractionSchema = z
           fromKey: z.string().max(200),
           toKey: z.string().max(200),
           type: z.enum(relationTypes),
-          necessity: z.number().min(0).max(1),
+          necessity: relationNecessitySchema,
           scaffoldable: z.boolean(),
         }),
       )
@@ -195,54 +200,18 @@ export const finalSchema = generatedSchema.extend({
     .max(24),
 });
 
-export const evaluatedSchema = z.object({
-  evidence: z
-    .array(
-      z.object({
-        knowledgeId: z.string().uuid(),
-        knowledgeRevisionId: z.string().uuid(),
-        revision: z.number().int().positive(),
-        dimension: z.enum([
-          "recognition",
-          "recall",
-          "explanation",
-          "application",
-          "discrimination",
-          "transfer",
-        ]),
-        evidenceType: z.enum([
-          "self_report",
-          "recognition_response",
-          "free_explanation",
-          "application",
-          "contrast",
-          "prediction",
-          "artifact",
-          "execution_result",
-        ]),
-        polarity: z.enum(["positive", "negative", "ambiguous"]),
-        score: z.number().min(0).max(1),
-        evaluatorConfidence: z.number().min(0).max(1),
-        ambiguous: z.boolean(),
-        copied: z.boolean(),
-        sourceSpans: z.array(sourceSpanSchema).max(32),
-        limitations: z.array(z.string().max(1_000)).max(16),
-        relatedKnowledgeIds: z.array(z.string().uuid()).max(24),
-        assessmentId: z.string().uuid().nullable(),
-        threadId: z.string().uuid().nullable(),
-        difficulty: z.number().min(0).max(1),
-      }),
-    )
-    .max(24),
-  openQuestion: z.string().max(2_000).nullable(),
-});
-
 export type TurnInput = {
   readonly owner: LearnerId;
   readonly conversationId: string;
   readonly messageId: string;
+  readonly messageEventId?: string;
   readonly content: string;
   readonly assistance: "none" | "hint" | "worked_example";
   readonly confidence?: number | undefined;
   readonly selfReport: "unsure" | "neutral" | "confident";
+  readonly threadId?: string;
+  readonly newThread?: boolean;
+  readonly origin?: (typeof threadOrigins)[number];
+  readonly whyNow?: string;
+  readonly desiredOutcome?: string;
 };

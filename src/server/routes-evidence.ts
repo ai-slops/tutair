@@ -31,16 +31,10 @@ export const registerEvidenceRoutes = (app: Hono, services: Services): void => {
             copiedFromRecentContext: body.copied,
           }
         : body.assistance;
-    const evaluator =
-      body.evaluator === undefined
-        ? { type: "rule" as const, rubricVersion: "legacy-evidence-v1" }
-        : {
-            type: body.evaluator.type,
-            rubricVersion: body.evaluator.rubricVersion,
-            ...(body.evaluator.modelRunId === undefined
-              ? {}
-              : { modelRunId: body.evaluator.modelRunId }),
-          };
+    const evaluator = body.evaluator ?? {
+      type: "rule" as const,
+      rubricVersion: "legacy-evidence-v1",
+    };
     const evidence = services.knowledge.addEvidence(owner, {
       knowledgeId: body.knowledgeId,
       knowledgeRevisionId: body.knowledgeRevisionId ?? revisionId,

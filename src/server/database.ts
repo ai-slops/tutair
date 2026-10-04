@@ -1,9 +1,13 @@
 import { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
+import { migrateExposures } from "./exposure-migration.js";
+import { migrateKnowledgeMetadata } from "./knowledge-migration.js";
 import { projectionVersion } from "./learner-projection.js";
+import { migrateModelContexts } from "./model-context-migration.js";
+import { migrateThreads } from "./thread-migration.js";
 
 const migrations = `
-PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;
+PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA recursive_triggers=ON;
 CREATE TABLE IF NOT EXISTS privacy_mode(singleton INTEGER PRIMARY KEY CHECK(singleton=1),active INTEGER NOT NULL CHECK(active IN(0,1))); INSERT OR IGNORE INTO privacy_mode VALUES(1,0);
 CREATE TABLE IF NOT EXISTS learners(id TEXT PRIMARY KEY,display_name TEXT NOT NULL,created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS sessions(id TEXT PRIMARY KEY,learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,token_hash TEXT UNIQUE NOT NULL,created_at TEXT NOT NULL,expires_at TEXT NOT NULL);
@@ -75,8 +79,17 @@ export class Database {
   readonly raw: DatabaseSync;
   constructor(path: string) {
     this.raw = new DatabaseSync(path);
-    this.raw.exec(migrations);
-    migrateLearnerState(this.raw);
+    try {
+      this.raw.exec(migrations);
+      migrateLearnerState(this.raw);
+      migrateExposures(this.raw);
+      migrateModelContexts(this.raw);
+      migrateKnowledgeMetadata(this.raw);
+      migrateThreads(this.raw);
+    } catch (error) {
+      this.raw.close();
+      throw error;
+    }
   }
   run(sql: string, values: readonly SqlValue[] = []): void {
     this.raw.prepare(sql).run(...values);

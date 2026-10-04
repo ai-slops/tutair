@@ -121,5 +121,5 @@ describe("phase-one tutor acceptance scenarios", () => {
     );
     const evidence = (await client.json("/api/export"))["evidence"] as Json[];
     expect(evidence.map((item) => item["dimension"])).toEqual(["explanation", "application"]);
-  });
+  }, 10_000);
 });

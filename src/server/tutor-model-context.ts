@@ -8,9 +8,9 @@ const preservedStringField =
 
 const fieldPriority = new Map(
   [
-    "message",
-    "currentGoal",
     "draft",
+    "currentGoal",
+    "message",
     "candidates",
     "resolutionCandidates",
     "knowledge",
@@ -119,5 +119,11 @@ export function boundModelContext(
       lower = midpoint + 1;
     } else upper = midpoint - 1;
   }
+  if (typeof input["draft"] === "string" && result["draft"] !== input["draft"])
+    throw new ApiError(
+      422,
+      "model_context_draft_too_large",
+      "A draft cannot be partially safety-checked",
+    );
   return result;
 }

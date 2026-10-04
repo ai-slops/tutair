@@ -112,6 +112,28 @@ describe("conservative knowledge resolution", () => {
     }
   });
 
+  it("does not reuse matching semantic text with a conflicting structured definition scope", () => {
+    // Given
+    const scopedCandidate = {
+      ...candidate,
+      definitionScope: { domain: "mathematics", exclusions: ["ceremonial usage"] },
+    };
+    const scopedOffered = {
+      ...offered,
+      definitionScope: { domain: "social customs", exclusions: ["mathematical usage"] },
+    };
+
+    // When
+    const result = normalizeResolution({
+      candidates: [scopedCandidate],
+      offeredKnowledge: [scopedOffered],
+      resolution: { matches: [match], provisional: [] },
+    });
+
+    // Then
+    expect(result.decisions[0]?.resolution).toBe("new");
+  });
+
   it("records but never persists provider-invented candidate keys", () => {
     const result = normalizeResolution({
       candidates: [candidate],

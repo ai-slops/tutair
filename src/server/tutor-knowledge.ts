@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  type CompatibleRevisionClaim,
+  type DefinitionScope,
+  migrateRevisionMetadata,
+} from "./knowledge-contracts.js";
 import type { KnowledgeRepository } from "./repository-knowledge.js";
 import { normalizeResolution, semanticReuseConfidence } from "./resolution-policy.js";
 import { applyKnowledgeRisk } from "./tutor-policies.js";
@@ -21,6 +26,7 @@ const revisionSchema = z.object({
   revision: z.number().int().positive(),
   statement: z.string(),
   semantic_scope: z.string(),
+  definition_scope_json: z.string(),
   distinguishing_features_json: z.string(),
   claims_json: z.string(),
   source_type: z.string(),
@@ -35,6 +41,8 @@ export type KnowledgeContext = {
   readonly revisionId: string;
   readonly definition: string;
   readonly semanticScope: string;
+  readonly definitionScope?: DefinitionScope;
+  readonly claimDetails?: readonly CompatibleRevisionClaim[];
   readonly distinguishingFeatures: readonly string[];
   readonly claims: readonly string[];
   readonly riskScope: string;
@@ -56,6 +64,7 @@ export function knowledgeContext(
       const revision = revisionSchema.parse(
         repository.revision(owner, item.id, item.current_revision),
       );
+      const metadata = migrateRevisionMetadata(revision);
       return {
         id: item.id,
         title: item.title,
@@ -64,6 +73,8 @@ export function knowledgeContext(
         revisionId: revision.id,
         definition: revision.statement,
         semanticScope: revision.semantic_scope,
+        definitionScope: metadata.definitionScope,
+        claimDetails: metadata.claims,
         distinguishingFeatures: z
           .array(z.string())
           .parse(JSON.parse(revision.distinguishing_features_json)),
@@ -182,6 +193,9 @@ export function persistResolution(input: {
       kind: candidate.kind,
       aliases: candidate.aliases,
       semanticScope: candidate.semanticScope,
+      ...(candidate.definitionScope === undefined
+        ? {}
+        : { definitionScope: candidate.definitionScope }),
       distinguishingFeatures: candidate.distinguishingFeatures,
       claims: candidate.claims,
       sourceType: "model_generated",

@@ -1,11 +1,13 @@
 import { applyCorrection } from "./correction-store.js";
 import type { Database } from "./database.js";
+import { knowledgeScopeFingerprint, migrateRevisionMetadata } from "./knowledge-contracts.js";
 import type {
   CorrectionInput,
   NewEvidence,
   NewKnowledge,
   NewRevision,
 } from "./knowledge-inputs.js";
+import { insertKnowledgeRevision } from "./knowledge-revision-store.js";
 import { knowledgeRecord, learnerStateRecord, revisionRecord } from "./records.js";
 import { insertEvidence, listEvidence, rebuildEvidenceProjections } from "./repository-evidence.js";
 import type { LearnerId } from "./types.js";
@@ -79,12 +81,17 @@ export class KnowledgeRepository {
           existing.id,
           existing.current_revision,
         );
-        const semanticScope = revisionRecord.parse(current).semantic_scope;
-        if (semanticScope !== (input.semanticScope ?? ""))
+        const currentMetadata = migrateRevisionMetadata(revisionRecord.parse(current));
+        if (
+          knowledgeScopeFingerprint(
+            currentMetadata.semanticScope,
+            currentMetadata.definitionScope,
+          ) !== knowledgeScopeFingerprint(input.semanticScope ?? "", input.definitionScope)
+        )
           throw new ApiError(
             409,
             "canonical_scope_mismatch",
-            "A canonical key cannot be reimported with a different semantic scope",
+            "A canonical key cannot be reimported with a different definition scope",
           );
         return {
           item: existing,
@@ -99,10 +106,9 @@ export class KnowledgeRepository {
       }
     }
     const id = newId();
-    const revisionId = newId();
     const now = isoNow();
     const scope = owner === null ? "canonical" : "provisional";
-    this.db.transaction(() => {
+    const revision = this.db.transaction(() => {
       this.db.run("INSERT INTO knowledge_items VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", [
         id,
         owner,
@@ -117,44 +123,21 @@ export class KnowledgeRepository {
         input.confidence,
         now,
       ]);
-      this.db.run("INSERT INTO knowledge_revisions VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", [
-        revisionId,
-        id,
-        1,
-        input.statement,
-        input.semanticScope ?? "",
-        JSON.stringify(input.distinguishingFeatures ?? []),
-        JSON.stringify(
-          (input.claims ?? []).map((claim) =>
-            typeof claim === "string"
-              ? {
-                  text: claim,
-                  authority: owner === null ? "canonical" : "provisional",
-                  sourceRefs: input.sourceRefs ?? [],
-                }
-              : claim,
-          ),
-        ),
-        JSON.stringify(
-          input.sourceRefs ?? (input.sourceRef === undefined ? [] : [input.sourceRef]),
-        ),
-        owner === null ? "canonical_import" : (input.sourceType ?? "learner_manual"),
-        input.sourceRef ?? null,
-        input.modelRunId ?? null,
-        input.conversationId ?? null,
-        JSON.stringify(input.sourceMessageIds ?? []),
-        JSON.stringify(input.sourceMessageEventIds ?? []),
-        now,
-      ]);
+      const inserted = insertKnowledgeRevision(this.db, {
+        knowledgeId: id,
+        revision: 1,
+        statement: input.statement,
+        sourceType: owner === null ? "canonical_import" : (input.sourceType ?? "learner_manual"),
+        sourceRef: input.sourceRef ?? null,
+        authority: owner === null ? "canonical" : "provisional",
+        details: input,
+      });
       this.db.run("INSERT INTO knowledge_fts VALUES(?,?,?)", [id, input.title, input.statement]);
+      return inserted;
     });
     return {
       item: this.item(owner ?? "00000000-0000-0000-0000-000000000000", id),
-      revision: this.db.one(
-        "SELECT * FROM knowledge_revisions WHERE id=?",
-        [revisionId],
-        revisionRecord,
-      ),
+      revision,
     };
   }
   addRevision(owner: LearnerId, input: NewRevision): unknown {
@@ -166,38 +149,16 @@ export class KnowledgeRepository {
         "Canonical knowledge can only be revised by canonical import",
       );
     const next = item.current_revision + 1;
-    const now = isoNow();
-    const revisionId = newId();
-    this.db.transaction(() => {
-      this.db.run("INSERT INTO knowledge_revisions VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", [
-        revisionId,
-        input.knowledgeId,
-        next,
-        input.statement,
-        input.details?.semanticScope ?? "",
-        JSON.stringify(input.details?.distinguishingFeatures ?? []),
-        JSON.stringify(
-          (input.details?.claims ?? []).map((claim) =>
-            typeof claim === "string"
-              ? {
-                  text: claim,
-                  authority: item.learner_id === null ? "canonical" : "provisional",
-                  sourceRefs: input.details?.sourceRefs ?? [],
-                }
-              : claim,
-          ),
-        ),
-        JSON.stringify(
-          input.details?.sourceRefs ?? (input.sourceRef === null ? [] : [input.sourceRef]),
-        ),
-        input.sourceType,
-        input.sourceRef,
-        input.details?.modelRunId ?? null,
-        input.details?.conversationId ?? null,
-        JSON.stringify(input.details?.sourceMessageIds ?? []),
-        JSON.stringify(input.details?.sourceMessageEventIds ?? []),
-        now,
-      ]);
+    return this.db.transaction(() => {
+      const revision = insertKnowledgeRevision(this.db, {
+        knowledgeId: input.knowledgeId,
+        revision: next,
+        statement: input.statement,
+        sourceType: input.sourceType,
+        sourceRef: input.sourceRef,
+        authority: item.learner_id === null ? "canonical" : "provisional",
+        ...(input.details === undefined ? {} : { details: input.details }),
+      });
       this.db.run("UPDATE knowledge_items SET current_revision=? WHERE id=?", [
         next,
         input.knowledgeId,
@@ -208,12 +169,8 @@ export class KnowledgeRepository {
         item.title,
         input.statement,
       ]);
+      return revision;
     });
-    return this.db.one(
-      "SELECT * FROM knowledge_revisions WHERE id=?",
-      [revisionId],
-      revisionRecord,
-    );
   }
   evidence(owner: LearnerId, knowledgeId?: string, revision?: number): readonly unknown[] {
     return listEvidence(this.db, {

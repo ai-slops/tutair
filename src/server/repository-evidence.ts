@@ -14,6 +14,7 @@ const sourceRecord = z.object({
 });
 const eventRecord = z.object({ id: z.string() });
 const ownedIdRecord = z.object({ id: z.string() });
+const evidenceMetadataRecord = evidenceRecord.extend({ evaluator_metadata_json: z.string() });
 
 export const listEvidence = (
   db: Database,
@@ -36,7 +37,7 @@ export const listEvidence = (
   return db.all(
     `SELECT * FROM evidence WHERE ${filters.join(" AND ")} ORDER BY created_at,id`,
     values,
-    evidenceRecord,
+    evidenceMetadataRecord,
   );
 };
 
@@ -88,6 +89,7 @@ export const insertEvidence = (db: Database, owner: LearnerId, input: NewEvidenc
     throw new ApiError(422, "invalid_evidence_thread", "Evidence thread is not learner-owned");
   }
   if (
+    input.evaluator.type === "model" &&
     input.evaluator.modelRunId !== undefined &&
     input.evaluator.modelRunId !== null &&
     db.one(
@@ -110,6 +112,16 @@ export const insertEvidence = (db: Database, owner: LearnerId, input: NewEvidenc
     }
   }
   const createdAt = isoNow();
+  const evaluatorMetadata =
+    input.evaluator.type === "test_runner"
+      ? {
+          runner: input.evaluator.runner,
+          suiteRef: input.evaluator.suiteRef,
+          ...(input.evaluator.resultRef === undefined
+            ? {}
+            : { resultRef: input.evaluator.resultRef }),
+        }
+      : {};
   const projectionEvidence = {
     id: newId(),
     knowledgeRevisionId: input.knowledgeRevisionId,
@@ -139,8 +151,9 @@ export const insertEvidence = (db: Database, owner: LearnerId, input: NewEvidenc
     input.strength,
     input.evaluatorConfidence,
     input.evaluator.type,
-    input.evaluator.modelRunId ?? null,
+    input.evaluator.type === "model" ? (input.evaluator.modelRunId ?? null) : null,
     input.evaluator.rubricVersion,
+    JSON.stringify(evaluatorMetadata),
     input.assistance.hints,
     input.assistance.answerVisible ? 1 : 0,
     input.assistance.openBook ? 1 : 0,
@@ -171,10 +184,17 @@ export const insertEvidence = (db: Database, owner: LearnerId, input: NewEvidenc
           createdAt,
         ]);
     }
-    db.run(`INSERT INTO evidence VALUES(${values.map(() => "?").join(",")})`, values);
+    db.run(
+      `INSERT INTO evidence(id,learner_id,knowledge_id,knowledge_revision_id,revision,conversation_id,message_id,message_event_id,assessment_id,dimension,evidence_type,score,polarity,strength,evaluator_confidence,evaluator_type,evaluator_model_run_id,rubric_version,evaluator_metadata_json,hints,answer_visible,open_book,copied_from_recent_context,supporting_spans_json,limitations_json,related_unit_ids_json,thread_id,difficulty,context_discount,weight,created_at) VALUES(${values.map(() => "?").join(",")})`,
+      values,
+    );
     rebuildEvidenceProjections(db, owner, input.knowledgeId);
   });
-  return db.one("SELECT * FROM evidence WHERE id=?", [projectionEvidence.id], evidenceRecord);
+  return db.one(
+    "SELECT * FROM evidence WHERE id=?",
+    [projectionEvidence.id],
+    evidenceMetadataRecord,
+  );
 };
 
 export const rebuildEvidenceProjections = (

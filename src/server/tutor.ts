@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { Database } from "./database.js";
 import { ModelRunner } from "./model-runner.js";
 import type { TutorProvider } from "./provider.js";
@@ -5,7 +6,8 @@ import type { CoreRepository } from "./repository-core.js";
 import type { KnowledgeRepository } from "./repository-knowledge.js";
 import { searchKnowledge } from "./search.js";
 import { loadTutorContext } from "./tutor-context.js";
-import { TutorFinalReviewer } from "./tutor-final.js";
+import { evaluationSchemaFor } from "./tutor-evaluation-boundary.js";
+import { TutorEvidenceStore } from "./tutor-evidence-store.js";
 import {
   extractionCandidates,
   knowledgeContext,
@@ -14,19 +16,18 @@ import {
 } from "./tutor-knowledge.js";
 import { boundModelContext } from "./tutor-model-context.js";
 import { copiedFromTutor, enforceCopiedDiscount } from "./tutor-policies.js";
+import { TutorResponseService } from "./tutor-response.js";
 import {
-  evaluatedSchema,
   extractionSchema,
-  finalSchema,
-  generatedSchema,
-  lintedSchema,
   planningSchema,
   resolutionSchema,
   type TurnInput,
 } from "./tutor-schemas.js";
 import { TutorStageRunner } from "./tutor-stage.js";
+import { selectTutorThread } from "./tutor-thread-selection.js";
+import { loadTurnKnowledge } from "./tutor-turn-context.js";
 import { TutorTurnStore } from "./tutor-turn-store.js";
-import { newId } from "./types.js";
+import { ApiError, newId } from "./types.js";
 
 export class TutorPipeline {
   readonly runner: ModelRunner;
@@ -39,16 +40,37 @@ export class TutorPipeline {
     this.runner = new ModelRunner(db, provider);
   }
 
-  async turn(input: TurnInput): Promise<{
+  async turn(request: TurnInput): Promise<{
     readonly tutorMessage: unknown;
     readonly run: unknown;
     readonly thread: unknown;
     readonly knowledgeChanges: readonly unknown[];
   }> {
     const traceId = newId();
+    const source = this.db.one(
+      `SELECT e.id,e.content FROM message_events e JOIN messages m ON m.id=e.message_id
+       WHERE e.message_id=? AND e.learner_id=? AND m.learner_id=? AND m.conversation_id=?
+         AND m.role='learner' AND e.event_type='created'`,
+      [request.messageId, request.owner, request.owner, request.conversationId],
+      z.object({ id: z.string(), content: z.string() }),
+    );
+    if (source === null || source.content !== request.content)
+      throw new ApiError(
+        422,
+        "invalid_turn_source",
+        "Turn input must match its original learner message",
+      );
+    const retrieval = await searchKnowledge(
+      this.db,
+      this.provider,
+      request.owner,
+      request.content,
+      16,
+    );
+    const selectedThread = selectTutorThread(this.core, request, retrieval.results);
+    const input = { ...request, threadId: selectedThread.id, messageEventId: source.id };
     const stages = new TutorStageRunner(this.runner, input);
     const store = new TutorTurnStore(this.db, this.core, this.knowledge);
-    const retrieval = await searchKnowledge(this.db, this.provider, input.owner, input.content, 16);
     const context = loadTutorContext(this.db, this.core, input, retrieval.results);
     const immutableKnowledge = knowledgeContext(
       this.knowledge,
@@ -58,7 +80,9 @@ export class TutorPipeline {
     const rawCommon = {
       traceId,
       message: input.content,
+      sourceMessageEventId: input.messageEventId,
       currentGoal: context.currentGoal,
+      learningThread: context.learningThread,
       recentContext: context.recentContext,
       relevantHistory: retrieval.results,
       knowledge: immutableKnowledge,
@@ -66,6 +90,7 @@ export class TutorPipeline {
       learnerStates: context.learnerStates,
       supportingEvidence: context.supportingEvidence,
       openQuestions: context.openQuestions,
+      assessments: context.assessments,
       selfReport: input.selfReport,
       confidence: input.confidence ?? null,
     };
@@ -73,14 +98,23 @@ export class TutorPipeline {
     const evaluated = await stages.withFallback({
       stage: "evaluation",
       data: common,
-      schema: evaluatedSchema,
-      fallback: { evidence: [], openQuestion: null },
+      schema: evaluationSchemaFor(immutableKnowledge, input, context.assessments),
+      fallback: {
+        evidence: [],
+        openQuestion: null,
+        unresolvedAmbiguities: [],
+        suggestedFollowup: null,
+      },
     });
     const evaluation = enforceCopiedDiscount(
       evaluated.value,
       copiedFromTutor(input.content, context.tutorTexts),
     );
-    store.evidence(input, evaluation, evaluated.runId);
+    const evaluationOutcome = new TutorEvidenceStore(this.knowledge).record(
+      input,
+      { ...evaluated, value: evaluation },
+      immutableKnowledge,
+    );
     const refreshedContext = loadTutorContext(this.db, this.core, input, retrieval.results);
     const refreshedCommon = boundModelContext({
       ...rawCommon,
@@ -128,123 +162,62 @@ export class TutorPipeline {
     });
     store.relations(input, extracted.value.relations, first.resolvedByKey);
     const turnKnowledgeIds = [
-      ...new Set([...refreshedContext.selectedKnowledgeIds, ...first.knowledgeIds]),
-    ];
-    const turnKnowledge = knowledgeContext(this.knowledge, input.owner, turnKnowledgeIds);
+      ...new Set([...first.knowledgeIds, ...refreshedContext.selectedKnowledgeIds]),
+    ].slice(0, 24);
+    const turnKnowledge = loadTurnKnowledge(this.knowledge, input.owner, turnKnowledgeIds);
+    const turnCommon = boundModelContext({
+      ...refreshedCommon,
+      ...turnKnowledge,
+      micrograph: extracted.value,
+    });
     const planned = await stages.stage({
       stage: "planning",
       schema: planningSchema,
       data: boundModelContext({
-        ...refreshedCommon,
-        micrograph: extracted.value,
+        ...turnCommon,
         resolution: resolved.value,
-        knowledge: turnKnowledge,
         knowledgeIds: first.knowledgeIds,
       }),
     });
-    store.plan(input, planned);
-    const draft = await stages.stage({
-      stage: "draft",
-      schema: generatedSchema,
-      data: boundModelContext({
-        ...refreshedCommon,
-        plan: planned.value,
-        micrograph: extracted.value,
-        assistance: input.assistance,
-        selfReport: input.selfReport,
-      }),
-    });
-    const checked = await stages.withFallback({
-      stage: "lint",
-      schema: lintedSchema,
-      data: boundModelContext({
-        ...refreshedCommon,
-        draft: draft.value.text,
-        plan: planned.value,
-        knownStates: refreshedContext.learnerStates,
-      }),
-      fallback: {
-        safe: true,
-        issues: ["lint_skipped"],
-        concepts: [],
-        generatedCandidates: [],
-        lintSkipped: true,
-      },
-    });
-    let lintChanges: readonly unknown[] = [];
-    let allowedKnowledgeIds = first.knowledgeIds;
-    if (checked.value.generatedCandidates.length > 0) {
-      const generated = checked.value.generatedCandidates;
-      const lintResolution = await stages.stage({
-        stage: "resolution",
-        schema: resolutionSchema,
-        data: boundModelContext({
-          ...refreshedCommon,
-          candidates: generated,
-          resolutionCandidates: orderedResolutionCandidates(
-            turnKnowledge,
-            retrieval.results,
-            generated.map((item) => item.label),
-          ),
-          independentOfGeneration: true,
-        }),
-      });
-      const persisted = persistResolution({
-        repository: this.knowledge,
-        owner: input.owner,
-        conversationId: input.conversationId,
-        messageId: input.messageId,
-        runId: lintResolution.runId,
-        resolution: lintResolution.value,
-        candidates: generated,
-        offeredKnowledge: turnKnowledge,
-      });
-      lintChanges = persisted.changes;
-      allowedKnowledgeIds = [...new Set([...allowedKnowledgeIds, ...persisted.knowledgeIds])];
-    }
-    const final = await stages.stage({
-      stage: "final",
-      schema: finalSchema,
-      data: boundModelContext({
-        ...refreshedCommon,
-        draft: draft.value.text,
-        lint: checked.value,
-        knowledge: knowledgeContext(this.knowledge, input.owner, allowedKnowledgeIds),
-        allowedKnowledgeIds,
-      }),
-    });
-    const reviewed = await new TutorFinalReviewer(this.knowledge, stages, input).review({
-      common: refreshedCommon,
+    store.plan(
+      input,
+      planned,
+      turnKnowledge.knowledge.map((item) => item.id),
+    );
+    const reviewed = await new TutorResponseService(this.knowledge, stages).generate({
+      common: turnCommon,
       plan: planned.value,
-      initialLint: checked.value,
-      final,
-      allowedKnowledgeIds,
+      knowledge: turnKnowledge.knowledge,
+      allowedKnowledgeIds: turnKnowledge.knowledge.map((item) => item.id),
     });
     const tutorMessage = store.reply(
       input,
       reviewed.final,
-      reviewed.allowedKnowledgeIds,
+      reviewed.knowledge,
       this.provider.state.synthetic,
     );
     const thread = store.thread(input, planned.value.currentGoal, [
       ...(evaluation.openQuestion === null ? [] : [evaluation.openQuestion]),
+      ...(evaluationOutcome.followupQuestion === null ? [] : [evaluationOutcome.followupQuestion]),
       ...planned.value.deferredQuestions,
     ]);
     return {
       tutorMessage,
       run: {
-        id: final.runId,
+        id: reviewed.runId,
         traceId,
         status: "completed",
         stages: stages.runIds.length,
         runIds: stages.runIds,
         extractionFallback: extracted.runId === "fallback",
+        evaluationSkipped: evaluated.runId === "fallback",
+        followupTrackingSkipped: evaluationOutcome.followupTrackingSkipped,
         lintSkipped: reviewed.lintSkipped,
         retrievalMode: retrieval.mode,
         exposureTrackingSkipped: reviewed.final.discardedExposures.length > 0,
       },
       thread,
-      knowledgeChanges: [...first.changes, ...lintChanges],
+      knowledgeChanges: [...first.changes, ...reviewed.changes],
     };
   }
 }

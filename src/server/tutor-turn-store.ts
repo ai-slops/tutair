@@ -3,13 +3,8 @@ import type { Database } from "./database.js";
 import { type DiscardedExposure, exposureGroundingFailure } from "./exposure-grounding.js";
 import type { CoreRepository } from "./repository-core.js";
 import type { KnowledgeRepository } from "./repository-knowledge.js";
-import type {
-  evaluatedSchema,
-  extractionSchema,
-  finalSchema,
-  planningSchema,
-  TurnInput,
-} from "./tutor-schemas.js";
+import type { KnowledgeContext } from "./tutor-knowledge.js";
+import type { extractionSchema, finalSchema, planningSchema, TurnInput } from "./tutor-schemas.js";
 import type { StageResult } from "./tutor-stage.js";
 import { ApiError, isoNow, newId } from "./types.js";
 
@@ -19,44 +14,6 @@ export class TutorTurnStore {
     readonly core: CoreRepository,
     readonly knowledge: KnowledgeRepository,
   ) {}
-
-  evidence(
-    input: TurnInput,
-    evaluation: z.infer<typeof evaluatedSchema>,
-    evaluationRunId: string,
-  ): void {
-    for (const item of evaluation.evidence)
-      this.knowledge.addEvidence(input.owner, {
-        knowledgeId: item.knowledgeId,
-        knowledgeRevisionId: item.knowledgeRevisionId,
-        revision: item.revision,
-        conversationId: input.conversationId,
-        messageId: input.messageId,
-        dimension: item.dimension,
-        evidenceType: item.evidenceType,
-        score: item.score,
-        polarity: item.polarity,
-        strength: item.score,
-        evaluatorConfidence: item.evaluatorConfidence,
-        evaluator: {
-          type: evaluationRunId === "fallback" ? "rule" : "model",
-          ...(evaluationRunId === "fallback" ? {} : { modelRunId: evaluationRunId }),
-          rubricVersion: "phase1-evidence-v1",
-        },
-        assistance: {
-          hints: input.assistance === "hint" ? 1 : 0,
-          answerVisible: input.assistance === "worked_example",
-          openBook: input.assistance !== "none",
-          copiedFromRecentContext: item.copied,
-        },
-        supportingSpans: item.sourceSpans,
-        limitations: item.limitations,
-        relatedUnitIds: item.relatedKnowledgeIds,
-        ...(item.assessmentId === null ? {} : { assessmentId: item.assessmentId }),
-        ...(item.threadId === null ? {} : { threadId: item.threadId }),
-        difficulty: item.difficulty,
-      });
-  }
 
   relations(
     input: TurnInput,
@@ -85,10 +42,37 @@ export class TutorTurnStore {
   plan(
     input: TurnInput,
     planned: StageResult<z.infer<typeof planningSchema>>,
+    offeredKnowledgeIds: readonly string[],
   ): { readonly id: string } {
     const thread = z
       .object({ id: z.string() })
       .parse(this.thread(input, planned.value.currentGoal, []));
+    const prior = this.core.thread(input.owner, thread.id);
+    const offered = new Set(offeredKnowledgeIds);
+    const priorTargets = z
+      .array(z.string())
+      .parse(JSON.parse(prior.target_knowledge_unit_ids_json));
+    const priorDeferred = z
+      .array(z.string())
+      .parse(JSON.parse(prior.deferred_knowledge_unit_ids_json));
+    const targetKnowledgeUnitIds = [
+      ...new Set([...priorTargets, ...planned.value.targetUnits.filter((id) => offered.has(id))]),
+    ];
+    const deferredKnowledgeUnitIds = [
+      ...new Set([
+        ...priorDeferred,
+        ...planned.value.deferredUnits.filter((id) => offered.has(id)),
+      ]),
+    ].filter((id) => !targetKnowledgeUnitIds.includes(id));
+    if (
+      JSON.stringify(priorTargets) !== JSON.stringify(targetKnowledgeUnitIds) ||
+      JSON.stringify(priorDeferred) !== JSON.stringify(deferredKnowledgeUnitIds)
+    ) {
+      this.core.updateThread(input.owner, thread.id, {
+        targetKnowledgeUnitIds,
+        deferredKnowledgeUnitIds,
+      });
+    }
     this.db.run("INSERT INTO turn_plans VALUES(?,?,?,?,?,?,?)", [
       newId(),
       input.owner,
@@ -115,22 +99,24 @@ export class TutorTurnStore {
     final: StageResult<z.infer<typeof finalSchema>> & {
       readonly discardedExposures?: readonly DiscardedExposure[];
     },
-    allowedIds: readonly string[],
+    generationKnowledge: readonly KnowledgeContext[],
     synthetic: boolean,
   ): unknown {
-    const approved = new Set(allowedIds);
-    const exposed = new Map<string, { readonly revision: number }>();
+    const snapshots = new Map(generationKnowledge.map((item) => [item.id, item]));
+    const approved = new Set(snapshots.keys());
+    const exposed = new Map<string, KnowledgeContext>();
     for (const declaration of final.value.exposures) {
-      if (exposureGroundingFailure(final.value.text, declaration, approved) !== null)
+      const snapshot = snapshots.get(declaration.knowledgeId);
+      if (
+        snapshot === undefined ||
+        exposureGroundingFailure(final.value.text, declaration, approved) !== null
+      )
         throw new ApiError(
           422,
           "invalid_exposure_grounding",
           "Tutor exposures must identify approved knowledge and a non-empty final-text span",
         );
-      const item = z
-        .object({ current_revision: z.number() })
-        .parse(this.knowledge.item(input.owner, declaration.knowledgeId));
-      exposed.set(declaration.knowledgeId, { revision: item.current_revision });
+      exposed.set(declaration.knowledgeId, snapshot);
     }
     return this.db.transaction(() => {
       const tutorMessage = this.core.createMessage(
@@ -141,20 +127,35 @@ export class TutorTurnStore {
         synthetic,
       );
       const tutorMessageId = z.object({ id: z.string() }).parse(tutorMessage).id;
+      const sourceEvent = z
+        .object({ id: z.string() })
+        .parse(
+          this.db.one(
+            "SELECT id FROM message_events WHERE message_id=? AND learner_id=? AND event_type='created'",
+            [tutorMessageId, input.owner],
+            z.object({ id: z.string() }),
+          ),
+        );
       this.db.run("UPDATE model_runs SET output_message_id=? WHERE id=? AND learner_id=?", [
         tutorMessageId,
         final.runId,
         input.owner,
       ]);
       for (const [id, item] of exposed) {
-        this.db.run("INSERT INTO exposures VALUES(?,?,?,?,?,?)", [
-          newId(),
-          input.owner,
-          id,
-          item.revision,
-          tutorMessageId,
-          isoNow(),
-        ]);
+        this.db.run(
+          "INSERT INTO exposures(id,learner_id,knowledge_id,revision,message_id,created_at,knowledge_revision_id,message_event_id,provenance) VALUES(?,?,?,?,?,?,?,?,?)",
+          [
+            newId(),
+            input.owner,
+            id,
+            item.revision,
+            tutorMessageId,
+            isoNow(),
+            item.revisionId,
+            sourceEvent.id,
+            "generation_snapshot",
+          ],
+        );
         this.knowledge.rebuild(input.owner, id);
       }
       if (final.discardedExposures?.length) {
@@ -178,14 +179,10 @@ export class TutorTurnStore {
   }
 
   thread(input: TurnInput, goal: string, questions: readonly string[]): unknown {
-    const existing = this.db.one(
-      `SELECT t.id,t.goal FROM threads t
-       JOIN thread_conversations tc ON tc.thread_id=t.id
-       WHERE tc.learner_id=? AND tc.conversation_id=? AND t.status='open'
-       ORDER BY t.updated_at DESC LIMIT 1`,
-      [input.owner, input.conversationId],
-      z.object({ id: z.string(), goal: z.string() }),
-    );
+    const existing =
+      input.threadId === undefined
+        ? this.core.currentThread(input.owner, input.conversationId)
+        : this.core.thread(input.owner, input.threadId);
     const thread =
       existing ??
       z.object({ id: z.string(), goal: z.string() }).parse(
@@ -215,14 +212,7 @@ export class TutorTurnStore {
       });
     }
     for (const question of new Set(questions))
-      this.db.run("INSERT INTO open_questions VALUES(?,?,?,?,?,?)", [
-        newId(),
-        thread.id,
-        input.owner,
-        question,
-        "open",
-        isoNow(),
-      ]);
+      this.core.addThreadQuestion(input.owner, thread.id, question);
     return this.core.thread(input.owner, thread.id);
   }
 }

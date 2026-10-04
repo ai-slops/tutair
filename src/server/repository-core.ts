@@ -1,19 +1,23 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { Database } from "./database.js";
-import {
-  conversationRecord,
-  learnerRecord,
-  messageRecord,
-  sessionRecord,
-  threadRecord,
-} from "./records.js";
+import { conversationRecord, learnerRecord, messageRecord, sessionRecord } from "./records.js";
+import { ThreadRepository } from "./repository-threads.js";
+import type {
+  ThreadCreate,
+  ThreadQuestionRecord,
+  ThreadRecord,
+  ThreadUpdate,
+} from "./thread-schemas.js";
 import type { LearnerId } from "./types.js";
 import { ApiError, isoNow, newId } from "./types.js";
 
 const hash = (token: string): string => createHash("sha256").update(token).digest("hex");
 
 export class CoreRepository {
-  constructor(readonly db: Database) {}
+  private readonly threadRepository: ThreadRepository;
+  constructor(readonly db: Database) {
+    this.threadRepository = new ThreadRepository(db);
+  }
   signup(displayName: string): { readonly token: string; readonly learner: unknown } {
     const id = newId();
     const token = randomBytes(32).toString("base64url");
@@ -182,60 +186,33 @@ export class CoreRepository {
       ]);
     });
   }
-  threads(owner: LearnerId): readonly unknown[] {
-    return this.db.all(
-      "SELECT * FROM threads WHERE learner_id=? ORDER BY updated_at DESC",
-      [owner],
-      threadRecord,
-    );
+  threads(owner: LearnerId): readonly ThreadRecord[] {
+    return this.threadRepository.list(owner);
   }
-  thread(owner: LearnerId, id: string) {
-    const row = this.db.one(
-      "SELECT * FROM threads WHERE id=? AND learner_id=?",
-      [id, owner],
-      threadRecord,
-    );
-    if (row === null) throw new ApiError(404, "thread_not_found", "Thread not found");
-    return row;
+  thread(owner: LearnerId, id: string): ThreadRecord {
+    return this.threadRepository.get(owner, id);
   }
-  createThread(
+  createThread(owner: LearnerId, input: ThreadCreate): ThreadRecord {
+    return this.threadRepository.create(owner, input);
+  }
+  updateThread(owner: LearnerId, id: string, input: ThreadUpdate): ThreadRecord {
+    return this.threadRepository.update(owner, id, input);
+  }
+  addThreadQuestion(owner: LearnerId, id: string, text: string): ThreadQuestionRecord {
+    return this.threadRepository.addQuestion(owner, id, text);
+  }
+  updateThreadQuestion(
     owner: LearnerId,
-    input: {
-      readonly title: string;
-      readonly goal: string;
-      readonly conversationId?: string | undefined;
-    },
-  ): unknown {
-    if (input.conversationId !== undefined) this.conversation(owner, input.conversationId);
-    const id = newId();
-    const now = isoNow();
-    this.db.transaction(() => {
-      this.db.run("INSERT INTO threads VALUES(?,?,?,?,?,?,?,?)", [
-        id,
-        owner,
-        input.conversationId ?? null,
-        input.title,
-        input.goal,
-        "open",
-        now,
-        now,
-      ]);
-      if (input.conversationId !== undefined)
-        this.db.run("INSERT INTO thread_conversations VALUES(?,?,?,?)", [
-          id,
-          input.conversationId,
-          owner,
-          now,
-        ]);
-      this.db.run("INSERT INTO thread_events VALUES(?,?,?,?,?,?)", [
-        newId(),
-        id,
-        owner,
-        "created",
-        JSON.stringify({ conversationId: input.conversationId ?? null }),
-        now,
-      ]);
-    });
-    return this.thread(owner, id);
+    threadId: string,
+    questionId: string,
+    status: "open" | "resolved" | "parked",
+  ): ThreadQuestionRecord {
+    return this.threadRepository.updateQuestion(owner, threadId, questionId, status);
+  }
+  currentThread(owner: LearnerId, conversationId: string): ThreadRecord | null {
+    return this.threadRepository.current(owner, conversationId);
+  }
+  selectThread(owner: LearnerId, conversationId: string, id: string, reason: string): ThreadRecord {
+    return this.threadRepository.select(owner, conversationId, id, reason);
   }
 }

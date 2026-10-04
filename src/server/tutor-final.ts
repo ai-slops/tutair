@@ -1,15 +1,9 @@
 import type { z } from "zod";
 import { type DiscardedExposure, exposureGroundingFailure } from "./exposure-grounding.js";
-import type { KnowledgeRepository } from "./repository-knowledge.js";
-import { knowledgeContext } from "./tutor-knowledge.js";
+import type { KnowledgeContext } from "./tutor-knowledge.js";
 import { boundModelContext } from "./tutor-model-context.js";
 import { markLintSkipped, unsafeRiskyFinal } from "./tutor-policies.js";
-import {
-  type finalSchema,
-  lintedSchema,
-  type planningSchema,
-  type TurnInput,
-} from "./tutor-schemas.js";
+import { type finalSchema, lintedSchema, type planningSchema } from "./tutor-schemas.js";
 import type { StageResult, TutorStageRunner } from "./tutor-stage.js";
 import { ApiError } from "./types.js";
 
@@ -18,23 +12,19 @@ type FinalReviewRequest = {
   readonly plan: z.infer<typeof planningSchema>;
   readonly initialLint: z.infer<typeof lintedSchema>;
   readonly final: StageResult<z.infer<typeof finalSchema>>;
-  readonly allowedKnowledgeIds: readonly string[];
+  readonly knowledge: readonly KnowledgeContext[];
 };
 
 type ReviewedFinal = {
   readonly final: StageResult<z.infer<typeof finalSchema>> & {
     readonly discardedExposures: readonly DiscardedExposure[];
   };
-  readonly allowedKnowledgeIds: readonly string[];
+  readonly knowledge: readonly KnowledgeContext[];
   readonly lintSkipped: boolean;
 };
 
 export class TutorFinalReviewer {
-  constructor(
-    readonly repository: KnowledgeRepository,
-    readonly stages: TutorStageRunner,
-    readonly input: TurnInput,
-  ) {}
+  constructor(readonly stages: TutorStageRunner) {}
 
   async review(request: FinalReviewRequest): Promise<ReviewedFinal> {
     const checked = await this.stages.withFallback({
@@ -42,6 +32,7 @@ export class TutorFinalReviewer {
       schema: lintedSchema,
       data: boundModelContext({
         ...request.common,
+        knowledge: request.knowledge,
         draft: request.final.value.text,
         plan: request.plan,
         knownStates: request.common["learnerStates"] ?? [],
@@ -55,11 +46,7 @@ export class TutorFinalReviewer {
         lintSkipped: true,
       },
     });
-    const knowledge = knowledgeContext(
-      this.repository,
-      this.input.owner,
-      request.allowedKnowledgeIds,
-    );
+    const knowledge = request.knowledge;
     if (
       unsafeRiskyFinal(checked.value, [
         ...knowledge,
@@ -73,14 +60,12 @@ export class TutorFinalReviewer {
         "unsafe_tutor_output",
         "Unsafe high-stakes or current-contested tutor output was blocked",
       );
-    const allowedKnowledgeIds = knowledge
-      .filter(
-        (item) =>
-          item.scope === "canonical" ||
-          (item.riskScope !== "high-stakes" && item.riskScope !== "current-contested"),
-      )
-      .map((item) => item.id);
-    const allowed = new Set(allowedKnowledgeIds);
+    const allowedKnowledge = knowledge.filter(
+      (item) =>
+        item.scope === "canonical" ||
+        (item.riskScope !== "high-stakes" && item.riskScope !== "current-contested"),
+    );
+    const allowed = new Set(allowedKnowledge.map((item) => item.id));
     const lintSkipped = request.initialLint.lintSkipped || checked.value.lintSkipped;
     const discardedExposures: DiscardedExposure[] = [];
     const exposures = request.final.value.exposures.filter((exposure) => {
@@ -90,7 +75,7 @@ export class TutorFinalReviewer {
       return false;
     });
     return {
-      allowedKnowledgeIds,
+      knowledge: allowedKnowledge,
       lintSkipped,
       final: {
         ...request.final,

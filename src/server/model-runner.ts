@@ -1,6 +1,13 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { Database } from "./database.js";
+import {
+  MODEL_CONTEXT_VERSION,
+  modelContextSnapshot,
+  PROMPT_SCHEMA_VERSIONS,
+  STAGE_SCHEMA_VERSIONS,
+  STAGE_VERSIONS,
+} from "./model-context-version.js";
 import type { Stage, TutorProvider } from "./provider.js";
 import { strictOutputSchema } from "./strict-output-schema.js";
 import { boundModelContext } from "./tutor-model-context.js";
@@ -41,12 +48,18 @@ export class ModelRunner {
         : {}),
     });
     const inputHash = createHash("sha256").update(JSON.stringify(boundedData)).digest("hex");
+    const version = STAGE_VERSIONS[stage];
+    const promptVersion =
+      this.provider.state.outputMode === "compatibility"
+        ? PROMPT_SCHEMA_VERSIONS.compatibilityPrompt
+        : PROMPT_SCHEMA_VERSIONS.prompt;
+    const schemaVersion = STAGE_SCHEMA_VERSIONS[stage];
     this.db.run("INSERT INTO model_runs VALUES(?,?,?,?,?,?,?,?,?,?,?)", [
       runId,
       owner,
       conversationId,
       stage,
-      "phase1-v1",
+      version,
       this.provider.state.provider,
       "running",
       messageId,
@@ -58,10 +71,8 @@ export class ModelRunner {
       runId,
       this.provider.state.model,
       stage,
-      this.provider.state.outputMode === "compatibility"
-        ? "phase1-prompt-v2-compatibility"
-        : "phase1-prompt-v2",
-      "phase1-schema-v2",
+      promptVersion,
+      schemaVersion,
       inputHash,
       null,
       null,
@@ -72,13 +83,23 @@ export class ModelRunner {
       const jsonSchema = z
         .record(z.string(), z.unknown())
         .parse(strictOutputSchema(z.toJSONSchema(schema)));
-      const raw = await this.provider.call({
+      const call = {
         stage,
-        version: "phase1-v1",
+        version,
         system: this.instruction(stage),
         data: boundedData,
         jsonSchema,
-      });
+      } satisfies Parameters<TutorProvider["call"]>[0];
+      const snapshot = modelContextSnapshot(call);
+      this.db.run("INSERT INTO model_run_contexts VALUES(?,?,?,?,?,?)", [
+        runId,
+        owner,
+        MODEL_CONTEXT_VERSION,
+        snapshot.json,
+        snapshot.hash,
+        isoNow(),
+      ]);
+      const raw = await this.provider.call(call);
       const result = z
         .object({
           value: z.unknown(),

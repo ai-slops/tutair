@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import { knowledgeScopeFingerprint } from "./knowledge-contracts.js";
 import type { KnowledgeContext } from "./tutor-knowledge.js";
 import type { candidateSchema, resolutionSchema } from "./tutor-schemas.js";
 import { ApiError } from "./types.js";
@@ -12,8 +13,6 @@ type Decision = {
   | { readonly resolution: "reuse"; readonly knowledge: KnowledgeContext }
   | { readonly resolution: "new" }
 );
-
-const normalized = (text: string): string => text.normalize("NFKC").trim().toLocaleLowerCase();
 
 export function normalizeResolution(input: {
   readonly candidates: readonly Candidate[];
@@ -52,7 +51,8 @@ export function normalizeResolution(input: {
       match.decision !== "provisional" &&
       match.confidence >= semanticReuseConfidence &&
       offered.kind === candidate.kind &&
-      normalized(offered.semanticScope) === normalized(candidate.semanticScope)
+      knowledgeScopeFingerprint(offered.semanticScope, offered.definitionScope) ===
+        knowledgeScopeFingerprint(candidate.semanticScope, candidate.definitionScope)
     ) {
       decisions.push({
         resolution: "reuse",

@@ -1,12 +1,13 @@
 import { z } from "zod";
 import type { Database } from "./database.js";
+import { migrateRevisionMetadata } from "./knowledge-contracts.js";
 import type { CorrectionInput } from "./knowledge-inputs.js";
 import { knowledgeRecord, revisionRecord } from "./records.js";
 import type { KnowledgeRepository } from "./repository-knowledge.js";
 import type { LearnerId } from "./types.js";
 import { ApiError, isoNow, newId } from "./types.js";
 
-const sourceMessageRecord = z.object({ id: z.string() });
+const sourceMessageRecord = z.object({ id: z.string(), conversation_id: z.string() });
 const sourceEventRecord = z.object({ id: z.string() });
 const evidenceReferenceRecord = z.object({ id: z.string() });
 
@@ -61,7 +62,7 @@ export const applyCorrection = (
     input.messageId === undefined
       ? null
       : db.one(
-          "SELECT m.id FROM messages m JOIN conversations c ON c.id=m.conversation_id AND c.learner_id=m.learner_id WHERE m.id=? AND m.learner_id=? AND m.role='learner'",
+          "SELECT m.id,m.conversation_id FROM messages m JOIN conversations c ON c.id=m.conversation_id AND c.learner_id=m.learner_id WHERE m.id=? AND m.learner_id=? AND m.role='learner'",
           [input.messageId, owner],
           sourceMessageRecord,
         );
@@ -96,6 +97,7 @@ export const applyCorrection = (
       "Correction evidence is not scoped to this learner and revision",
     );
   const targetId = targetIdFor(db, owner, input, prior.id);
+  const priorMetadata = migrateRevisionMetadata(prior);
   const sourceDetails = {
     title: item.title,
     statement: input.statement,
@@ -105,6 +107,17 @@ export const applyCorrection = (
     sourceType: "learner_manual" as const,
     ...(sourceMessage === null ? {} : { sourceMessageIds: [sourceMessage.id] }),
     ...(sourceEvent === null ? {} : { sourceMessageEventIds: [sourceEvent.id] }),
+  };
+  const revisionDetails = {
+    ...sourceDetails,
+    semanticScope: priorMetadata.semanticScope,
+    definitionScope: priorMetadata.definitionScope,
+    distinguishingFeatures: z
+      .array(z.string())
+      .parse(JSON.parse(prior.distinguishing_features_json)),
+    claims: priorMetadata.claims,
+    sourceRefs: z.array(z.string()).parse(JSON.parse(prior.source_refs_json)),
+    ...(sourceMessage === null ? {} : { conversationId: sourceMessage.conversation_id }),
   };
   return db.transaction(() => {
     const result =
@@ -116,7 +129,7 @@ export const applyCorrection = (
               statement: input.statement,
               sourceType: "learner_correction:revise",
               sourceRef: sourceMessage?.id ?? null,
-              details: sourceDetails,
+              details: revisionDetails,
             }),
           }
         : input.kind === "meaning_mismatch"
@@ -154,6 +167,10 @@ export const applyCorrection = (
         correction.id,
         correction.createdAt,
       ]);
+    if (input.kind === "meaning_mismatch") {
+      const createdItem = knowledgeRecord.parse(result.item);
+      repository.rebuild(owner, createdItem.id);
+    }
     repository.rebuild(owner, input.knowledgeId);
     return { correction, item: result.item, revision: result.revision };
   });

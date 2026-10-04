@@ -22,7 +22,7 @@ export function retrievalDocuments(db: Database, owner: LearnerId): readonly Ret
      SELECT m.id,'message','Message',m.content,'private',0 FROM messages m
        WHERE m.learner_id=? AND m.tombstoned_at IS NULL
      UNION ALL
-     SELECT t.id,'thread',t.title,t.goal,'private',0 FROM threads t WHERE t.learner_id=?
+      SELECT t.id,'thread',t.title,t.goal || char(10) || t.desired_outcome || char(10) || COALESCE(t.why_now,''),'private',0 FROM threads t WHERE t.learner_id=?
      UNION ALL
      SELECT e.id,'evidence',k.title || ' / ' || e.dimension,
        r.statement || char(10) || m.content,'private',e.revision

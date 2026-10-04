@@ -3,6 +3,8 @@ import type { Database } from "./database.js";
 import { messageRecord } from "./records.js";
 import type { CoreRepository } from "./repository-core.js";
 import { retrievalDocument } from "./retrieval-documents.js";
+import type { ThreadRecord } from "./thread-schemas.js";
+import { loadLearnerContext } from "./tutor-learner-context.js";
 import type { TurnInput } from "./tutor-schemas.js";
 
 const conversationGoal = z.object({ goal: z.string().nullable() });
@@ -11,6 +13,7 @@ const stateRecord = z.record(z.string(), z.union([z.string(), z.number(), z.null
 export type TutorContext = {
   readonly currentGoal: string;
   readonly threadId: string | null;
+  readonly learningThread: ThreadRecord | null;
   readonly selectedKnowledgeIds: readonly string[];
   readonly recentContext: readonly z.infer<typeof messageRecord>[];
   readonly tutorTexts: readonly string[];
@@ -18,6 +21,7 @@ export type TutorContext = {
   readonly learnerStates: readonly unknown[];
   readonly supportingEvidence: readonly unknown[];
   readonly openQuestions: readonly unknown[];
+  readonly assessments: readonly unknown[];
 };
 
 const knowledgeIdRecord = z.object({ knowledge_id: z.string() });
@@ -37,41 +41,16 @@ const relationRecord = z.object({
   scaffoldable: z.number().nullable(),
 });
 
-function boundedRecords(
-  records: readonly z.infer<typeof stateRecord>[],
-  maxPerUnit: number,
-  characterBudget: number,
-): readonly z.infer<typeof stateRecord>[] {
-  const counts = new Map<string, number>();
-  const selected: z.infer<typeof stateRecord>[] = [];
-  let characters = 0;
-  for (const record of records) {
-    const knowledgeId = record["knowledge_id"];
-    if (typeof knowledgeId !== "string") continue;
-    const count = counts.get(knowledgeId) ?? 0;
-    const size = JSON.stringify(record).length;
-    if (count >= maxPerUnit || characters + size > characterBudget) continue;
-    counts.set(knowledgeId, count + 1);
-    selected.push(record);
-    characters += size;
-  }
-  return selected;
-}
-
 export function loadTutorContext(
   db: Database,
   core: CoreRepository,
   input: TurnInput,
   retrieved: readonly unknown[],
 ): TutorContext {
-  const thread = db.one(
-    `SELECT t.id,t.goal FROM threads t
-     JOIN thread_conversations tc ON tc.thread_id=t.id
-     WHERE tc.learner_id=? AND tc.conversation_id=? AND t.status='open'
-     ORDER BY t.updated_at DESC LIMIT 1`,
-    [input.owner, input.conversationId],
-    z.object({ id: z.string(), goal: z.string() }),
-  );
+  const thread =
+    input.threadId === undefined
+      ? core.currentThread(input.owner, input.conversationId)
+      : core.thread(input.owner, input.threadId);
   const conversation = conversationGoal.parse(core.conversation(input.owner, input.conversationId));
   const recentContext = db
     .all(
@@ -126,6 +105,11 @@ export function loadTutorContext(
     ),
   );
   if (thread !== null) {
+    for (const id of [
+      ...z.array(z.string()).parse(JSON.parse(thread.target_knowledge_unit_ids_json)),
+      ...z.array(z.string()).parse(JSON.parse(thread.deferred_knowledge_unit_ids_json)),
+    ])
+      selected.add(id);
     const plans = db.all(
       "SELECT data_json FROM turn_plans WHERE learner_id=? AND thread_id=? ORDER BY created_at DESC LIMIT 4",
       [input.owner, thread.id],
@@ -174,47 +158,30 @@ export function loadTutorContext(
     selectedKnowledge.add(id);
   }
   const selectedKnowledgeIds = [...selectedKnowledge];
-  const placeholders = selectedKnowledgeIds.map(() => "?").join(",");
-  const learnerStates =
-    selectedKnowledgeIds.length === 0
-      ? []
-      : boundedRecords(
-          db.all(
-            `SELECT * FROM learner_state WHERE learner_id=? AND knowledge_id IN (${placeholders}) ORDER BY projected_at DESC`,
-            [input.owner, ...selectedKnowledgeIds],
-            stateRecord,
-          ),
-          6,
-          12_000,
-        );
-  const supportingEvidence =
-    selectedKnowledgeIds.length === 0
-      ? []
-      : boundedRecords(
-          db.all(
-            `SELECT * FROM evidence WHERE learner_id=? AND knowledge_id IN (${placeholders}) ORDER BY created_at DESC`,
-            [input.owner, ...selectedKnowledgeIds],
-            stateRecord,
-          ),
-          4,
-          16_000,
-        );
   return {
     currentGoal: thread?.goal ?? conversation.goal ?? input.content,
     threadId: thread?.id ?? null,
+    learningThread: thread,
     selectedKnowledgeIds,
     recentContext,
     tutorTexts: recentContext
       .filter((message) => message.role === "tutor")
       .map((message) => message.content),
     relations,
-    learnerStates,
-    supportingEvidence,
+    assessments:
+      thread === null
+        ? []
+        : db.all(
+            "SELECT * FROM assessments WHERE learner_id=? AND thread_id=? ORDER BY created_at DESC,id LIMIT 12",
+            [input.owner, thread.id],
+            stateRecord,
+          ),
+    ...loadLearnerContext(db, input.owner, selectedKnowledgeIds),
     openQuestions:
       thread === null
         ? []
         : db.all(
-            "SELECT * FROM open_questions WHERE learner_id=? AND thread_id=? AND status='open' ORDER BY created_at DESC LIMIT 12",
+            "SELECT * FROM open_questions WHERE learner_id=? AND thread_id=? AND status IN ('open','parked') ORDER BY CASE status WHEN 'open' THEN 0 ELSE 1 END,created_at DESC LIMIT 12",
             [input.owner, thread.id],
             stateRecord,
           ),

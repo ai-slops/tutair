@@ -3,9 +3,13 @@ import { Hono } from "hono";
 import { parse } from "yaml";
 import { z } from "zod";
 import { jsonBody, ownerFor, type Services } from "./context.js";
+import {
+  canonicalKnowledgeYamlSchema,
+  knowledgeCreateBoundarySchema,
+} from "./knowledge-contracts.js";
 import { genericRecord } from "./records.js";
 import { registerEvidenceRoutes } from "./routes-evidence.js";
-import { canonicalYamlSchema, importSchema, knowledgeCreateSchema } from "./schemas.js";
+import { importSchema } from "./schemas.js";
 import { searchKnowledge } from "./search.js";
 import { ApiError, isoNow, newId } from "./types.js";
 
@@ -52,7 +56,7 @@ export const knowledgeRoutes = (services: Services): Hono => {
   });
   app.post("/knowledge", async (c) => {
     const owner = ownerFor(c, services);
-    const body = knowledgeCreateSchema.parse(await jsonBody(c));
+    const body = knowledgeCreateBoundarySchema.parse(await jsonBody(c));
     return c.json(services.knowledge.create(owner, body), 201);
   });
   app.post("/knowledge/import", async (c) => {
@@ -77,7 +81,7 @@ export const knowledgeRoutes = (services: Services): Hono => {
       );
     const request = importSchema.parse(await jsonBody(c));
     const document: unknown = parse(request.content);
-    const data = canonicalYamlSchema.parse(document);
+    const data = canonicalKnowledgeYamlSchema.parse(document);
     const imported = services.db.transaction(() => {
       const results = data.items.map((item) => {
         const result = services.knowledge.create(null, {
@@ -90,6 +94,7 @@ export const knowledgeRoutes = (services: Services): Hono => {
           kind: item.kind,
           aliases: item.aliases,
           semanticScope: item.semanticScope,
+          definitionScope: item.definitionScope,
           distinguishingFeatures: item.distinguishingFeatures,
           claims: item.claims,
           sourceRefs: [data.source],

@@ -22,7 +22,9 @@ export const exportRoutes = (services: Services): Hono => {
       threads: services.core.threads(owner),
       threadConversations: owned("thread_conversations"),
       threadEvents: owned("thread_events"),
+      currentThreads: owned("current_threads"),
       openQuestions: owned("open_questions"),
+      threadQuestionEvents: owned("thread_question_events"),
       knowledge,
       revisions: services.db.all(
         "SELECT r.* FROM knowledge_revisions r JOIN knowledge_items k ON k.id=r.knowledge_id WHERE k.learner_id IS NULL OR k.learner_id=? ORDER BY r.knowledge_id,r.revision",
@@ -45,6 +47,11 @@ export const exportRoutes = (services: Services): Hono => {
       modelRunDetails: services.db.all(
         "SELECT d.* FROM model_run_details d JOIN model_runs r ON r.id=d.run_id WHERE r.learner_id=?",
         [owner],
+        genericRecord,
+      ),
+      modelRunContexts: services.db.all(
+        "SELECT c.* FROM model_run_contexts c JOIN model_runs r ON r.id=c.run_id WHERE c.learner_id=? AND r.learner_id=? ORDER BY c.created_at,c.run_id",
+        [owner, owner],
         genericRecord,
       ),
       traces: owned("traces"),

@@ -1,5 +1,8 @@
 import { z } from "zod";
+import { threadRecord } from "./thread-schemas.js";
 import { riskScopes } from "./types.js";
+
+export { threadRecord };
 
 export const learnerRecord = z.object({
   id: z.string(),
@@ -32,16 +35,6 @@ export const messageRecord = z.object({
   created_at: z.string(),
   updated_at: z.string(),
 });
-export const threadRecord = z.object({
-  id: z.string(),
-  learner_id: z.string(),
-  conversation_id: z.string().nullable(),
-  title: z.string(),
-  goal: z.string(),
-  status: z.enum(["open", "paused", "resolved"]),
-  created_at: z.string(),
-  updated_at: z.string(),
-});
 export const knowledgeRecord = z.object({
   id: z.string(),
   learner_id: z.string().nullable(),
@@ -70,6 +63,7 @@ export const revisionRecord = z.object({
   revision: z.number(),
   statement: z.string(),
   semantic_scope: z.string(),
+  definition_scope_json: z.string(),
   distinguishing_features_json: z.string(),
   claims_json: z.string(),
   source_refs_json: z.string(),
@@ -114,6 +108,7 @@ export const evidenceRecord = z.object({
   strength: z.number(),
   evaluator_confidence: z.number(),
   evaluator_type: z.string(),
+  evaluator_metadata_json: z.string(),
   evaluator_model_run_id: z.string().nullable(),
   rubric_version: z.string(),
   hints: z.number(),

@@ -1,3 +1,4 @@
+import type { DefinitionScope, EvidenceEvaluator } from "./knowledge-contracts.js";
 import type { KnowledgeDimension } from "./learner-projection.js";
 import type { RiskScope } from "./types.js";
 
@@ -17,6 +18,7 @@ export type RevisionClaim = {
   readonly text: string;
   readonly authority: "canonical" | "provisional" | "learner" | "external";
   readonly sourceRefs: readonly string[];
+  readonly status?: "model_generated" | "source_supported" | "reviewed" | undefined;
 };
 
 export type NewKnowledge = {
@@ -34,6 +36,7 @@ export type NewKnowledge = {
     | "misconception";
   readonly aliases?: readonly string[];
   readonly semanticScope?: string;
+  readonly definitionScope?: DefinitionScope;
   readonly distinguishingFeatures?: readonly string[];
   readonly claims?: readonly (string | RevisionClaim)[];
   readonly sourceRefs?: readonly string[];
@@ -60,11 +63,7 @@ export type NewEvidence = {
   readonly polarity: "positive" | "negative" | "ambiguous";
   readonly strength: number;
   readonly evaluatorConfidence: number;
-  readonly evaluator: {
-    readonly type: "model" | "human" | "rule";
-    readonly modelRunId?: string | null;
-    readonly rubricVersion: string;
-  };
+  readonly evaluator: EvidenceEvaluator;
   readonly assistance: {
     readonly hints: number;
     readonly answerVisible: boolean;

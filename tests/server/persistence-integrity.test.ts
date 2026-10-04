@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
+import { CoreRepository } from "../../src/server/repository-core.js";
 import { createBackendHarness, type Json, makeClient, post } from "./backend-harness.js";
 
 const createdKnowledge = async (client: ReturnType<typeof makeClient>, title: string) => {
@@ -127,16 +128,38 @@ describe("correction and projection persistence integrity", () => {
     // Given
     const { client, database } = harness.setup();
     const signup = await client.json("/api/auth/local-signup", post({}));
-    const learnerId = ((signup["learner"] as Json).id ?? "") as string;
+    const learnerId = z.object({ learner: z.object({ id: z.string() }) }).parse(signup).learner.id;
     const knowledge = await createdKnowledge(client, "Exposure topic");
-    database.run("INSERT INTO exposures VALUES(?,?,?,?,?,?)", [
-      "00000000-0000-4000-8000-000000000002",
-      learnerId,
-      knowledge.item.id,
-      1,
-      null,
-      "2026-09-19T00:00:00.000Z",
-    ]);
+    const core = new CoreRepository(database);
+    const conversation = z
+      .object({ id: z.string() })
+      .parse(core.createConversation(learnerId, "Exposure", null));
+    const message = z
+      .object({ id: z.string() })
+      .parse(core.createMessage(learnerId, conversation.id, "tutor", "Exposure topic definition"));
+    const event = z
+      .object({ id: z.string() })
+      .parse(
+        database.one(
+          "SELECT id FROM message_events WHERE message_id=?",
+          [message.id],
+          z.object({ id: z.string() }),
+        ),
+      );
+    database.run(
+      "INSERT INTO exposures(id,learner_id,knowledge_id,revision,message_id,created_at,knowledge_revision_id,message_event_id,provenance) VALUES(?,?,?,?,?,?,?,?,?)",
+      [
+        "00000000-0000-4000-8000-000000000002",
+        learnerId,
+        knowledge.item.id,
+        1,
+        message.id,
+        "2026-09-19T00:00:00.000Z",
+        knowledge.revision.id,
+        event.id,
+        "generation_snapshot",
+      ],
+    );
 
     // When
     await client.call("/api/evidence/rebuild", post({ knowledgeId: knowledge.item.id }));
