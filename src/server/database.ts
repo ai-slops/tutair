@@ -5,6 +5,7 @@ import { migrateKnowledgeMetadata } from "./knowledge-migration.js";
 import { projectionVersion } from "./learner-projection.js";
 import { migrateModelContexts } from "./model-context-migration.js";
 import { migrateThreads } from "./thread-migration.js";
+import { migrateTurnRequests } from "./turn-request-migration.js";
 
 const migrations = `
 PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA recursive_triggers=ON;
@@ -86,6 +87,7 @@ export class Database {
       migrateModelContexts(this.raw);
       migrateKnowledgeMetadata(this.raw);
       migrateThreads(this.raw);
+      migrateTurnRequests(this.raw);
     } catch (error) {
       this.raw.close();
       throw error;

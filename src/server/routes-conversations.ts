@@ -2,7 +2,9 @@ import type { Hono } from "hono";
 import { z } from "zod";
 import { jsonBody, ownerFor, type Services } from "./context.js";
 import { genericRecord } from "./records.js";
-import { conversationSchema, messageSchema, tutorTurnSchema } from "./schemas.js";
+import { conversationSchema, messageSchema } from "./schemas.js";
+import { registerTutorTurnRoute } from "./turn-request-route.js";
+import { TurnRequestStore } from "./turn-request-store.js";
 import { ApiError } from "./types.js";
 
 const blockedRecord = z.object({ blocked: z.number() });
@@ -28,9 +30,12 @@ export const registerConversationRoutes = (app: Hono, services: Services): void 
   app.get("/conversations/:id", (c) => {
     const owner = ownerFor(c, services);
     const id = c.req.param("id");
+    const currentThread = services.core.currentThread(owner, id);
     return c.json({
       conversation: services.core.conversation(owner, id),
       messages: services.core.messages(owner, id),
+      currentThreadId: currentThread?.id ?? null,
+      turnOutcomes: new TurnRequestStore(services.db).outcomes(owner, id),
       threads: services.db.all(
         "SELECT t.* FROM threads t JOIN thread_conversations tc ON tc.thread_id=t.id WHERE tc.learner_id=? AND tc.conversation_id=? ORDER BY t.updated_at DESC",
         [owner, id],
@@ -86,60 +91,5 @@ export const registerConversationRoutes = (app: Hono, services: Services): void 
     services.core.tombstone(ownerFor(c, services), c.req.param("id"), c.req.param("messageId"));
     return c.body(null, 204);
   });
-  app.post("/conversations/:id/tutor-turn", async (c) => {
-    const owner = ownerFor(c, services);
-    const conversationId = c.req.param("id");
-    services.core.conversation(owner, conversationId);
-    const cutoff = Date.now() - 60_000;
-    const attempts = (services.turnAttempts.get(owner) ?? []).filter((time) => time > cutoff);
-    if (attempts.length >= 20)
-      throw new ApiError(429, "rate_limited", "Tutor turn rate limit exceeded");
-    attempts.push(Date.now());
-    services.turnAttempts.set(owner, attempts);
-    const body = tutorTurnSchema.parse(await jsonBody(c));
-    const lock = `${owner}:${conversationId}`;
-    if (services.turnLocks.has(lock))
-      throw new ApiError(409, "turn_in_progress", "A tutor turn is already running");
-    services.turnLocks.add(lock);
-    try {
-      const userMessage = services.core.createMessage(
-        owner,
-        conversationId,
-        "learner",
-        body.content,
-      );
-      const messageId = z.object({ id: z.string() }).parse(userMessage).id;
-      try {
-        const result = await services.tutor.turn({
-          owner,
-          conversationId,
-          messageId,
-          content: body.content,
-          assistance: body.assistance,
-          selfReport: body.selfReport,
-          ...(body.confidence === undefined ? {} : { confidence: body.confidence }),
-          ...(body.threadId === undefined ? {} : { threadId: body.threadId }),
-          ...(body.newThread === undefined ? {} : { newThread: body.newThread }),
-          ...(body.origin === undefined ? {} : { origin: body.origin }),
-          ...(body.whyNow === undefined ? {} : { whyNow: body.whyNow }),
-          ...(body.desiredOutcome === undefined ? {} : { desiredOutcome: body.desiredOutcome }),
-        });
-        return c.json(
-          { userMessage, ...result, synthetic: services.provider.state.synthetic },
-          201,
-        );
-      } catch (error) {
-        if (error instanceof ApiError)
-          throw new ApiError(error.status, error.code, error.message, {
-            ...error.details,
-            userMessageId: messageId,
-          });
-        throw new ApiError(500, "tutor_turn_failed", "Tutor turn failed after saving input", {
-          userMessageId: messageId,
-        });
-      }
-    } finally {
-      services.turnLocks.delete(lock);
-    }
-  });
+  registerTutorTurnRoute(app, services);
 };
