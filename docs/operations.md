@@ -90,6 +90,11 @@ record. Editing a message preserves its previous content in the event history.
 Evidence refers to the assessed revision and source, not whatever definition
 happens to be current today.
 
+New exposure records likewise retain the final-generation revision and the tutor
+message's original event. Exposure updates, replacement writes, and normal deletes
+are rejected by database triggers; privacy erasure permits the required cascades,
+including learner-local exposures to shared canonical knowledge.
+
 The explicit privacy-erasure operation deletes learner-owned source and derived
 data and revokes the session. That operation is the deliberate exception to
 append-only history. An operator must separately remove backups and previously
@@ -106,6 +111,43 @@ same application version first, verify access and a conversation, then upgrade.
 
 Model artifacts are replaceable and need not be backed up, but caching them
 allows subsequent local semantic searches without network downloads.
+
+### Thread, knowledge, and model-context upgrades
+
+Startup now initializes thread metadata/current-selection/question-event tables,
+structured definition-scope and evaluator metadata columns, and immutable model
+context snapshots. Original question duplicates and prior revision rows are
+retained; new question insertion is deduplicated without deleting history.
+Existing `open`/`paused` statuses are kept, with aliases accepted at the API.
+
+Snapshots contain the bounded learner context actually supplied to the provider
+adapter, including private message excerpts, knowledge revisions, and learner
+state. Treat snapshots and exports with the same privacy controls as conversation
+data. They increase database size: a turn can have several bounded snapshots,
+including failed and repaired calls. They are not a store of provider credentials
+or internal chain-of-thought. Historical runs without snapshots remain unavailable
+for exact input replay. Privacy erasure cascades to the new private tables.
+
+The application enables SQLite recursive triggers on every `Database` connection
+so immutable DELETE guards also apply to the deletion implicit in REPLACE writes.
+Operator scripts must use the same connection policy; do not disable integrity
+triggers or bypass the application connection setup to mutate historical records.
+
+### Exposure provenance upgrade
+
+Back up before upgrading. Opening the database applies an atomic exposure schema
+migration: three additive columns, one-time revision-ID backfill, and immutable
+history/insert-integrity triggers. Existing IDs, numeric revisions, messages, and
+timestamps are preserved. All migrated rows stay `legacy_unverified`; source event
+IDs are not guessed. Unresolved revision IDs remain null and do not contribute to
+future revisions merely because their sequence numbers happen to match.
+
+Repeated starts do not rewrite these rows. An incompletely hand-modified schema
+fails with `exposure_schema_partial`; restore a consistent backup rather than
+manually disabling integrity triggers. The legacy and new rows can coexist.
+Do not run the old binary against the upgraded database: its six-value positional
+exposure INSERT is incompatible. Rollback requires the matching pre-upgrade backup
+and application version, not deleting the new columns from live data.
 
 ## Provider failures
 

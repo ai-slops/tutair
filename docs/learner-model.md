@@ -37,6 +37,22 @@ immutable message event, the assessed source snapshot, supporting character span
 and evaluator provenance. A revised definition does not inherit old evidence.
 Exports retain both source and derived records.
 
+New exposures retain the final-generation knowledge revision and the original
+tutor message event. A revision change while generation, schema repair, or final
+review is in progress does not move that exposure to the newer definition.
+Exposures are immutable and learner-local; only privacy erasure removes them.
+Legacy exposures are marked `legacy_unverified`, with no inferred source event.
+Rebuild uses exact stored revision UUIDs, including the UUIDs recovered from valid
+legacy unit/revision pairs. An unresolved legacy revision never gains exposure
+merely because a matching sequence number is created later.
+
+Projection rebuilds reconstruct all immutable revisions of each selected unit,
+including historical evidence, exposures, and subsequent invalidations or
+corrections. Current unit aggregates and tutor context use only current-revision
+state. Historical state remains inspectable through the revision API and does not
+become evidence for a newer definition. This is recalculation with the current
+algorithm and clock, not an as-of-time replay; staleness can change with time.
+
 Invalidated observations remain in the archive but stop contributing to state.
 Claiming less knowledge raises uncertainty and removes supported status where
 appropriate. Claiming more knowledge weakly reduces recognition uncertainty by
@@ -71,6 +87,7 @@ than being destructively merged.
 
 The runtime indexes authorized messages, threads, knowledge, and evidence using
 SQLite FTS5 and combines lexical and semantic ranks with reciprocal-rank fusion.
+Thread search also includes the durable desired outcome and why-now metadata.
 The query-local FTS index deliberately excludes other learners from BM25 corpus
 statistics and is discarded immediately after ranking. This favors simple,
 private local operation over large-corpus indexing throughput.
@@ -85,3 +102,22 @@ selected definitions, one-hop relationships, revision-specific state, evidence,
 recent messages, and thread questions. New evidence is projected before planning.
 An additional final-answer lint protects high-risk output. Exposures require
 approved unit IDs and non-empty spans in the final reply.
+
+Post-resolution context now refreshes definitions, revision-scoped state and
+relations before planning, draft, and lint. Retrieved units remain available to
+final generation alongside lint-discovered units. Safety lint receives the whole
+draft, or the call explicitly fails its budget check; a truncated tail is not
+silently treated as inspected.
+
+Evaluation validates observations against the exact revisions offered for that
+call, supplied assessments, the selected thread, related-unit IDs, and UTF-16
+span bounds in the original learner message. A source edit during the model call
+does not retarget evidence to the edited event. Invalid batches are regenerated
+once and otherwise skipped with an explicit flag; evidence and the accepted
+evaluation outcome are persisted atomically. A structured follow-up is a pending
+learning question, not a mastery observation or a mandatory quiz.
+
+The bounded model input envelope is preserved in immutable learner-private
+`model_run_contexts`. Its revision/state references and schema versions explain
+the inference inputs; this is not a guarantee of deterministic model output or
+educational calibration. See [real quality evaluation](quality-evaluation.md).
