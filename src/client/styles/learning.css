@@ -1,0 +1,195 @@
+.thread-indexes,
+.thread-index,
+.learning-thread-list,
+.learning-thread-copy,
+.knowledge-queues,
+.queue-list,
+.tracking-notice-copy,
+.recovery-content,
+.recovery-options,
+.question-form,
+.queue-actions,
+.field-stack {
+  display: grid;
+}
+
+.thread-indexes,
+.knowledge-queues {
+  gap: var(--space-6);
+}
+
+.thread-indexes {
+  margin-block-start: var(--space-4);
+}
+
+.thread-index,
+.learning-thread-list,
+.queue-list,
+.tracking-notice-copy,
+.recovery-content,
+.recovery-options,
+.question-form,
+.queue-actions,
+.field-stack {
+  gap: var(--space-2);
+}
+
+.thread-index + .thread-index {
+  padding-block-start: var(--space-6);
+  border-block-start: 1px solid var(--color-rule);
+}
+
+.index-heading,
+.queue-heading,
+.dialog-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.index-heading h2 {
+  font-family: var(--font-sans);
+  font-size: var(--type-h3);
+  font-weight: 600;
+}
+
+.learning-thread-row,
+.queue-row {
+  display: grid;
+  gap: var(--space-3);
+  min-inline-size: 0;
+  padding: var(--space-3);
+  background: var(--color-paper);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-sm);
+}
+
+.queue-actions {
+  grid-auto-flow: column;
+}
+
+.learning-thread-row .queue-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-flow: row;
+}
+
+.question-form {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.queue-row {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+}
+
+.queue-row .queue-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-flow: row;
+}
+
+.learning-thread-row[data-active="true"] {
+  background: var(--color-forest-wash);
+  border-color: var(--color-rule-strong);
+}
+
+.learning-thread-copy > *,
+.queue-row > *,
+.recovery-option span {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+  text-wrap: pretty;
+}
+
+.learning-thread-copy span,
+.recovery-option small {
+  color: var(--color-ink-muted);
+  font-size: var(--type-small);
+}
+
+.learning-thread-row .button,
+.queue-row .button {
+  justify-self: start;
+}
+
+.learning-thread-row .queue-actions > .button {
+  inline-size: 100%;
+}
+
+.notice-tracking {
+  color: var(--color-amber);
+  background: var(--color-amber-wash);
+}
+
+.message-with-tracking {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.recovery-notice {
+  color: var(--color-ink);
+  background: var(--color-forest-wash);
+}
+
+.recovery-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-block-size: var(--control-min);
+  padding: var(--space-3);
+  color: var(--color-ink);
+  text-align: start;
+  background: var(--color-paper);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-sm);
+}
+
+.recovery-option > span:first-child {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.recovery-option:hover {
+  border-color: var(--color-rule-strong);
+}
+
+.field-stack > span {
+  font-size: var(--type-small);
+  font-weight: 700;
+}
+
+.field-stack textarea.modal-field {
+  padding-block: var(--space-3);
+  resize: vertical;
+}
+
+.field-stack select.modal-field {
+  background: var(--color-paper-raised);
+}
+
+.dialog-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 45rem) {
+  .question-form,
+  .queue-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dialog-actions > .button,
+  .question-form > .button,
+  .queue-actions > .button,
+  .learning-thread-row .button,
+  .queue-row .button {
+    inline-size: 100%;
+  }
+
+  .queue-actions {
+    grid-auto-flow: row;
+  }
+}
