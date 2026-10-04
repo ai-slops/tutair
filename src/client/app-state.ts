@@ -17,3 +17,10 @@ export async function sendDraft(
   if (content.length === 0) return;
   if (await send(content)) clear();
 }
+
+export function clearMatchingRecoveredDraft(
+  savedContent: string,
+  setDraft: (update: (current: string) => string) => void,
+): void {
+  setDraft((current) => (current === savedContent ? "" : current));
+}

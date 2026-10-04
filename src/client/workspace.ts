@@ -1,15 +1,21 @@
 import type {
-  CorrectionKind,
-  KnowledgeItem,
-  Message,
-  ProviderStatus,
-  SearchResult,
-  Thread,
-} from "./model";
+  ConversationSummary,
+  LearningThread,
+  LearningThreadDetail,
+  LearningThreadInput,
+  LearningThreadStatus,
+  QuestionStatus,
+  RecoveryChoice,
+  TurnRecovery,
+} from "./learning-model";
+import type { CorrectionKind, KnowledgeItem, Message, ProviderStatus, SearchResult } from "./model";
 
 export type WorkspaceSnapshot = {
-  readonly threads: readonly Thread[];
-  readonly activeThreadId: string | null;
+  readonly conversations: readonly ConversationSummary[];
+  readonly activeConversationId: string | null;
+  readonly learningThreads: readonly LearningThread[];
+  readonly activeLearningThread: LearningThreadDetail | null;
+  readonly recovery: TurnRecovery | null;
   readonly messages: readonly Message[];
   readonly knowledge: readonly KnowledgeItem[];
   readonly provider: ProviderStatus;
@@ -17,10 +23,22 @@ export type WorkspaceSnapshot = {
 
 export interface WorkspaceApi {
   load(): Promise<WorkspaceSnapshot>;
-  createThread(): Promise<WorkspaceSnapshot>;
+  createConversation(): Promise<WorkspaceSnapshot>;
+  createLearningThread(input: LearningThreadInput): Promise<WorkspaceSnapshot>;
   openConversation(conversationId: string): Promise<WorkspaceSnapshot>;
   openSearchThread(threadId: string): Promise<WorkspaceSnapshot>;
-  sendMessage(threadId: string | null, content: string): Promise<WorkspaceSnapshot>;
+  sendMessage(conversationId: string | null, content: string): Promise<WorkspaceSnapshot>;
+  resolveTurn(choice: RecoveryChoice): Promise<WorkspaceSnapshot>;
+  retryTurn(): Promise<WorkspaceSnapshot>;
+  updateLearningThread(threadId: string, input: LearningThreadInput): Promise<WorkspaceSnapshot>;
+  setThreadStatus(threadId: string, status: LearningThreadStatus): Promise<WorkspaceSnapshot>;
+  addQuestion(threadId: string, text: string): Promise<WorkspaceSnapshot>;
+  setQuestionStatus(
+    threadId: string,
+    questionId: string,
+    status: QuestionStatus,
+  ): Promise<WorkspaceSnapshot>;
+  promoteKnowledge(threadId: string, knowledgeId: string): Promise<WorkspaceSnapshot>;
   createSession(): Promise<WorkspaceSnapshot>;
   correctKnowledge(
     itemId: string,
@@ -46,8 +64,11 @@ export const EMPTY_PROVIDER: ProviderStatus = {
 };
 
 export const EMPTY_SNAPSHOT: WorkspaceSnapshot = {
-  threads: [],
-  activeThreadId: null,
+  conversations: [],
+  activeConversationId: null,
+  learningThreads: [],
+  activeLearningThread: null,
+  recovery: null,
   messages: [],
   knowledge: [],
   provider: EMPTY_PROVIDER,

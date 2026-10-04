@@ -22,9 +22,12 @@ function deferred<T>(): {
   };
 }
 
-const snapshot = (activeThreadId: string): WorkspaceSnapshot => ({
-  threads: [],
-  activeThreadId,
+const snapshot = (activeConversationId: string): WorkspaceSnapshot => ({
+  conversations: [],
+  activeConversationId,
+  learningThreads: [],
+  activeLearningThread: null,
+  recovery: null,
   messages: [],
   knowledge: [],
   provider: {
@@ -41,7 +44,7 @@ describe("workspace correctness", () => {
     const applied: string[] = [];
     const run = createLatestRunner<WorkspaceSnapshot>({
       onStart: vi.fn(),
-      onValue: (value) => applied.push(value.activeThreadId ?? "none"),
+      onValue: (value) => applied.push(value.activeConversationId ?? "none"),
       onError: vi.fn(),
       onSettled: vi.fn(),
     });
@@ -61,7 +64,7 @@ describe("workspace correctness", () => {
     const errors: string[] = [];
     const run = createLatestRunner<WorkspaceSnapshot>({
       onStart: vi.fn(),
-      onValue: (value) => applied.push(value.activeThreadId ?? "none"),
+      onValue: (value) => applied.push(value.activeConversationId ?? "none"),
       onError: (error) => errors.push(error.message),
       onSettled: vi.fn(),
     });
@@ -81,7 +84,7 @@ describe("workspace correctness", () => {
     const applied: string[] = [];
     const run = createLatestRunner<WorkspaceSnapshot>({
       onStart: vi.fn(),
-      onValue: (value) => applied.push(value.activeThreadId ?? "none"),
+      onValue: (value) => applied.push(value.activeConversationId ?? "none"),
       onError: vi.fn(),
       onSettled: vi.fn(),
     });
