@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
+import { compress } from "hono/compress";
 import { secureHeaders } from "hono/secure-headers";
 import { z } from "zod";
 import { createApp } from "./app.js";
@@ -39,6 +40,11 @@ app.use(
     referrerPolicy: "no-referrer",
   }),
 );
+app.use("/assets/*", compress());
+app.use("/assets/*", async (context, next) => {
+  await next();
+  context.header("Cache-Control", "public, max-age=31536000, immutable");
+});
 app.get("/assets/*", serveStatic({ root: "./dist/client" }));
 app.get("/favicon.svg", serveStatic({ root: "./dist/client" }));
 app.get("/favicon.ico", (c) => c.body(null, 204));
