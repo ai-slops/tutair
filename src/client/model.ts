@@ -1,3 +1,5 @@
+import type { TrackingStatus } from "./learning-model";
+
 export const DIMENSIONS = [
   "Recognition",
   "Recall",
@@ -16,18 +18,13 @@ export const DIMENSION_LABELS = {
   transfer: "Transfer",
 } as const satisfies Record<string, DimensionName>;
 
-export type Thread = {
-  readonly id: string;
-  readonly title: string;
-  readonly updatedAt: string;
-};
-
 export type Message = {
   readonly id: string;
   readonly role: "user" | "assistant";
   readonly content: string;
   readonly createdAt: string;
   readonly status: "complete" | "sending" | "failed";
+  readonly tracking?: TrackingStatus;
 };
 
 export type Evidence = {
