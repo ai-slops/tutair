@@ -22,7 +22,7 @@ is explicitly configured on the server, never silently selected after a failure.
 - `POST /api/conversations/:id/messages` `{ content: string }` -> `201 { message }`
 - `PATCH /api/conversations/:id/messages/:messageId` `{ content: string }` -> `{ message }`
 - `DELETE /api/conversations/:id/messages/:messageId` -> `204`
-- `POST /api/conversations/:id/tutor-turn` `{ content: string, assistance?: "none"|"hint"|"worked_example", confidence?: number, selfReport?: "unsure"|"neutral"|"confident" }` -> `201 { userMessage, tutorMessage?, run, thread?, knowledgeChanges, synthetic }`. Input is persisted even when generation fails.
+- `POST /api/conversations/:id/tutor-turn` `{ content: string, requestId?: UUID, assistance?: "none"|"hint"|"worked_example", confidence?: number, selfReport?: "unsure"|"neutral"|"confident" }` -> `201 { requestId, userMessage, tutorMessage?, run, thread?, knowledgeChanges, synthetic }`. Input is persisted even when generation fails. Reusing the same `requestId` and base input resumes or returns the stored request rather than creating a second learner message; conflicting reuse is rejected.
 
 Messages retain immutable edit events; deletion is a tombstone.
 
@@ -42,8 +42,11 @@ The metadata initializes a new thread, rather than rewriting an existing project
 durable outcome. The current thread is retained unless explicitly overridden.
 Without one, an exact-title retrieved match can be selected; ambiguous candidates
 return 409 `thread_selection_ambiguous` with JSON-encoded `error.details.candidateIds`.
-Use an explicit `threadId` or `newThread: true` to resolve that choice. The accepted
-learner message remains saved, as for other failed turns.
+Use the returned `requestId` with an explicit `threadId` or `newThread: true` to
+resolve that choice. The accepted learner message remains saved and is not posted
+again. A request still running can be continued with the same ID; unknown delivery
+is checked before retry, while a confirmed failed request is refreshed rather than
+blindly resubmitted.
 
 Turn `run.evaluationSkipped` distinguishes a successful empty evaluation from a
 failed or persistently invalid evaluation. `run.followupTrackingSkipped` identifies
