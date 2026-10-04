@@ -18,8 +18,18 @@ const http = vi.hoisted(() => {
       json: () => {
         requests.push(`GET ${path}`);
         if (path === "threads/thread-search")
-          return Promise.resolve({ conversations: [conversation] });
-        if (path === "threads/thread-empty") return Promise.resolve({ conversations: [] });
+          return Promise.resolve({
+            thread: thread("thread-search"),
+            openQuestions: [],
+            conversations: [conversation],
+          });
+        if (path === "threads/thread-empty")
+          return Promise.resolve({
+            thread: thread("thread-empty"),
+            openQuestions: [],
+            conversations: [],
+          });
+        if (path === "threads") return Promise.resolve({ threads: [thread("thread-search")] });
         if (path === "session") return Promise.resolve({ learner: { id: "learner" } });
         if (path === "capabilities")
           return Promise.resolve({
@@ -41,12 +51,28 @@ const http = vi.hoisted(() => {
     post: vi.fn((path: string, _options?: unknown) => ({
       json: () => {
         requests.push(`POST ${path}`);
-        if (path === "threads/thread-empty/resume") return Promise.resolve({ conversation });
+        if (path === "threads/thread-empty/resume" || path === "threads/thread-search/resume")
+          return Promise.resolve({ conversation });
         throw new TypeError(`Unexpected POST ${path}`);
       },
     })),
     delete: vi.fn(),
   };
+  function thread(id: string) {
+    return {
+      id,
+      title: "FSM",
+      conversationId: id === "thread-empty" ? null : conversation.id,
+      goal: "Learn",
+      origin: "question",
+      whyNow: null,
+      desiredOutcome: "Learn",
+      status: "paused",
+      targetKnowledgeUnitIds: [],
+      deferredKnowledgeUnitIds: [],
+      updatedAt: conversation.updatedAt,
+    };
+  }
   return { client, requests };
 });
 
@@ -64,15 +90,16 @@ describe("thread resume and learner state", () => {
   it("opens the most recent conversation linked to a thread search result", async () => {
     const result = await api.openSearchThread("thread-search");
 
-    expect(result.activeThreadId).toBe("conversation-linked");
+    expect(result.activeConversationId).toBe("conversation-linked");
     expect(http.requests).toContain("GET threads/thread-search");
     expect(http.requests).not.toContain("GET conversations/thread-search");
+    expect(http.requests).toContain("POST threads/thread-search/resume");
   });
 
   it("resumes a thread with no linked conversation", async () => {
     const result = await api.openSearchThread("thread-empty");
 
-    expect(result.activeThreadId).toBe("conversation-linked");
+    expect(result.activeConversationId).toBe("conversation-linked");
     expect(http.requests).toContain("POST threads/thread-empty/resume");
   });
 
@@ -117,6 +144,7 @@ describe("thread resume and learner state", () => {
         open
         items={[item]}
         selected={item}
+        error={null}
         onClose={vi.fn()}
         onSelect={vi.fn()}
         onCorrect={vi.fn()}

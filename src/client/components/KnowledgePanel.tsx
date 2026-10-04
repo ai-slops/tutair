@@ -1,39 +1,59 @@
 import { BookMarked, CheckCircle2, FileText, PencilLine, X } from "lucide-react";
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
+import type { LearningThreadDetail } from "../learning-model";
 import { DIMENSIONS, type DimensionName, type KnowledgeItem } from "../model";
 import { useFocusTrap } from "../useFocusTrap";
+import { useMediaMatch } from "../useMediaMatch";
+import { KnowledgeQueues } from "./KnowledgeQueues";
 import { LearnerStatePanel } from "./LearnerStatePanel";
 
 type KnowledgePanelProps = {
   readonly open: boolean;
   readonly items: readonly KnowledgeItem[];
   readonly selected: KnowledgeItem | null;
+  readonly error: string | null;
+  readonly learningThread?: LearningThreadDetail | null;
   readonly onClose: () => void;
   readonly onSelect: (item: KnowledgeItem) => void;
   readonly onCorrect: (item: KnowledgeItem) => void;
+  readonly onPromote?: (id: string) => Promise<boolean>;
+  readonly onAddQuestion?: (question: string) => Promise<boolean>;
+  readonly onSetQuestionStatus?: (
+    id: string,
+    status: "open" | "parked" | "resolved",
+  ) => Promise<boolean>;
 };
 
 export function KnowledgePanel(props: KnowledgePanelProps) {
   const paneRef = useRef<HTMLElement>(null);
-  useFocusTrap(props.open, paneRef, props.onClose, { mediaQuery: "(max-width: 70rem)" });
+  const overlay = useMediaMatch("(max-width: 70rem)");
+  const overlayDialogProps = overlay ? { role: "dialog" as const, "aria-modal": props.open } : {};
+  const deferredKnowledgeIds = useMemo(
+    () => new Set(props.learningThread?.deferredKnowledgeUnitIds ?? []),
+    [props.learningThread?.deferredKnowledgeUnitIds],
+  );
+  useFocusTrap(props.open && overlay, paneRef, props.onClose);
 
   return (
     <aside
+      {...overlayDialogProps}
       ref={paneRef}
       className="knowledge-pane"
       data-open={props.open}
-      aria-label="Knowledge and evidence"
+      inert={overlay && !props.open}
+      aria-hidden={overlay && !props.open}
+      aria-label="Learning overview"
     >
       <div className="pane-header">
         <div>
           <p className="eyebrow">Evidence margin</p>
-          <h2>Knowledge</h2>
+          <h2>Overview</h2>
         </div>
         <button
           className="icon-button mobile-only"
           type="button"
           onClick={props.onClose}
-          aria-label="Close knowledge"
+          aria-label="Close overview"
         >
           <X className="icon" />
         </button>
@@ -44,6 +64,20 @@ export function KnowledgePanel(props: KnowledgePanelProps) {
         </p>
         <DimensionStrip items={props.items} onSelect={props.onSelect} />
         <ConceptList items={props.items} selected={props.selected} onSelect={props.onSelect} />
+        {props.learningThread === undefined ||
+        props.learningThread === null ||
+        props.onPromote === undefined ||
+        props.onAddQuestion === undefined ||
+        props.onSetQuestionStatus === undefined ? null : (
+          <KnowledgeQueues
+            deferred={props.items.filter((item) => deferredKnowledgeIds.has(item.id))}
+            questions={props.learningThread.questions}
+            error={props.error}
+            onPromote={props.onPromote}
+            onAddQuestion={props.onAddQuestion}
+            onSetQuestionStatus={props.onSetQuestionStatus}
+          />
+        )}
         {props.selected === null ? (
           <div className="detail-section">
             <BookMarked className="icon" />
@@ -84,7 +118,6 @@ function ConceptList({
               className="concept-row"
               type="button"
               key={item.id}
-              aria-label={`Inspect ${item.name}`}
               aria-pressed={selected?.id === item.id}
               onClick={() => onSelect(item)}
             >

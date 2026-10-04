@@ -1,5 +1,7 @@
 import { DIMENSIONS, type KnowledgeItem } from "../model";
 
+const NUMBER_FORMATTER = new Intl.NumberFormat("en", { maximumFractionDigits: 3 });
+
 export function LearnerStatePanel({ item }: { readonly item: KnowledgeItem }) {
   return (
     <section className="detail-section" aria-labelledby="learner-state-heading">
@@ -64,5 +66,5 @@ export function LearnerStatePanel({ item }: { readonly item: KnowledgeItem }) {
 }
 
 function formatValue(value: number): string {
-  return new Intl.NumberFormat("en", { maximumFractionDigits: 3 }).format(value);
+  return NUMBER_FORMATTER.format(value);
 }
