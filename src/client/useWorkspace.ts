@@ -1,4 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type {
+  LearningThreadInput,
+  LearningThreadStatus,
+  QuestionStatus,
+  RecoveryChoice,
+} from "./learning-model";
 import type { CorrectionKind, KnowledgeItem, SearchResult } from "./model";
 import {
   EMPTY_SNAPSHOT,
@@ -53,13 +59,26 @@ type SearchState = {
 
 type WorkspaceState = {
   readonly snapshot: WorkspaceSnapshot;
+  readonly initialized: boolean;
   readonly loading: boolean;
   readonly error: string | null;
   readonly refresh: () => Promise<boolean>;
-  readonly createThread: () => Promise<boolean>;
+  readonly createConversation: () => Promise<boolean>;
+  readonly createLearningThread: (input: LearningThreadInput) => Promise<boolean>;
   readonly openConversation: (id: string) => Promise<boolean>;
   readonly openSearchThread: (id: string) => Promise<boolean>;
   readonly send: (content: string) => Promise<boolean>;
+  readonly resolveTurn: (choice: RecoveryChoice) => Promise<boolean>;
+  readonly retryTurn: () => Promise<boolean>;
+  readonly updateLearningThread: (id: string, input: LearningThreadInput) => Promise<boolean>;
+  readonly setThreadStatus: (id: string, status: LearningThreadStatus) => Promise<boolean>;
+  readonly addQuestion: (id: string, text: string) => Promise<boolean>;
+  readonly setQuestionStatus: (
+    id: string,
+    questionId: string,
+    status: QuestionStatus,
+  ) => Promise<boolean>;
+  readonly promoteKnowledge: (id: string, knowledgeId: string) => Promise<boolean>;
   readonly createSession: () => Promise<boolean>;
   readonly correct: (
     item: KnowledgeItem,
@@ -72,6 +91,7 @@ type WorkspaceState = {
 
 export function useWorkspace(api: WorkspaceApi): WorkspaceState {
   const [snapshot, setSnapshot] = useState<WorkspaceSnapshot>(EMPTY_SNAPSHOT);
+  const [initialized, setInitialized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState<SearchState>({
@@ -89,7 +109,10 @@ export function useWorkspace(api: WorkspaceApi): WorkspaceState {
         },
         onValue: setSnapshot,
         onError: (cause) => setError(cause.message),
-        onSettled: () => setLoading(false),
+        onSettled: () => {
+          setLoading(false);
+          setInitialized(true);
+        },
       }),
     [],
   );
@@ -118,17 +141,35 @@ export function useWorkspace(api: WorkspaceApi): WorkspaceState {
 
   return {
     snapshot,
+    initialized,
     loading,
     error,
     refresh,
-    createThread: () => run(() => api.createThread()),
+    createConversation: () => run(() => api.createConversation()),
+    createLearningThread: (input) => run(() => api.createLearningThread(input)),
     openConversation: (id) => run(() => api.openConversation(id)),
     openSearchThread: (id) => run(() => api.openSearchThread(id)),
     send: (content) =>
       run(
-        () => api.sendMessage(snapshot.activeThreadId, content),
+        () => api.sendMessage(snapshot.activeConversationId, content),
         () => api.load(),
       ),
+    resolveTurn: (choice) =>
+      run(
+        () => api.resolveTurn(choice),
+        () => api.load(),
+      ),
+    retryTurn: () =>
+      run(
+        () => api.retryTurn(),
+        () => api.load(),
+      ),
+    updateLearningThread: (id, input) => run(() => api.updateLearningThread(id, input)),
+    setThreadStatus: (id, status) => run(() => api.setThreadStatus(id, status)),
+    addQuestion: (id, text) => run(() => api.addQuestion(id, text)),
+    setQuestionStatus: (id, questionId, status) =>
+      run(() => api.setQuestionStatus(id, questionId, status)),
+    promoteKnowledge: (id, knowledgeId) => run(() => api.promoteKnowledge(id, knowledgeId)),
     createSession: () => run(() => api.createSession()),
     correct: (item, correction, kind) => run(() => api.correctKnowledge(item.id, correction, kind)),
     deleteAll: () => run(() => api.deleteAll()),
