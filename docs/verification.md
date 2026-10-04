@@ -279,3 +279,35 @@ was possible. Those remain explicitly incomplete; see
 [quality evaluation](quality-evaluation.md) and the updated
 [implementation status](phase-one-status.md). Earlier live-provider observations
 are historical evidence, not claimed as rerun.
+
+## Phase One browser integration: October 4, 2026
+
+The production client build and isolated in-memory browser fixture were exercised
+with Chrome at 1280×900, 768×900, and 375×900. The fixture used the explicitly
+synthetic provider, disabled embeddings, and did not read the normal learner DB.
+
+The existing recovery regression first failed at 375px with the composer right
+edge at `442.78125px`. Runtime geometry showed the main pane's implicit grid
+column resolving to `442.781px`; an explicit `minmax(0, 1fr)` column reduced the
+surface to the viewport, after which the saved message was resolved exactly once.
+
+Fresh browser evidence is under `/tmp/opencode/tutair-visual/`. It covers empty,
+conversation, tracking, overview/question queues, goal dialog, thread drawer, and
+ambiguous saved-turn recovery states. The capture driver recorded no uncaught page
+errors and verified deferred-target promotion and single-message ambiguity recovery.
+
+Three real-Chrome Lighthouse runs per form factor produced medians of
+**100/100/100/100** for performance/accessibility/best-practices/SEO on both
+desktop and mobile after correcting muted contrast, visible-label naming, initial
+data layout shift, and fingerprinted-asset compression/caching. Lighthouse still
+lists informational render-blocking/network-tree insights despite category scores
+of 100; two mobile traces also logged `NO_LCP` Lantern diagnostics while still
+producing complete category results. The six individual JSON reports and summary
+are retained rather than presenting local synthetic-fixture scores as proof of
+real-network performance.
+
+React Doctor 0.9.14 scanned all 30 client source files with zero diagnostics.
+Headed mode was unavailable because this container has no X server; screenshots,
+interaction flows, and Lighthouse used the installed Chrome stable binary in
+headless/CDP mode. No external LLM credential, educational-quality study, public
+ingress, or deployed-network audit was performed in this run.
