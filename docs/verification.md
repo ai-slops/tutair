@@ -1,6 +1,13 @@
 # Phase 1 verification record
 
-Verified on September 19, 2026, using Node.js 24 in the provided DIM workspace.
+This is a chronological record, not a claim that every original requirement is
+complete. See the [requirement audit](phase-one-status.md) for remaining work.
+The latest verification is September 22, 2026, below; earlier observations are
+retained with their original dates and environment limitations.
+
+## Baseline: September 19, 2026
+
+Verified using Node.js 24 in the provided DIM workspace.
 
 ## Automated checks
 
@@ -100,3 +107,175 @@ session. A Korean FSM question completed with HTTP 201 after approximately
 100 seconds and its answer appeared in the conversation, confirming that the
 longer browser submission timeout is active. QA used isolated test learners;
 existing learner conversations and API credentials were not modified.
+
+## Requirement audit and revision reconstruction: September 22, 2026
+
+Compared the supplied 0–69 section specification with documentation, source, and
+tests. Added a numbered, condensed requirements preservation document and a
+section-by-section implementation status/backlog. These are not a verbatim copy
+of the original source file or a declaration of complete Phase 1 delivery.
+
+Implemented reconstruction of historical learner-state revisions and explicit
+current-revision selection in tutor context. A historical evidence invalidation
+now updates its historical projection without deleting the original evidence or
+transferring it to the new definition. Rebuild continues to count units.
+
+Validation on Node.js 24.19.0:
+
+- Before changes: 111 tests passed, one opt-in local-embedding test skipped.
+- New regression coverage first demonstrated missing historical rows and stale
+  historical state after evidence invalidation; the context test demonstrated
+  selection of old state by projection timestamp rather than current revision.
+- Final `npm test`: **116 passed, one skipped, 29 test files passed**.
+  Five new scenarios are in `tests/server/projection-rebuild.test.ts`.
+- `npm run typecheck`, `npm run check`, and `npm run build` passed.
+  The same five CSS warnings and two upstream Zod annotation warnings remain.
+- TypeScript LSP is still unavailable; Markdown has no configured LSP. Compiler
+  and formatter checks were used instead. No LSP-clean result is claimed.
+
+A separate driver started the built API on an ephemeral loopback HTTP port with
+an isolated in-memory SQLite database and synthetic demo generation. It observed:
+
+1. Health success, zero canonical units, and six provisional units from an FSM turn.
+2. Tutor exposure with zero learner evidence, followed by a manually supplied
+   application observation and a second immutable definition revision.
+3. After discarding only this temporary learner's projection cache, the real
+   rebuild endpoint restored six historical dimensions with recognition exposure
+   and application effective evidence of 1.
+4. Current revision 2 retained six unknown dimensions and aggregate mastery 0.
+5. Invalidating the old observation removed its projection contribution while
+   preserving the evidence row and historical recognition exposure.
+6. A different learner's rebuild returned 404; a malformed unit ID returned 422.
+
+The temporary HTTP listener and database were closed. Existing learner data and
+credentials were not read or changed. This run did not exercise a real external
+LLM, local-model inference, public ingress, or browser UI. The embedding integration
+test is intentionally opt-in and was not enabled; existing September 19–20 results
+are historical evidence, not claimed as rerun. No frontend code changed.
+
+## Exposure snapshot and immutable history: September 22, 2026
+
+Completed the next Phase 1 backlog item: pin new exposures to the exact knowledge
+revision supplied to final generation and the original tutor message event. The
+same snapshot now flows through final generation, schema repair, final review,
+and persistence. Exposure insertion validates both reference chains; update,
+ordinary delete, and SQLite replacement writes are blocked.
+
+Startup migration preserves legacy rows, backfills only valid historical
+unit/revision/owner mappings, and labels every pre-upgrade row `legacy_unverified`.
+It does not infer message events or retroactively assert generation provenance.
+Unresolved legacy references remain null and cannot start contributing exposure
+when a matching revision sequence number is created later. Mixed old/new records
+survive reopening; incomplete hand-modified schemas are rejected.
+
+Validation:
+
+- `npm test`: **133 passed, one skipped, 32 test files passed**.
+  Seventeen new cases cover revision changes during generation/review/repair,
+  original-event preservation after edits/tombstones, legacy migration/reopening,
+  invalid revision and ownership links, immutable writes including replacement,
+  and private/canonical exposure erasure without deleting shared definitions.
+- Initial regression runs reproduced revision drift and missing source-event
+  links, allowed history mutation/replacement, and unresolved legacy exposure
+  incorrectly attaching to a subsequently created revision.
+- Type checking, Biome checks, and server/client builds passed. After the final
+  projection filter change, the full test suite, type check, affected-file Biome
+  check, and server build were rerun. Client inputs did not change.
+- Existing five CSS warnings and two upstream Zod annotation warnings remain.
+  TypeScript LSP is unavailable and Markdown has no configured LSP; no LSP-clean
+  claim is made. Changed source/test modules remain below 250 nonblank/noncomment
+  lines; `tutor.ts` is at 249 and should be split by responsibility before further
+  orchestration growth. No new type assertions, dependencies, or logging added.
+
+A separate driver used the built API over a live ephemeral loopback HTTP listener
+and an isolated temporary on-disk SQLite database. It seeded the old six-column
+exposure format, then exercised the real application startup migration and HTTP
+export/rebuild/turn/edit/tombstone/privacy endpoints. It observed:
+
+1. Legacy records exported as `legacy_unverified`, with no fabricated event ID.
+2. A legacy missing revision remained unknown after that sequence number was
+   created and the learner projection was rebuilt.
+3. A real correction request changed a knowledge unit to revision 2 while the
+   synthetic provider's final call was pending. Its exposure remained on revision
+   1 and the UUID supplied to generation. The turn stored five exposures and zero
+   learner evidence; aggregate mastery remained zero.
+4. Editing and tombstoning the tutor reply left the linked original event content
+   equal to the generated reply. Direct exposure UPDATE/DELETE attempts failed.
+5. Erasure succeeded for both the migrated learner and the new learner with HTTP
+   204; the erased session returned 401 and SQLite reported zero FK violations.
+
+The listener, database, and temporary database directory were closed/removed.
+Existing learner data and credentials were not touched. Generation was explicitly
+synthetic and embeddings disabled; external model quality, browser UI, public
+ingress, and the opt-in local embedding integration were not retested.
+
+## Remaining backend contracts and integration: September 22, 2026
+
+Completed the actionable backend items from the remaining-work list:
+
+- One refreshed post-resolution knowledge/state/relation context for planning,
+  draft, initial lint, final generation and final review, preserving retrieved
+  units and generation-time revisions. Safety inspection does not silently lose
+  the tail of a long draft to the context budget.
+- LearningThread origin, why-now, durable outcome, targets/deferred units,
+  question lifecycle/audit, stable current selection, explicit new/select/resume,
+  and legacy status compatibility. Existing duplicate questions survive migration.
+- Explicit evaluation/follow-up skipped flags, structured ambiguity/follow-up,
+  supplied revision/thread/assessment/related-unit/span validation, original
+  learner-message event pinning, and atomic accepted evaluation persistence.
+- Immutable, learner-private snapshots of the exact bounded provider-adapter
+  StructuredCall, including failures/repairs, stage schema versions and hashes;
+  owner-scoped export and privacy erasure.
+- Structured definition scope and claim status, legacy-compatible necessity,
+  test-runner evaluator metadata, immediate unknown state for meaning mismatch,
+  and preservation of prior metadata when revising a definition.
+- Recursive SQLite triggers so REPLACE cannot bypass existing immutable-history
+  DELETE guards through the application's Database connection.
+
+Oracle review identified concrete integration boundaries; regression tests first
+demonstrated unoffered observations creating evidence, invalid observation batches
+partially persisting, source-edit retargeting, truncated draft tails, dropped
+retrieved units at final generation, and REPLACE history bypasses. These paths were
+corrected without removing or weakening their behavioral assertions.
+
+Final `npm run verify` passed on Node.js 24.19.0:
+
+- **191 tests passed, one opt-in local-embedding test skipped, 47 test files passed.**
+- Strict type check passed. Biome had zero errors and the existing five CSS warnings.
+- Server and client production builds passed; the same two upstream Zod comment
+  annotation warnings remain.
+- No server source or server test module exceeds 250 nonblank/noncomment lines.
+  Large orchestration, revision persistence, thread routes and question history
+  were split by responsibility rather than suppressing type or size checks.
+- TypeScript LSP remains unavailable and Markdown has no configured LSP; compiler
+  and formatter checks were used. No LSP-clean result is claimed.
+
+A separate driver personally exercised the built API over a live ephemeral
+loopback HTTP server and isolated in-memory SQLite database, with explicit
+synthetic demo generation and embeddings disabled. It verified:
+
+1. Zero canonical rows, a provisional structured definition, and an existing
+   retrieved unit present throughout planning/draft/both lints/final.
+2. Project `desiredOutcome` survived goal updates; questions deduplicated and
+   transitioned to parked; target promotion removed a deferred unit.
+3. A parked thread rejected an ordinary selected turn with 409, and explicit
+   resume reopened it in another conversation without losing its identity.
+4. Meaning mismatch returned six unknown dimensions; definition revision retained
+   structured scope; a test-runner observation retained runner/suite/result metadata.
+5. Injected evaluator outage returned a usable response with `evaluationSkipped`;
+   an explicit new-thread request created a different project thread.
+6. **24 exported model-context snapshots** exactly matched their stored canonical
+   JSON hashes, including failed calls. Another learner exported none of them.
+7. Synthetic quality labels were excluded from the default report, which correctly
+   had zero real samples, and appeared only with `includeSynthetic=true`.
+8. Cross-learner thread lookup returned 404; erasure returned 204, revoked the
+   session (401), removed private snapshots, and left zero foreign-key violations.
+
+The driver closed its listener/database. Existing learner data and secrets were
+not used. No frontend code changed and browser UI was not rerun. The environment
+has no configured external provider credentials or `.env`, so no real external
+LLM call, general educational-quality measurement, or longitudinal outcome study
+was possible. Those remain explicitly incomplete; see
+[quality evaluation](quality-evaluation.md) and the updated
+[implementation status](phase-one-status.md). Earlier live-provider observations
+are historical evidence, not claimed as rerun.
