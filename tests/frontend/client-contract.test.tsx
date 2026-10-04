@@ -44,13 +44,15 @@ describe("client runtime contracts", () => {
         open
         items={[exposureOnly]}
         selected={null}
+        error={null}
         onClose={vi.fn()}
         onSelect={vi.fn()}
         onCorrect={vi.fn()}
       />,
     );
 
-    expect(markup).toContain("Inspect Bayes theorem");
+    expect(markup).toContain('<button class="concept-row" type="button" aria-pressed="false">');
+    expect(markup).toContain("Bayes theorem");
   });
 
   it("offers claim-less correction intent without inferring it from prose", () => {

@@ -1,6 +1,8 @@
 import { HTTPError } from "ky";
 import { z } from "zod";
-import type { Message, ProviderStatus, Thread } from "./model";
+import { TurnOutcomeSchema } from "./learning-contract";
+import type { ConversationSummary } from "./learning-model";
+import type { Message, ProviderStatus } from "./model";
 
 const DateSchema = z.string().min(1);
 export const IdSchema = z.string().min(1);
@@ -12,7 +14,7 @@ export const ConversationSchema = z
     createdAt: DateSchema,
     updatedAt: DateSchema,
   })
-  .passthrough();
+  .catchall(z.unknown());
 export const MessageSchema = z
   .object({
     id: IdSchema,
@@ -21,17 +23,15 @@ export const MessageSchema = z
     createdAt: DateSchema,
     deletedAt: DateSchema.nullable(),
   })
-  .passthrough();
+  .catchall(z.unknown());
 export const ConversationsSchema = z.object({ conversations: z.array(ConversationSchema) });
 export const ConversationDetailSchema = z.object({
   conversation: ConversationSchema,
   messages: z.array(MessageSchema),
-  threads: z.array(z.object({ id: IdSchema }).passthrough()),
+  threads: z.array(z.object({ id: IdSchema }).catchall(z.unknown())),
+  currentThreadId: IdSchema.nullable().default(null),
+  turnOutcomes: z.array(TurnOutcomeSchema).default([]),
 });
-export const ThreadDetailSchema = z
-  .object({ conversations: z.array(ConversationSchema) })
-  .passthrough();
-export const ThreadResumeSchema = z.object({ conversation: ConversationSchema }).passthrough();
 export const CapabilitiesSchema = z.object({
   provider: z.string(),
   model: z.string().nullable(),
@@ -48,7 +48,7 @@ export const KnowledgeRecordSchema = z
     currentRevision: z.number().int(),
     createdAt: DateSchema,
   })
-  .passthrough();
+  .catchall(z.unknown());
 export const KnowledgeListSchema = z.object({ items: z.array(KnowledgeRecordSchema) });
 export const RevisionSchema = z
   .object({
@@ -57,7 +57,7 @@ export const RevisionSchema = z
     sourceRef: z.string().nullable(),
     createdAt: DateSchema,
   })
-  .passthrough();
+  .catchall(z.unknown());
 export const EvidenceRecordSchema = z
   .object({
     id: IdSchema,
@@ -73,10 +73,10 @@ export const EvidenceRecordSchema = z
     createdAt: DateSchema,
     messageId: z.string(),
   })
-  .passthrough();
+  .catchall(z.unknown());
 export const ExposureSchema = z
   .object({ id: IdSchema, messageId: z.string().nullable(), createdAt: DateSchema })
-  .passthrough();
+  .catchall(z.unknown());
 export const LearnerStateSchema = z
   .object({
     dimension: EvidenceRecordSchema.shape.dimension,
@@ -88,7 +88,7 @@ export const LearnerStateSchema = z
     knowledgeRevisionId: IdSchema,
     evidenceIds: z.array(IdSchema),
   })
-  .passthrough();
+  .catchall(z.unknown());
 export const KnowledgeDetailSchema = z
   .object({
     item: KnowledgeRecordSchema,
@@ -97,16 +97,16 @@ export const KnowledgeDetailSchema = z
     exposures: z.array(ExposureSchema),
     learnerState: z.array(LearnerStateSchema).default([]),
   })
-  .passthrough();
+  .catchall(z.unknown());
 export const TutorTurnSchema = z
   .object({
     userMessage: MessageSchema,
     tutorMessage: MessageSchema.optional(),
     synthetic: z.boolean(),
   })
-  .passthrough();
+  .catchall(z.unknown());
 export const SignupSchema = z.object({
-  learner: z.object({ id: IdSchema }).passthrough(),
+  learner: z.object({ id: IdSchema }).catchall(z.unknown()),
   synthetic: z.boolean(),
 });
 export const SearchResultSchema = z
@@ -117,25 +117,33 @@ export const SearchResultSchema = z
     statement: z.string(),
     score: z.number(),
   })
-  .passthrough();
+  .catchall(z.unknown());
 export const SearchResponseSchema = z
   .object({
     results: z.array(SearchResultSchema),
     mode: z.enum(["hybrid", "fts-only"]),
     degradedReason: z.string().optional(),
   })
-  .passthrough();
+  .catchall(z.unknown());
 
-const ErrorBodySchema = z.object({ error: z.object({ code: z.string(), message: z.string() }) });
+const ErrorBodySchema = z.object({
+  error: z.object({
+    code: z.string(),
+    message: z.string(),
+    details: z.record(z.string(), z.string()).default({}),
+  }),
+});
 
 export class ApiError extends Error {
   readonly name = "ApiError";
+  readonly details: Readonly<Record<string, string>>;
   constructor(
     readonly code: string,
     message: string,
-    options?: ErrorOptions,
+    options?: ErrorOptions & { readonly details?: Readonly<Record<string, string>> },
   ) {
     super(message, options);
+    this.details = options?.details ?? {};
   }
 }
 
@@ -153,7 +161,7 @@ export async function request<T>(
         parsed.success
           ? parsed.data.error.message
           : `Request failed with status ${cause.response.status}`,
-        { cause },
+        { cause, details: parsed.success ? parsed.data.error.details : {} },
       );
     }
     if (cause instanceof z.ZodError)
@@ -166,10 +174,10 @@ export async function request<T>(
   }
 }
 
-export function mapThread(record: z.infer<typeof ConversationSchema>): Thread {
+export function mapConversation(record: z.infer<typeof ConversationSchema>): ConversationSummary {
   return {
     id: record.id,
-    title: record.title || record.goal || "Untitled learning thread",
+    title: record.title || record.goal || "Untitled conversation",
     updatedAt: record.updatedAt,
   };
 }
