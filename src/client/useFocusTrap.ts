@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useRef } from "react";
+import { type RefObject, useEffect, useLayoutEffect, useRef } from "react";
 
 const FOCUSABLE =
   'a[href], button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])';
@@ -11,8 +11,10 @@ export function useFocusTrap(
 ): void {
   const closeRef = useRef(onClose);
   const blockedRef = useRef(options.closeBlocked ?? false);
-  closeRef.current = onClose;
-  blockedRef.current = options.closeBlocked ?? false;
+  useLayoutEffect(() => {
+    closeRef.current = onClose;
+    blockedRef.current = options.closeBlocked ?? false;
+  }, [onClose, options.closeBlocked]);
 
   useEffect(() => {
     if (!active) return;
