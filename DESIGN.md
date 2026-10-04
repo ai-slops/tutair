@@ -23,7 +23,7 @@ The memorable moment is a calm three-part learning desk: thread index, readable 
 | Paper muted | `--color-paper-muted` | `#ebe5d7` | Sidebar, active rows |
 | Paper raised | `--color-paper-raised` | `#ffffff` | Dialogs and popovers |
 | Ink | `--color-ink` | `#1e2922` | Primary text |
-| Ink muted | `--color-ink-muted` | `#687069` | Supporting text |
+| Ink muted | `--color-ink-muted` | `#5f675f` | Supporting text; maintains AA contrast on forest wash |
 | Ink faint | `--color-ink-faint` | `#8b918c` | Metadata and placeholders |
 | Forest | `--color-forest` | `#174d37` | Primary actions and links |
 | Forest hover | `--color-forest-hover` | `#0f3c2a` | Interactive hover |
@@ -67,6 +67,14 @@ Radius tokens: `--radius-sm` 6px, `--radius-md` 10px, `--radius-lg` 16px, `--rad
 
 Desktop is a fixed-sidenav shell: 288px thread index, fluid conversation, optional 336px evidence folio. The shell is bounded by `100dvh`; each pane owns vertical scroll. Tablet hides the evidence folio in an overlay drawer. Mobile uses one visible layer with thread and evidence drawers; the composer stays in normal grid flow at the bottom of the main shell. Primary content never scrolls horizontally.
 
+The outer grid has one explicit `minmax(0, 1fr)` row and a definite `100dvh` height;
+content must never enlarge that row. Overview queue rows stack copy above their
+actions at every viewport because the overview is always a narrow container.
+Closed overlay panes are inert and hidden from accessibility navigation; this
+state follows the same media query as the visual drawer, including live resizing.
+CJK prose keeps word boundaries where possible, with emergency wrapping for
+unbroken tokens rather than a zero-width text column.
+
 ## 5. Components
 
 ### Button / IconButton
@@ -89,6 +97,31 @@ Desktop is a fixed-sidenav shell: 288px thread index, fluid conversation, option
 - Structure: title, updated time, optional current marker.
 - States: default, hover, active, keyboard focus, search-filtered empty.
 - Layout: list item with truncation; long titles wrap to two lines at most.
+
+### ConversationIndex / LearningThreadIndex
+- Conversations and learning threads are separate, explicitly headed lists: conversations are message histories; learning threads are durable goals that may link several conversations.
+- Each region has its own empty, loading, error, active, and keyboard-focus states. A conversation action says “New conversation”; a goal action says “Start learning thread.”
+- A learning-thread row exposes outcome first, optional origin and “Why now?” as supporting text, and an explicit “Resume” action. Selecting a conversation never silently changes the durable learning-thread goal.
+- Every learning-thread row shows its title, outcome, durable status, and whether it is current. Only inactive rows expose Resume. Status-aware lifecycle actions remain available: open threads can pause, resolve, or abandon; paused threads can reopen, resolve, or abandon; resolved threads can reopen or abandon; abandoned threads can reopen. Pending updates disable thread transitions, and failures preserve the prior status and controls.
+- Desktop keeps both lists in the thread pane. Narrow screens keep the same reading order in the existing drawer and allow Korean or other long unbroken content to wrap without widening the drawer.
+
+### ThreadDialog / GoalEditor
+- Thread creation and goal editing use labeled fields for title, outcome, origin, and “Why now?”; only outcome is required. An omitted title inherits the outcome so the API still receives a stable display label.
+- States: pristine, invalid, saving, server error, and saved. While saving, controls are disabled and the dialog remains open; it closes and clears local values only after confirmed success.
+- Goal metadata is durable context, not placeholder copy. Existing values are preserved when an update fails.
+- Uses the Modal focus trap, Escape behavior, and focus restoration. Validation and server errors are associated with fields or announced through `role="alert"`.
+
+### RecoveryNotice
+- Appears in the conversation when a submitted message was persisted but its learning-thread selection is ambiguous.
+- Structure: concise explanation, candidate learning-thread buttons with outcome/context, and an explicit start-new-thread option when the contract permits it.
+- Selecting a candidate resumes processing from the persisted message; the UI never submits or duplicates the learner’s message. Pending, success, and error states are response-scoped and announced without moving focus.
+- Recovery kind controls the available action: `selection` offers thread choices; `running` states that the saved request is in progress and offers “Continue saved request”; `unknown` states that delivery is unconfirmed and offers “Check request delivery”; `failed` offers refresh only and never a blind resubmit.
+- After a successful selection or retry, the composer clears only when its current draft still exactly matches the recovered saved content. A newer edited draft and every false or failed recovery remain untouched.
+
+### TrackingNotice
+- Sits directly after the tutor response it describes and uses information or amber notice styling without implying that the response itself failed.
+- Separately names evaluation skipped and exposure tracking skipped; concise reason text may be disclosed when supplied by the server.
+- Uses `role="status"`, remains visible on refresh, and is keyed to the response rather than displayed as a global workspace error.
 
 ### LearningSearch
 - Thread-title filtering is labeled narrowly and never presented as content search.
@@ -116,12 +149,19 @@ Desktop is a fixed-sidenav shell: 288px thread index, fluid conversation, option
 - Empty and unavailable source states are written plainly.
 - Correction dialog requires an explicit correction intent (revise, claim more, claim less, invalidate evidence, or meaning mismatch); intent is never guessed from prose.
 
+### DeferredKnowledge / OpenQuestions
+- Deferred knowledge is a thread-target holding area, not a knowledge-state transition. It explicitly says “Deferred here; this does not change knowledge state,” and each unit offers “Move to learning targets.” No action claims understanding, acceptance, or mastery.
+- Learning questions show their current open, parked, or resolved lifecycle state. Open questions expose Resolve and Park; parked and resolved questions expose Reopen. Actions use contract-specific verbs rather than ambiguous icon-only controls.
+- States: empty, loading, per-row pending, action error, and complete. A successful action removes or updates only the affected row; failed actions preserve the row and its context.
+- These sections live in the evidence folio and inherit its scroll ownership. Long English or Korean statements use normal wrapping plus overflow-safe breaking for identifiers and sources.
+
 ### Modal / Drawer
 - Used for settings and destructive confirmation. Raised paper surface, strong rule, restrained shadow.
 - Traps focus, closes on Escape except while a destructive request is pending, restores trigger focus.
 
 ### EmptyState
 - Serif goal prompt, short explanation, suggested prompt buttons sourced from static instructional copy (not fake user data), and focused composer.
+- Initial workspace loading uses a bounded, announced status surface until the first server snapshot settles; it never flashes an empty learner state before persisted data arrives.
 
 ## 6. Motion & Interaction
 

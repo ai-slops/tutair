@@ -105,10 +105,11 @@
   background: var(--color-paper);
 }
 .thread-row-title {
+  display: -webkit-box;
   overflow: hidden;
   font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 .thread-row-meta {
   color: var(--color-ink-muted);
@@ -471,5 +472,25 @@
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+.button.mobile-only,
+.icon-button.mobile-only {
+  display: none;
+}
+
+@media (max-width: 70rem) {
+  .button.mobile-only,
+  .main-header .overview-trigger,
+  .knowledge-pane .icon-button.mobile-only {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 45rem) {
+  .thread-pane .icon-button.mobile-only,
+  .main-header .icon-button.mobile-only {
+    display: inline-flex;
   }
 }
