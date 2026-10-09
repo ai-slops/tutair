@@ -1,11 +1,15 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { ZodError } from "zod";
+import type { ChatGptAuth } from "./chatgpt-auth.js";
+import { createChatGptAuth } from "./chatgpt-config.js";
 import { Database } from "./database.js";
 import { presentJson } from "./presentation.js";
-import { createProvider, type TutorProvider } from "./provider.js";
+import type { TutorProvider } from "./provider.js";
+import { createProvider } from "./provider-factory.js";
 import { CoreRepository } from "./repository-core.js";
 import { KnowledgeRepository } from "./repository-knowledge.js";
+import { chatGptRoutes } from "./routes-chatgpt.js";
 import { coreRoutes } from "./routes-core.js";
 import { exportRoutes } from "./routes-export.js";
 import { knowledgeRoutes } from "./routes-knowledge.js";
@@ -17,13 +21,15 @@ export type AppOptions = {
   readonly databasePath?: string;
   readonly provider?: TutorProvider;
   readonly env?: NodeJS.ProcessEnv;
+  readonly chatgptAuth?: ChatGptAuth | null;
 };
 
 export const createApp = (
   options: AppOptions = {},
 ): { readonly app: Hono; readonly database: Database } => {
   const database = new Database(options.databasePath ?? process.env["TUTOR_DB_PATH"] ?? "tutor.db");
-  const provider = options.provider ?? createProvider(options.env ?? process.env);
+  const chatgptAuth = options.chatgptAuth ?? createChatGptAuth(options.env ?? process.env);
+  const provider = options.provider ?? createProvider(options.env ?? process.env, chatgptAuth);
   const core = new CoreRepository(database);
   const knowledge = new KnowledgeRepository(database);
   const configuredImportToken =
@@ -39,6 +45,7 @@ export const createApp = (
     turnLocks: new Set<string>(),
     turnAttempts: new Map<string, number[]>(),
     canonicalImportToken: configuredImportToken.trim() === "" ? null : configuredImportToken,
+    chatgptAuth,
   };
   const app = new Hono();
   app.use(
@@ -66,10 +73,19 @@ export const createApp = (
     }
   });
   app.route("/api", coreRoutes(services));
+  app.route("/api", chatGptRoutes(services));
   app.route("/api", knowledgeRoutes(services));
   app.route("/api", qualityRoutes(services));
   app.route("/api", exportRoutes(services));
   app.get("/api/health", (c) => c.json({ status: "ok" }));
+  app.get("/auth/callback", async (c) => {
+    if (chatgptAuth === null)
+      throw new ApiError(404, "chatgpt_personal_disabled", "Personal ChatGPT mode is disabled");
+    await chatgptAuth.complete(new URL(c.req.url).searchParams);
+    return c.html(
+      '<!doctype html><html lang="en"><meta charset="utf-8"><title>ChatGPT connected</title><body><main><h1>ChatGPT connected</h1><p>Return to Tutair. You can close this tab.</p></main></body></html>',
+    );
+  });
   app.notFound((c) => c.json({ error: { code: "not_found", message: "Route not found" } }, 404));
   app.onError((error, c) => {
     if (error instanceof ApiError)

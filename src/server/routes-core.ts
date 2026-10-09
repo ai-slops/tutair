@@ -20,8 +20,9 @@ export const coreRoutes = (services: Services): Hono => {
     return c.json({ learner: result.learner, synthetic: false }, 201);
   });
   app.get("/session", (c) => c.json({ learner: services.core.learner(ownerFor(c, services)) }));
-  app.get("/capabilities", (c) =>
-    c.json({
+  app.get("/capabilities", async (c) => {
+    const owner = ownerFor(c, services);
+    return c.json({
       provider: services.provider.state.provider,
       outputMode: services.provider.state.outputMode ?? null,
       model: services.provider.state.model,
@@ -30,11 +31,15 @@ export const coreRoutes = (services: Services): Hono => {
       search: true,
       searchMode: services.provider.state.embedding === "configured" ? "hybrid" : "fts-only",
       synthetic: services.provider.state.synthetic,
-    }),
-  );
+      chatgpt:
+        services.chatgptAuth === null || services.chatgptAuth === undefined
+          ? { enabled: false, connected: false }
+          : await services.chatgptAuth.status(owner),
+    });
+  });
   registerConversationRoutes(app, services);
   registerThreadRoutes(app, services);
-  app.delete("/privacy", (c) => {
+  app.delete("/privacy", async (c) => {
     const owner = ownerFor(c, services);
     services.db.transaction(() => {
       services.db.run("UPDATE privacy_mode SET active=1 WHERE singleton=1");
@@ -48,6 +53,7 @@ export const coreRoutes = (services: Services): Hono => {
       services.db.run("UPDATE privacy_mode SET active=0 WHERE singleton=1");
     });
     deleteCookie(c, "tutor_session", { path: "/" });
+    await services.chatgptAuth?.disconnect(owner);
     return c.body(null, 204);
   });
   return app;

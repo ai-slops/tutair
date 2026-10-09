@@ -1,5 +1,6 @@
 import type { Context } from "hono";
 import { getCookie } from "hono/cookie";
+import type { ChatGptAuth } from "./chatgpt-auth.js";
 import type { Database } from "./database.js";
 import type { TutorProvider } from "./provider.js";
 import type { CoreRepository } from "./repository-core.js";
@@ -17,6 +18,7 @@ export type Services = {
   readonly turnLocks: Set<string>;
   readonly turnAttempts: Map<string, number[]>;
   readonly canonicalImportToken?: string | null;
+  readonly chatgptAuth?: ChatGptAuth | null;
 };
 
 export const ownerFor = (c: Context, services: Services): LearnerId => {
