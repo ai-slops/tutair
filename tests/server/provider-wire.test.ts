@@ -47,13 +47,16 @@ describe("OpenAI-compatible provider wire seam", () => {
       OPENAI_BASE_URL: `http://127.0.0.1:${address.port}`,
       TUTOR_MODEL: "fake-model",
     });
-    const result = await provider.call({
-      stage: "extraction",
-      version: "phase1-v1",
-      system: "Extract",
-      data: { message: "data" },
-      jsonSchema: { type: "object" },
-    });
+    const result = await provider.call(
+      {
+        stage: "extraction",
+        version: "phase1-v1",
+        system: "Extract",
+        data: { message: "data" },
+        jsonSchema: { type: "object" },
+      },
+      "learner-1",
+    );
     expect(result).toEqual({
       value: { claims: [] },
       usage: { inputTokens: 11, outputTokens: 3, totalTokens: 14 },

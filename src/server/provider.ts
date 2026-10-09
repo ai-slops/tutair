@@ -37,7 +37,7 @@ export type ProviderCallResult = {
 export interface TutorProvider {
   readonly state: ProviderState;
   readonly embeddingProfile: string;
-  call(call: StructuredCall): Promise<unknown>;
+  call(call: StructuredCall, owner?: string): Promise<unknown>;
   embed?(texts: readonly string[]): Promise<readonly (readonly number[])[]>;
 }
 
@@ -53,7 +53,7 @@ const completionResponse = z.object({
 });
 const embeddingResponse = z.object({ data: z.array(z.object({ embedding: z.array(z.number()) })) });
 
-class OpenAiProvider implements TutorProvider {
+export class OpenAiProvider implements TutorProvider {
   readonly state: ProviderState;
   readonly client: typeof ky;
   readonly embeddingProfile: string;
@@ -83,7 +83,7 @@ class OpenAiProvider implements TutorProvider {
       retry: { limit: 2, methods: ["post"] },
     });
   }
-  async call(call: StructuredCall): Promise<ProviderCallResult> {
+  async call(call: StructuredCall, _owner?: string): Promise<ProviderCallResult> {
     switch (this.config.outputMode) {
       case "compatibility":
         return streamJsonCompletion(this.client, call, this.config.model);
@@ -152,7 +152,7 @@ class OpenAiProvider implements TutorProvider {
   }
 }
 
-class DisabledProvider implements TutorProvider {
+export class DisabledProvider implements TutorProvider {
   readonly embeddingProfile = "disabled:v1";
   readonly state: ProviderState = {
     provider: "disabled",
@@ -161,12 +161,12 @@ class DisabledProvider implements TutorProvider {
     synthetic: false,
     embedding: "disabled",
   };
-  async call(): Promise<never> {
+  async call(_call?: StructuredCall, _owner?: string): Promise<never> {
     throw new ApiError(503, "provider_disabled", "Tutor generation is disabled");
   }
 }
 
-class DemoProvider implements TutorProvider {
+export class DemoProvider implements TutorProvider {
   readonly embeddingProfile = "disabled:v1";
   readonly state: ProviderState = {
     provider: "demo",
@@ -175,64 +175,23 @@ class DemoProvider implements TutorProvider {
     synthetic: true,
     embedding: "disabled",
   };
-  async call(call: StructuredCall): Promise<ProviderCallResult> {
+  async call(call: StructuredCall, _owner?: string): Promise<ProviderCallResult> {
     return { value: demoCall(call), usage: null };
   }
 }
 
-class LocalEmbeddingProvider implements TutorProvider {
+export class LocalEmbeddingProvider implements TutorProvider {
   readonly state: ProviderState;
   readonly embeddingProfile = localEmbeddingProfile;
   constructor(readonly generation: TutorProvider) {
     this.state = { ...generation.state, embedding: "configured" };
   }
-  call(call: StructuredCall): Promise<unknown> {
-    return this.generation.call(call);
+  call(call: StructuredCall, owner?: string): Promise<unknown> {
+    return this.generation.call(call, owner);
   }
   embed(texts: readonly string[]): Promise<readonly (readonly number[])[]> {
     return embedLocal(texts);
   }
 }
 
-export const createProvider = (env: NodeJS.ProcessEnv): TutorProvider => {
-  const kind = env["TUTOR_PROVIDER"] ?? "disabled";
-  let provider: TutorProvider;
-  if (kind === "demo") provider = new DemoProvider();
-  else if (kind === "disabled") provider = new DisabledProvider();
-  else {
-    if (kind !== "openai")
-      throw new ApiError(
-        500,
-        "invalid_provider",
-        "TUTOR_PROVIDER must be demo, openai, or disabled",
-      );
-    const key = env["OPENAI_API_KEY"];
-    const model = env["TUTOR_MODEL"];
-    const base = env["OPENAI_BASE_URL"];
-    if (key === undefined || model === undefined || base === undefined)
-      throw new ApiError(
-        500,
-        "provider_configuration",
-        "OpenAI provider requires OPENAI_API_KEY, OPENAI_BASE_URL, and TUTOR_MODEL",
-      );
-    provider = new OpenAiProvider({
-      model,
-      baseUrl: base,
-      apiKey: key,
-      embeddingModel: env["TUTOR_EMBEDDING_MODEL"] ?? null,
-      outputMode: z
-        .enum(["strict", "compatibility"])
-        .default("strict")
-        .parse(env["TUTOR_OPENAI_MODE"]),
-    });
-  }
-  const embeddingProvider = env["EMBEDDING_PROVIDER"] ?? env["TUTOR_EMBEDDING_PROVIDER"] ?? "local";
-  if (embeddingProvider === "local") return new LocalEmbeddingProvider(provider);
-  if (embeddingProvider !== "openai" && embeddingProvider !== "disabled")
-    throw new ApiError(
-      500,
-      "embedding_configuration",
-      "EMBEDDING_PROVIDER must be local, openai, or disabled",
-    );
-  return provider;
-};
+export { createProvider } from "./provider-factory.js";
