@@ -24,6 +24,7 @@
     "@hono/node-server": "^1.19.0",
     "@huggingface/transformers": "^4.3.0",
     "hono": "^4.9.0",
+    "jose": "^6.2.12",
     "ky": "^1.10.0",
     "lucide-react": "^0.468.0",
     "react": "^19.1.0",
