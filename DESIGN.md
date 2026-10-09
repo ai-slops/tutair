@@ -131,6 +131,12 @@ unbroken tokens rather than a zero-width text column.
 - Desktop shows the explicit provider label beside its semantic status dot; compact screens retain an accessible labeled control.
 - Activating the status opens server-side setup guidance. Provider credentials are never collected in the browser.
 
+### ChatGPTConnection
+- Personal mode appears only when the server explicitly enables it. Disconnected, connected-without-model, ready, refreshing, and error states use the existing Notice, TextField, and Button primitives.
+- Connect opens the official authorization page in a separate tab through the same-origin loopback bridge. The dialog never renders, logs, exports, or stores access, refresh, or ID tokens.
+- A connected learner chooses only from account-returned models whose visibility is `list`; the display name is visible and the slug is the submitted value. Disconnect is explicit and learner-scoped.
+- Container and VM users receive concise loopback-forwarding guidance rather than an invented external callback. Remote/public origins cannot start authorization.
+
 ### Message
 - Variants: learner and tutor.
 - Learner uses a compact forest-wash note aligned to the reading measure; tutor is editorial prose without a chat bubble.
