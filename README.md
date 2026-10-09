@@ -93,7 +93,8 @@ grant. A real browser login is not exercised by the automated fixture suite.
 
 ChatGPT-plan inference always sends `stream: true` and `store: false`, accepts a
 result only after `response.completed`, and rejects failed, incomplete, or
-truncated streams. It does not silently fall back to API-key billing or demo mode.
+truncated streams. Tutair buffers and validates that stream server-side; the UI
+does not render live model deltas. It does not silently fall back to API-key billing or demo mode.
 This preview grants model inference, not ChatGPT conversation history or other
 account context. See the [official OSS sign-in guide](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
 and [preview limitations](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations).
