@@ -99,7 +99,7 @@ export class ModelRunner {
         snapshot.hash,
         isoNow(),
       ]);
-      const raw = await this.provider.call(call);
+      const raw = await this.provider.call(call, owner);
       const result = z
         .object({
           value: z.unknown(),
