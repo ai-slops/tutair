@@ -17,7 +17,7 @@ export class OwnerMutationGate {
       throw new ApiError(409, "oauth_session_invalidated", "ChatGPT connection was disconnected");
   }
 
-  async run(owner: string, operation: () => Promise<void>): Promise<void> {
+  async run<Result>(owner: string, operation: () => Promise<Result>): Promise<Result> {
     const previous = this.tails.get(owner) ?? Promise.resolve();
     const current = previous.catch(() => undefined).then(operation);
     const tail = current.then(
@@ -26,7 +26,7 @@ export class OwnerMutationGate {
     );
     this.tails.set(owner, tail);
     try {
-      await current;
+      return await current;
     } finally {
       if (this.tails.get(owner) === tail) this.tails.delete(owner);
     }

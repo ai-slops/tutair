@@ -182,10 +182,14 @@ export class ChatGptAuth {
   }
 
   async selectModel(owner: string, slug: string): Promise<void> {
+    const generation = this.mutations.current(owner);
     const available = await this.models(owner);
     if (!available.some((model) => model.slug === slug))
       throw new ApiError(422, "chatgpt_model_unavailable", "Selected model is not available");
-    await this.config.store.selectModel(owner, slug);
+    await this.mutations.run(owner, async () => {
+      this.mutations.assertCurrent(owner, generation);
+      await this.config.store.selectModel(owner, slug);
+    });
   }
 
   async responseCredential(owner: string): Promise<{
@@ -211,11 +215,15 @@ export class ChatGptAuth {
     const updated = await this.api.refresh(grant, this.now());
     if (!updated.scopes.includes(DIRECT_SCOPE))
       throw new ApiError(403, "oauth_scope_missing", "ChatGPT direct-token permission was revoked");
-    await this.mutations.run(owner, async () => {
+    return this.mutations.run(owner, async () => {
       this.mutations.assertCurrent(owner, generation);
-      await this.config.store.write(owner, updated);
+      const current = await this.config.store.read(owner);
+      if (current === null)
+        throw new ApiError(401, "chatgpt_not_connected", "Connect ChatGPT for this learner first");
+      const persisted = { ...updated, selectedModel: current.selectedModel };
+      await this.config.store.write(owner, persisted);
+      return persisted;
     });
-    return updated;
   }
 
   private clearRefresh(owner: string, refresh: Promise<StoredGrant>): void {

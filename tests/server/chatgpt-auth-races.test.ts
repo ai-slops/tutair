@@ -19,6 +19,9 @@ describe("ChatGPT disconnect races", () => {
   let pauseGrant: "authorization_code" | "refresh_token" | undefined;
   let reached: Deferred;
   let release: Deferred;
+  let pauseModels: boolean;
+  let modelsReached: Deferred;
+  let modelsRelease: Deferred;
   let now = Date.now();
   let port = 0;
 
@@ -29,6 +32,9 @@ describe("ChatGPT disconnect races", () => {
     pauseGrant = undefined;
     reached = deferred();
     release = deferred();
+    pauseModels = false;
+    modelsReached = deferred();
+    modelsRelease = deferred();
     server = createServer(async (request, response) => {
       const base = `http://127.0.0.1:${port}`;
       if (request.url === "/jwks") {
@@ -64,6 +70,19 @@ describe("ChatGPT disconnect races", () => {
             expires_in: 3600,
             scope: "openid offline_access resource.invoke chatgpt.tokens.use.direct",
             token_type: "Bearer",
+          }),
+        );
+        return;
+      }
+      if (request.url === "/models") {
+        if (pauseModels) {
+          modelsReached.resolve();
+          await modelsRelease.promise;
+        }
+        response.setHeader("content-type", "application/json");
+        response.end(
+          JSON.stringify({
+            models: [{ slug: "gpt-listed", display_name: "GPT Listed", visibility: "list" }],
           }),
         );
         return;
@@ -121,6 +140,42 @@ describe("ChatGPT disconnect races", () => {
 
     await expect(refreshing).rejects.toMatchObject({ code: "oauth_session_invalidated" });
     expect(await store.read("learner-1")).toBeNull();
+  });
+
+  it("does not restore model selection when disconnect overlaps model discovery", async () => {
+    const started = await auth.begin("learner-1");
+    nonce = requiredNonce(started.url);
+    await complete(auth, started.state);
+    pauseModels = true;
+    const selecting = auth.selectModel("learner-1", "gpt-listed");
+    await modelsReached.promise;
+
+    await auth.disconnect("learner-1");
+    modelsRelease.resolve();
+
+    await expect(selecting).rejects.toMatchObject({ code: "oauth_session_invalidated" });
+    expect(await store.read("learner-1")).toBeNull();
+  });
+
+  it("preserves a model selected while token refresh is in flight", async () => {
+    const started = await auth.begin("learner-1");
+    nonce = requiredNonce(started.url);
+    await complete(auth, started.state);
+    pauseModels = true;
+    const selecting = auth.selectModel("learner-1", "gpt-listed");
+    await modelsReached.promise;
+    now += 3_700_000;
+    nonce = undefined;
+    pauseGrant = "refresh_token";
+    const refreshing = auth.credential("learner-1");
+    await reached.promise;
+
+    modelsRelease.resolve();
+    await selecting;
+    release.resolve();
+
+    await expect(refreshing).resolves.toMatchObject({ selectedModel: "gpt-listed" });
+    expect(await store.read("learner-1")).toMatchObject({ selectedModel: "gpt-listed" });
   });
 });
 
