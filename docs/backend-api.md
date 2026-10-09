@@ -9,10 +9,22 @@ Clients never send learner IDs. Error bodies are
 
 - `POST /api/auth/local-signup` `{ displayName?: string }` -> `201 { learner, synthetic: false }`
 - `GET /api/session` -> `{ learner }`
-- `GET /api/capabilities` -> `{ provider, model, generation, embedding, search, synthetic }`
+- `GET /api/capabilities` -> `{ provider, model, generation, embedding, search, synthetic, chatgpt }`
 
-OpenAI providers also report `outputMode: "strict" | "compatibility"`. The mode
+OpenAI providers also report `outputMode: "strict" | "compatibility" | "responses"`. The mode
 is explicitly configured on the server, never silently selected after a failure.
+
+When personal mode is enabled, all ChatGPT routes require the learner cookie:
+
+- `GET /api/chatgpt/status` -> learner-scoped connection metadata without tokens
+- `GET /api/chatgpt/connect` -> `302` to official authorization; loopback only
+- `GET /auth/callback` -> validates and stores the official callback grant
+- `GET /api/chatgpt/models` -> `{ models: [{ slug, displayName }] }`, list-visible only
+- `PUT /api/chatgpt/model` `{ slug }` -> `204` after account-catalog validation
+- `DELETE /api/chatgpt/connection` -> `204` and removes this learner's local grant
+
+The callback is outside `/api` because it is the OAuth redirect URI. Its random
+state binds it to the initiating learner; callback output contains no credentials.
 
 ## Conversations and messages
 
