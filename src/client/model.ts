@@ -62,6 +62,13 @@ export type ProviderStatus = {
   readonly guidance: string;
 };
 
+export type ChatGptConnection = {
+  readonly enabled: boolean;
+  readonly connected: boolean;
+  readonly selectedModel: string | null;
+  readonly models: readonly { readonly slug: string; readonly displayName: string }[];
+};
+
 export type CorrectionKind =
   | "revise"
   | "claim_more"

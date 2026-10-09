@@ -40,6 +40,16 @@ export const CapabilitiesSchema = z.object({
   search: z.boolean(),
   searchMode: z.enum(["hybrid", "fts-only"]),
   synthetic: z.boolean(),
+  chatgpt: z
+    .object({
+      enabled: z.boolean(),
+      connected: z.boolean(),
+      selectedModel: z.string().nullable().optional(),
+    })
+    .default({ enabled: false, connected: false }),
+});
+export const ChatGptModelsSchema = z.object({
+  models: z.array(z.object({ slug: z.string().min(1), displayName: z.string().min(1) })),
 });
 export const KnowledgeRecordSchema = z
   .object({
@@ -193,6 +203,28 @@ export function mapMessage(record: z.infer<typeof MessageSchema>): Message {
 }
 
 export function providerFrom(capabilities: z.infer<typeof CapabilitiesSchema>): ProviderStatus {
+  if (capabilities.provider === "chatgpt") {
+    if (!capabilities.chatgpt.connected)
+      return {
+        mode: "unavailable",
+        label: "ChatGPT not connected",
+        guidance: "Connect this local learner to ChatGPT before tutoring.",
+      };
+    if (
+      capabilities.chatgpt.selectedModel === null ||
+      capabilities.chatgpt.selectedModel === undefined
+    )
+      return {
+        mode: "unavailable",
+        label: "Choose a ChatGPT model",
+        guidance: "Select one of the models available to this ChatGPT account.",
+      };
+    return {
+      mode: "configured",
+      label: capabilities.chatgpt.selectedModel,
+      guidance: "Tutor generation uses this learner's personal ChatGPT connection.",
+    };
+  }
   if (capabilities.synthetic)
     return {
       mode: "synthetic",
