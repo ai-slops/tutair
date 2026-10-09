@@ -23,14 +23,14 @@ for (const viewport of [
 }
 
 test("selects and disconnects an account-visible ChatGPT model", async ({ page }) => {
-  await page.goto("/");
-  const learnerId = await page.evaluate(async () => {
-    const response = await fetch("/api/session");
-    const body = await response.json();
-    return body.learner.id;
+  const signup = await page.request.post("/api/auth/local-signup", {
+    data: { displayName: "Local learner" },
   });
+  expect(signup.ok()).toBe(true);
+  const { learner } = await signup.json();
+  const learnerId = learner.id;
   await page.request.post("/__test__/chatgpt", { data: { learnerId } });
-  await page.reload();
+  await page.goto("/");
   await page.getByRole("button", { name: "Open settings" }).click();
   const dialog = page.getByRole("dialog", { name: "Session & model" });
 
