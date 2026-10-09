@@ -1,11 +1,13 @@
 import { AlertTriangle, ExternalLink, X } from "lucide-react";
 import { useRef } from "react";
-import type { CorrectionKind, ProviderStatus } from "../model";
+import type { ChatGptConnection, CorrectionKind, ProviderStatus } from "../model";
 import { useFocusTrap } from "../useFocusTrap";
+import { ChatGptSettings } from "./ChatGptSettings";
 
 type DialogProps = {
   readonly kind: "settings" | "delete" | "correction";
   readonly provider: ProviderStatus;
+  readonly chatgpt: ChatGptConnection;
   readonly busy: boolean;
   readonly correction: string;
   readonly correctionKind: CorrectionKind;
@@ -13,6 +15,8 @@ type DialogProps = {
   readonly onCorrectionKind: (value: CorrectionKind) => void;
   readonly onClose: () => void;
   readonly onConfirm: () => void;
+  readonly onSelectChatGptModel: (slug: string) => Promise<boolean>;
+  readonly onDisconnectChatGpt: () => Promise<boolean>;
 };
 
 export function Dialog(props: DialogProps) {
@@ -75,6 +79,12 @@ function bodyFor(props: DialogProps) {
             Your local session is authenticated with an HTTP-only cookie. Tutair never asks for or
             stores a model key in this browser.
           </p>
+          <ChatGptSettings
+            connection={props.chatgpt}
+            busy={props.busy}
+            onSelectModel={props.onSelectChatGptModel}
+            onDisconnect={props.onDisconnectChatGpt}
+          />
           <a
             className="button button-secondary"
             href="/model-setup.html"

@@ -219,6 +219,7 @@ export function App() {
         <Dialog
           kind={dialog}
           provider={workspace.snapshot.provider}
+          chatgpt={workspace.snapshot.chatgpt}
           busy={workspace.loading}
           correction={dialogValue}
           correctionKind={correctionKind}
@@ -228,6 +229,8 @@ export function App() {
           onConfirm={() => {
             void confirmDialog();
           }}
+          onSelectChatGptModel={workspace.selectChatGptModel}
+          onDisconnectChatGpt={workspace.disconnectChatGpt}
         />
       )}
       {threadDialog === null ? null : (
