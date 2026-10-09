@@ -38,6 +38,30 @@ and are linked to the exact imported revisions. Reimporting an existing key
 appends a revision only when its semantic scope and kind remain compatible;
 changed meanings require a new key, not an overwrite.
 
+## Personal ChatGPT credential boundary
+
+Personal ChatGPT mode is off unless `TUTOR_CHATGPT_PERSONAL=true`. Authorization
+may start only from an exact loopback request and matching loopback Origin; proxy
+forwarding headers are not authorization. The callback state is a short-lived,
+random, in-memory binding to the authenticated learner that initiated the flow.
+The callback does not rely on a cookie from the OpenAI redirect origin.
+
+The protected store defaults to `~/.config/tutair/chatgpt.json`. It contains the
+persistent opaque host ID, issued client IDs, validated subjects, selected model,
+and rotating credentials. Keep the containing directory owner-only and do not
+copy the file into the repository, exports, support transcripts, or screenshots.
+Writes use a same-directory temporary file, fsync, mode `0600`, and atomic rename.
+Successful refreshes serialize per learner and replace the refresh token as one
+record. A host ID is attribution, not proof of host identity.
+
+The official callback always targets `127.0.0.1` on
+`TUTOR_CHATGPT_CALLBACK_PORT`. In a container or VM, use SSH or the container
+runtime to forward that port to the Tutair listener, and browse Tutair itself at
+the forwarded `http://127.0.0.1:<callback-port>` URL before connecting. Do not use
+`localhost`, a public ingress callback, or an `X-Forwarded-Host` rewrite. For
+credential transfer to a VM, follow OpenAI's self-hosted VM guidance and use a
+secure channel; the VM retains its own host ID and performs later refreshes.
+
 ## DIM integration
 
 `.dim` remains the original development-environment lifecycle. The application's
