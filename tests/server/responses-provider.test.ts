@@ -1,4 +1,4 @@
-import { createServer, type RequestListener, type Server } from "node:http";
+import { createServer, type RequestListener, type Server, type ServerResponse } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
 import { ResponsesProvider } from "../../src/server/responses-provider.js";
 
@@ -35,6 +35,24 @@ describe("Responses tutor provider", () => {
     });
     expect(authorization).toBe("Bearer learner-token");
     expect(body).toMatchObject({ model: "gpt-fixture", stream: true, store: false });
+    expect(body).toMatchObject({
+      text: {
+        format: {
+          schema: {
+            type: "object",
+            required: ["claims", "note", "metadata"],
+            additionalProperties: false,
+            properties: {
+              metadata: {
+                type: "object",
+                required: ["source"],
+                additionalProperties: false,
+              },
+            },
+          },
+        },
+      },
+    });
     expect(body).not.toHaveProperty("temperature");
     expect(body).not.toHaveProperty("previous_response_id");
   });
@@ -54,6 +72,58 @@ describe("Responses tutor provider", () => {
     });
   });
 
+  it("bounds the response body lifetime after streaming headers arrive", async () => {
+    let openResponse: ServerResponse | undefined;
+    const baseUrl = await fixture((_request, response) => {
+      openResponse = response;
+      response.writeHead(200, { "content-type": "text/event-stream" });
+      response.write(events({ type: "response.output_text.delta", delta: '{"claims":' }));
+    });
+    const request = providerFor(baseUrl, 25).call(call(), "learner-1");
+    const observed = await Promise.race([
+      request.then(
+        () => ({ kind: "resolved" as const }),
+        (error: unknown) => ({ kind: "rejected" as const, error }),
+      ),
+      new Promise<{ readonly kind: "pending" }>((resolve) =>
+        setTimeout(() => resolve({ kind: "pending" }), 100),
+      ),
+    ]);
+
+    try {
+      expect(observed).toMatchObject({
+        kind: "rejected",
+        error: { code: "provider_timeout" },
+      });
+    } finally {
+      openResponse?.destroy();
+      await request.catch(() => undefined);
+    }
+  });
+
+  it("preserves documented plan quota errors and request IDs", async () => {
+    const baseUrl = await fixture((_request, response) => {
+      response.writeHead(429, {
+        "content-type": "application/json",
+        "x-request-id": "req_fixture",
+      });
+      response.end(
+        JSON.stringify({
+          error: {
+            code: "subscription_sharing_usage_limit_exceeded",
+            message: "ChatGPT plan usage limit reached",
+          },
+        }),
+      );
+    });
+
+    await expect(providerFor(baseUrl).call(call(), "learner-1")).rejects.toMatchObject({
+      status: 429,
+      code: "subscription_sharing_usage_limit_exceeded",
+      details: { requestId: "req_fixture" },
+    });
+  });
+
   function fixture(handler: RequestListener): Promise<string> {
     server = createServer(handler);
     return new Promise((resolve) => {
@@ -67,10 +137,11 @@ describe("Responses tutor provider", () => {
   }
 });
 
-function providerFor(baseUrl: string): ResponsesProvider {
+function providerFor(baseUrl: string, requestTimeoutMs?: number): ResponsesProvider {
   return new ResponsesProvider({
     stateProvider: "chatgpt",
     stateModel: null,
+    ...(requestTimeoutMs === undefined ? {} : { requestTimeoutMs }),
     resolve: async (owner) => {
       if (owner !== "learner-1") throw new Error("cross-learner credential request");
       return { accessToken: "learner-token", model: "gpt-fixture", apiBaseUrl: baseUrl };
@@ -84,7 +155,14 @@ function call() {
     version: "phase1-v1",
     system: "Extract",
     data: { message: "data" },
-    jsonSchema: { type: "object" },
+    jsonSchema: {
+      type: "object",
+      properties: {
+        claims: { type: "array", items: { type: "string" } },
+        note: { type: ["string", "null"] },
+        metadata: { type: "object", properties: { source: { type: "string" } } },
+      },
+    },
   };
 }
 
