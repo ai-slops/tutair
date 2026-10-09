@@ -77,6 +77,16 @@ export function createWorkspaceApi(client: KyInstance): WorkspaceApi {
       workspace.select(generation, null);
       return workspace.snapshot(null, generation);
     },
+    async selectChatGptModel(slug) {
+      const generation = workspace.begin();
+      await client.put("chatgpt/model", { json: { slug } });
+      return workspace.snapshot(workspace.activeConversationId, generation);
+    },
+    async disconnectChatGpt() {
+      const generation = workspace.begin();
+      await client.delete("chatgpt/connection");
+      return workspace.snapshot(workspace.activeConversationId, generation);
+    },
     search: (query) =>
       request(
         () => client.get("search", { searchParams: { q: query, limit: 20 } }).json(),

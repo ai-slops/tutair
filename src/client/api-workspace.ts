@@ -2,6 +2,7 @@ import { HTTPError, type KyInstance } from "ky";
 import { z } from "zod";
 import {
   CapabilitiesSchema,
+  ChatGptModelsSchema,
   ConversationDetailSchema,
   ConversationsSchema,
   mapConversation,
@@ -151,6 +152,9 @@ export class WorkspaceClient {
           : [],
       ) ?? [],
     );
+    const chatgptModels = capabilities.chatgpt.connected
+      ? await request(() => this.http.get("chatgpt/models").json(), ChatGptModelsSchema)
+      : { models: [] };
     return {
       conversations: conversations.conversations.map(mapConversation),
       activeConversationId: detail?.conversation.id ?? null,
@@ -168,6 +172,12 @@ export class WorkspaceClient {
         }) ?? [],
       knowledge,
       provider: providerFrom(capabilities),
+      chatgpt: {
+        enabled: capabilities.chatgpt.enabled,
+        connected: capabilities.chatgpt.connected,
+        selectedModel: capabilities.chatgpt.selectedModel ?? null,
+        models: chatgptModels.models,
+      },
     };
   }
 }

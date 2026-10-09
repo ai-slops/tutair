@@ -86,6 +86,8 @@ type WorkspaceState = {
     kind: CorrectionKind,
   ) => Promise<boolean>;
   readonly deleteAll: () => Promise<boolean>;
+  readonly selectChatGptModel: (slug: string) => Promise<boolean>;
+  readonly disconnectChatGpt: () => Promise<boolean>;
   readonly search: SearchState & { readonly run: (query: string) => Promise<void> };
 };
 
@@ -173,6 +175,8 @@ export function useWorkspace(api: WorkspaceApi): WorkspaceState {
     createSession: () => run(() => api.createSession()),
     correct: (item, correction, kind) => run(() => api.correctKnowledge(item.id, correction, kind)),
     deleteAll: () => run(() => api.deleteAll()),
+    selectChatGptModel: (slug) => run(() => api.selectChatGptModel(slug)),
+    disconnectChatGpt: () => run(() => api.disconnectChatGpt()),
     search: {
       ...search,
       async run(query) {

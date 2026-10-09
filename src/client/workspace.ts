@@ -8,7 +8,14 @@ import type {
   RecoveryChoice,
   TurnRecovery,
 } from "./learning-model";
-import type { CorrectionKind, KnowledgeItem, Message, ProviderStatus, SearchResult } from "./model";
+import type {
+  ChatGptConnection,
+  CorrectionKind,
+  KnowledgeItem,
+  Message,
+  ProviderStatus,
+  SearchResult,
+} from "./model";
 
 export type WorkspaceSnapshot = {
   readonly conversations: readonly ConversationSummary[];
@@ -19,6 +26,7 @@ export type WorkspaceSnapshot = {
   readonly messages: readonly Message[];
   readonly knowledge: readonly KnowledgeItem[];
   readonly provider: ProviderStatus;
+  readonly chatgpt: ChatGptConnection;
 };
 
 export interface WorkspaceApi {
@@ -46,6 +54,8 @@ export interface WorkspaceApi {
     kind: CorrectionKind,
   ): Promise<WorkspaceSnapshot>;
   deleteAll(): Promise<WorkspaceSnapshot>;
+  selectChatGptModel(slug: string): Promise<WorkspaceSnapshot>;
+  disconnectChatGpt(): Promise<WorkspaceSnapshot>;
   search(query: string): Promise<SearchResponse>;
   exportUrl(): string;
 }
@@ -72,4 +82,5 @@ export const EMPTY_SNAPSHOT: WorkspaceSnapshot = {
   messages: [],
   knowledge: [],
   provider: EMPTY_PROVIDER,
+  chatgpt: { enabled: false, connected: false, selectedModel: null, models: [] },
 };
