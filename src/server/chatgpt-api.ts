@@ -2,6 +2,7 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 import ky from "ky";
 import { z } from "zod";
 import type { StoredGrant } from "./chatgpt-token-store.js";
+import { ApiError } from "./types.js";
 
 const RESOURCE = "https://api.openai.com/v1";
 const tokenSchema = z.object({
@@ -56,6 +57,7 @@ export class ChatGptApi {
     return jwtVerify(idToken, createRemoteJWKSet(new URL(this.endpoints.jwksUrl)), {
       issuer: this.endpoints.issuer,
       audience: clientId,
+      requiredClaims: ["exp", "sub", "nonce"],
     });
   }
 
@@ -74,11 +76,20 @@ export class ChatGptApi {
         })
         .json(),
     );
+    if (token.id_token === undefined)
+      throw new ApiError(502, "oauth_id_token_missing", "Refresh did not return identity");
+    const idToken = token.id_token;
+    await jwtVerify(idToken, createRemoteJWKSet(new URL(this.endpoints.jwksUrl)), {
+      issuer: grant.issuer,
+      audience: grant.clientId,
+      subject: grant.subject,
+      requiredClaims: ["exp", "sub"],
+    });
     return {
       ...grant,
       accessToken: token.access_token,
       refreshToken: token.refresh_token,
-      idToken: token.id_token ?? grant.idToken,
+      idToken,
       scopes: token.scope?.split(" ").filter(Boolean) ?? grant.scopes,
       expiresAt: now + token.expires_in * 1_000,
     };

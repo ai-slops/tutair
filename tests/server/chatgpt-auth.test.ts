@@ -14,7 +14,9 @@ describe("Sign in with ChatGPT authorization", () => {
   let tokenClaims: Readonly<Record<string, unknown>>;
   const callbackClientId = "oaiapp_fixture";
   let tokenRefresh = "refresh-1";
-  let tokenNonce = "";
+  let tokenNonce: string | undefined;
+  let tokenScope: string | undefined;
+  let includeExpiration = true;
   let now = Date.now();
   let port = 0;
 
@@ -22,6 +24,9 @@ describe("Sign in with ChatGPT authorization", () => {
     const keys = await generateKeyPair("RS256");
     const jwk = { ...(await exportJWK(keys.publicKey)), kid: "fixture", alg: "RS256" };
     tokenClaims = { sub: "account-1" };
+    tokenNonce = undefined;
+    tokenScope = "openid profile offline_access resource.invoke chatgpt.tokens.use.direct";
+    includeExpiration = true;
     server = createServer(async (request, response) => {
       const base = `http://127.0.0.1:${port}`;
       if (request.url === "/jwks") {
@@ -34,13 +39,16 @@ describe("Sign in with ChatGPT authorization", () => {
         for await (const chunk of request)
           chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
         const form = new URLSearchParams(Buffer.concat(chunks).toString("utf8"));
-        const idToken = await new SignJWT({ ...tokenClaims, nonce: tokenNonce })
+        let signer = new SignJWT({
+          ...tokenClaims,
+          ...(tokenNonce === undefined ? {} : { nonce: tokenNonce }),
+        })
           .setProtectedHeader({ alg: "RS256", kid: "fixture" })
           .setIssuer(base)
           .setAudience(form.get("client_id") ?? callbackClientId)
-          .setExpirationTime("5m")
-          .setIssuedAt()
-          .sign(keys.privateKey);
+          .setIssuedAt();
+        if (includeExpiration) signer = signer.setExpirationTime("5m");
+        const idToken = await signer.sign(keys.privateKey);
         response.setHeader("content-type", "application/json");
         response.end(
           JSON.stringify({
@@ -48,7 +56,7 @@ describe("Sign in with ChatGPT authorization", () => {
             refresh_token: tokenRefresh,
             id_token: idToken,
             expires_in: 3600,
-            scope: "openid profile offline_access resource.invoke chatgpt.tokens.use.direct",
+            ...(tokenScope === undefined ? {} : { scope: tokenScope }),
             token_type: "Bearer",
           }),
         );
@@ -129,6 +137,40 @@ describe("Sign in with ChatGPT authorization", () => {
     ).rejects.toMatchObject({ code: "oauth_nonce_mismatch" });
   });
 
+  it("rejects callback scope when only the untrusted callback claims permission", async () => {
+    const started = await auth.begin("learner-1");
+    tokenNonce = requiredNonce(started.url);
+    tokenScope = undefined;
+
+    await expect(
+      auth.complete(
+        new URLSearchParams({
+          code: "code-1",
+          state: started.state,
+          client_id: callbackClientId,
+          scope: "chatgpt.tokens.use.direct",
+        }),
+      ),
+    ).rejects.toMatchObject({ code: "oauth_scope_missing" });
+  });
+
+  it.each([
+    ["expiration", { claims: { sub: "account-1" }, nonce: "valid", expiration: false }],
+    ["subject", { claims: {}, nonce: "valid", expiration: true }],
+    ["nonce", { claims: { sub: "account-1" }, nonce: undefined, expiration: true }],
+  ])("rejects an initial ID token without %s", async (_claim, identity) => {
+    const started = await auth.begin("learner-1");
+    tokenClaims = identity.claims;
+    tokenNonce = identity.nonce === "valid" ? requiredNonce(started.url) : undefined;
+    includeExpiration = identity.expiration;
+
+    await expect(
+      auth.complete(
+        new URLSearchParams({ code: "code-1", state: started.state, client_id: callbackClientId }),
+      ),
+    ).rejects.toBeDefined();
+  });
+
   it("rejects nonce, client, and returning-account mismatches", async () => {
     const started = await auth.begin("learner-1");
     tokenNonce = requiredNonce(started.url);
@@ -159,6 +201,7 @@ describe("Sign in with ChatGPT authorization", () => {
     );
     now += 3_700_000;
     tokenRefresh = "refresh-2";
+    tokenNonce = undefined;
 
     const credential = await auth.credential("learner-1");
     expect((await tokenStore.read("learner-1"))?.refreshToken).toBe("refresh-2");
@@ -166,6 +209,23 @@ describe("Sign in with ChatGPT authorization", () => {
 
     expect(credential.accessToken).toBe("access-1");
     expect(await auth.status("learner-1")).toMatchObject({ connected: false });
+  });
+
+  it("rejects a refreshed ID token for another subject without replacing credentials", async () => {
+    const started = await auth.begin("learner-1");
+    tokenNonce = requiredNonce(started.url);
+    await auth.complete(
+      new URLSearchParams({ code: "code-1", state: started.state, client_id: callbackClientId }),
+    );
+    const original = await tokenStore.read("learner-1");
+    now += 3_700_000;
+    tokenClaims = { sub: "account-2" };
+    tokenNonce = undefined;
+    tokenRefresh = "refresh-2";
+
+    await expect(auth.credential("learner-1")).rejects.toBeDefined();
+
+    expect(await tokenStore.read("learner-1")).toEqual(original);
   });
 
   it("lists only account-visible models and persists an available selection", async () => {

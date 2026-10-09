@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { ChatGptApi, type ChatGptEndpoints } from "./chatgpt-api.js";
 import type { ProtectedTokenStore, StoredGrant } from "./chatgpt-token-store.js";
+import { OwnerMutationGate } from "./owner-mutation-gate.js";
 import { ApiError } from "./types.js";
 
 const DIRECT_SCOPE = "chatgpt.tokens.use.direct";
@@ -16,6 +17,7 @@ type PendingAuthorization = {
   readonly clientId: string;
   readonly previous: StoredGrant | null;
   readonly createdAt: number;
+  readonly generation: number;
 };
 export type ChatGptAuthConfig = ChatGptEndpoints & {
   readonly enabled: boolean;
@@ -33,6 +35,7 @@ export class ChatGptAuth {
   readonly api: ChatGptApi;
   private readonly pending = new Map<string, PendingAuthorization>();
   private readonly refreshes = new Map<string, Promise<StoredGrant>>();
+  private readonly mutations = new OwnerMutationGate();
 
   constructor(readonly config: ChatGptAuthConfig) {
     this.api = new ChatGptApi(config);
@@ -40,7 +43,9 @@ export class ChatGptAuth {
 
   async begin(owner: string): Promise<{ readonly url: string; readonly state: string }> {
     this.requireEnabled();
+    const generation = this.mutations.current(owner);
     const previous = await this.config.store.read(owner);
+    this.mutations.assertCurrent(owner, generation);
     const state = randomBytes(32).toString("base64url");
     const nonce = randomBytes(32).toString("base64url");
     const verifier = randomBytes(48).toString("base64url");
@@ -53,6 +58,7 @@ export class ChatGptAuth {
       clientId,
       previous,
       createdAt: this.now(),
+      generation,
     });
     const url = new URL(this.config.authorizationUrl);
     const params = url.searchParams;
@@ -95,14 +101,15 @@ export class ChatGptAuth {
     });
     if (token.id_token === undefined)
       throw new ApiError(502, "oauth_id_token_missing", "Authorization did not return identity");
-    const scopes = (token.scope ?? params.get("scope") ?? "").split(" ").filter(Boolean);
+    const idToken = token.id_token;
+    const scopes = (token.scope ?? "").split(" ").filter(Boolean);
     if (!scopes.includes(DIRECT_SCOPE))
       throw new ApiError(
         403,
         "oauth_scope_missing",
         "ChatGPT direct-token permission was not granted",
       );
-    const verified = await this.api.verifyIdentity(token.id_token, clientId);
+    const verified = await this.api.verifyIdentity(idToken, clientId);
     if (verified.payload["nonce"] !== pending.nonce)
       throw new ApiError(401, "oauth_nonce_mismatch", "Authorization nonce did not match");
     const subject = z.string().min(1).parse(verified.payload.sub);
@@ -111,16 +118,19 @@ export class ChatGptAuth {
       (pending.previous.subject !== subject || pending.previous.clientId !== clientId)
     )
       throw new ApiError(409, "oauth_account_mismatch", "Authorization returned another account");
-    await this.config.store.write(pending.owner, {
-      clientId,
-      issuer: this.config.issuer,
-      subject,
-      scopes,
-      accessToken: token.access_token,
-      refreshToken: token.refresh_token,
-      idToken: token.id_token,
-      expiresAt: this.now() + token.expires_in * 1_000,
-      selectedModel: pending.previous?.selectedModel ?? null,
+    await this.mutations.run(pending.owner, async () => {
+      this.mutations.assertCurrent(pending.owner, pending.generation);
+      await this.config.store.write(pending.owner, {
+        clientId,
+        issuer: this.config.issuer,
+        subject,
+        scopes,
+        accessToken: token.access_token,
+        refreshToken: token.refresh_token,
+        idToken,
+        expiresAt: this.now() + token.expires_in * 1_000,
+        selectedModel: pending.previous?.selectedModel ?? null,
+      });
     });
     return pending.owner;
   }
@@ -139,19 +149,29 @@ export class ChatGptAuth {
   }
 
   async credential(owner: string): Promise<StoredGrant> {
+    const generation = this.mutations.current(owner);
     const grant = await this.config.store.read(owner);
+    this.mutations.assertCurrent(owner, generation);
     if (grant === null)
       throw new ApiError(401, "chatgpt_not_connected", "Connect ChatGPT for this learner first");
     if (grant.expiresAt > this.now() + 60_000) return grant;
     const active = this.refreshes.get(owner);
     if (active !== undefined) return active;
-    const refresh = this.refresh(owner, grant).finally(() => this.refreshes.delete(owner));
+    const refresh = this.refresh(owner, grant, generation);
     this.refreshes.set(owner, refresh);
+    void refresh.then(
+      () => this.clearRefresh(owner, refresh),
+      () => this.clearRefresh(owner, refresh),
+    );
     return refresh;
   }
 
   async disconnect(owner: string): Promise<void> {
-    await this.config.store.delete(owner);
+    this.mutations.invalidate(owner);
+    this.refreshes.delete(owner);
+    for (const [state, pending] of this.pending)
+      if (pending.owner === owner) this.pending.delete(state);
+    await this.mutations.run(owner, () => this.config.store.delete(owner));
   }
 
   async models(
@@ -183,12 +203,23 @@ export class ChatGptAuth {
     };
   }
 
-  private async refresh(owner: string, grant: StoredGrant): Promise<StoredGrant> {
+  private async refresh(
+    owner: string,
+    grant: StoredGrant,
+    generation: number,
+  ): Promise<StoredGrant> {
     const updated = await this.api.refresh(grant, this.now());
     if (!updated.scopes.includes(DIRECT_SCOPE))
       throw new ApiError(403, "oauth_scope_missing", "ChatGPT direct-token permission was revoked");
-    await this.config.store.write(owner, updated);
+    await this.mutations.run(owner, async () => {
+      this.mutations.assertCurrent(owner, generation);
+      await this.config.store.write(owner, updated);
+    });
     return updated;
+  }
+
+  private clearRefresh(owner: string, refresh: Promise<StoredGrant>): void {
+    if (this.refreshes.get(owner) === refresh) this.refreshes.delete(owner);
   }
 
   private resolveClient(pending: PendingAuthorization, supplied: string | null): string {
