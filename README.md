@@ -89,7 +89,9 @@ defaults to `~/.config/tutair/chatgpt.json`, is replaced atomically with mode
 `0600`, and is never included in UI responses or learning exports. Each grant is
 bound to the authenticated local learner, issued client, validated subject, and
 persistent host ID. Privacy deletion and Disconnect remove that learner's local
-grant. A real browser login is not exercised by the automated fixture suite.
+grant. The store coordinates same-path mutations within one server process; do
+not share one credential path between multiple Tutair processes. A real browser
+login is not exercised by the automated fixture suite.
 
 ChatGPT-plan inference always sends `stream: true` and `store: false`, accepts a
 result only after `response.completed`, and rejects failed, incomplete, or
