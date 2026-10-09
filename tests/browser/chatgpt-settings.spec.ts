@@ -35,9 +35,7 @@ test("selects and disconnects an account-visible ChatGPT model", async ({ page }
   const dialog = page.getByRole("dialog", { name: "Session & model" });
 
   await expect(dialog.getByRole("status")).toContainText("Connected for this local learner");
-  await expect(dialog.getByRole("combobox", { name: "ChatGPT model" })).toHaveValue(
-    "gpt-browser",
-  );
+  await expect(dialog.getByRole("combobox", { name: "ChatGPT model" })).toHaveValue("gpt-browser");
   await dialog.getByRole("button", { name: "Disconnect ChatGPT" }).click();
   await expect(dialog.getByRole("link", { name: "Connect ChatGPT" })).toBeVisible();
 });
