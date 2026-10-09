@@ -53,6 +53,55 @@ A compatible local inference service can use its own base URL and model.
 Provider credentials stay on the server. Model requests contain relevant private
 learning context: configure only a provider you trust with that data.
 
+#### Personal Sign in with ChatGPT (local opt-in)
+
+Tutair can use OpenAI's official open-source Sign in with ChatGPT flow and the
+public Responses API. It is disabled by default and is intended only for personal
+local testing:
+
+```dotenv
+TUTOR_PROVIDER=chatgpt
+TUTOR_CHATGPT_PERSONAL=true
+TUTOR_CHATGPT_CALLBACK_PORT=1455
+TUTOR_EMBEDDING_PROVIDER=local
+```
+
+Open `http://127.0.0.1:1455`, create the local learner session, then use
+**Settings → Session & model → Connect ChatGPT**. After authorization returns,
+refresh the session and choose one of the account models shown by OpenAI. Tutair
+uses only models marked `visibility: list`. The authorization client is public:
+there is no client secret. The server validates state, PKCE S256, JWT signature,
+issuer, audience, expiry, nonce, subject, issued client, account continuity, and
+the `chatgpt.tokens.use.direct` scope.
+
+The callback is exactly `http://127.0.0.1:1455/auth/callback`; `localhost` is not
+substitutable. For a container or remote VM, forward that loopback port to the
+server's actual port and browse through the forwarded loopback address. Example
+when Tutair listens on port 3000 in the VM:
+
+```sh
+ssh -N -L 1455:127.0.0.1:3000 user@vm
+```
+
+Do not invent an external callback URL or trust forwarded-host headers. Tutair
+rejects authorization initiation from non-loopback origins. Its credential file
+defaults to `~/.config/tutair/chatgpt.json`, is replaced atomically with mode
+`0600`, and is never included in UI responses or learning exports. Each grant is
+bound to the authenticated local learner, issued client, validated subject, and
+persistent host ID. Privacy deletion and Disconnect remove that learner's local
+grant. A real browser login is not exercised by the automated fixture suite.
+
+ChatGPT-plan inference always sends `stream: true` and `store: false`, accepts a
+result only after `response.completed`, and rejects failed, incomplete, or
+truncated streams. It does not silently fall back to API-key billing or demo mode.
+This preview grants model inference, not ChatGPT conversation history or other
+account context. See the [official OSS sign-in guide](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
+and [preview limitations](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations).
+
+API-key users may opt into the same Responses adapter with
+`TUTOR_PROVIDER=openai` and `TUTOR_OPENAI_MODE=responses`; existing strict and
+compatibility Chat Completions modes remain unchanged.
+
 For a deterministic, credential-free FSM walkthrough:
 
 ```dotenv

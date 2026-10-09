@@ -32,6 +32,7 @@
         <li><strong>Disabled</strong> keeps the learning workspace local without generation.</li>
         <li><strong>Demo</strong> exercises the workflow with an explicit synthetic banner. It is not presented as a real model.</li>
         <li><strong>OpenAI-compatible</strong> connects a provider that supports the required structured-output schema.</li>
+        <li><strong>Personal ChatGPT</strong> uses official local OAuth and the Responses API when the server explicitly enables it.</li>
       </ul>
       <h2>Configure the server</h2>
       <p>Set environment variables where the Tutair server runs, then restart it. Do not paste these values into browser storage or a conversation.</p>
@@ -44,12 +45,19 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_API_KEY=your-provider-key
 TUTOR_MODEL=gpt-4.1-mini
 
+# Personal local ChatGPT mode
+TUTOR_PROVIDER=chatgpt
+TUTOR_CHATGPT_PERSONAL=true
+TUTOR_CHATGPT_CALLBACK_PORT=1455
+
 # Optional provider embedding model
 TUTOR_EMBEDDING_MODEL=text-embedding-3-small
 
 # Or use local embeddings
 TUTOR_EMBEDDING_PROVIDER=local</code></pre>
-      <h2>Check the connection</h2>
+       <h2>Loopback callback</h2>
+       <p>Personal ChatGPT uses <code>http://127.0.0.1:1455/auth/callback</code>. Open Tutair through that same loopback port. For a container or VM listening on port 3000, forward it first: <code>ssh -N -L 1455:127.0.0.1:3000 user@vm</code>. Do not replace <code>127.0.0.1</code> with <code>localhost</code> or a public callback.</p>
+       <h2>Check the connection</h2>
       <p>Return to Tutair and open <strong>Settings → Session &amp; model</strong>. The status identifies the configured model, synthetic mode, or unavailable generation. A real-provider failure never silently falls back to synthetic output.</p>
       <h2>Privacy note</h2>
       <p>Your configured provider may receive learning context needed for a tutor turn. Review that provider’s retention policy before using sensitive learning material.</p>
