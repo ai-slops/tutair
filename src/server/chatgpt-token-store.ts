@@ -1,6 +1,7 @@
 import { mkdir, open, readFile, rename, rm } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { z } from "zod";
+import { ApiError } from "./types.js";
 
 const GrantSchema = z.object({
   clientId: z.string().min(1),
@@ -22,51 +23,85 @@ const StoreSchema = z.object({
 });
 type StoreData = z.infer<typeof StoreSchema>;
 
+const mutationTails = new Map<string, Promise<void>>();
+
 export class ProtectedTokenStore {
   constructor(readonly path: string) {}
 
   async hostId(): Promise<string> {
-    const data = await this.load();
-    await this.save(data);
-    return data.hostId;
+    return this.mutate(async () => {
+      const existing = await this.load();
+      if (existing !== null) return existing.hostId;
+      const created = this.empty();
+      await this.save(created);
+      return created.hostId;
+    });
   }
 
   async read(owner: string): Promise<StoredGrant | null> {
-    const grant = (await this.load()).grants[owner];
+    const grant = (await this.load())?.grants[owner];
     return grant ?? null;
   }
 
   async write(owner: string, grant: StoredGrant): Promise<void> {
-    const data = await this.load();
-    await this.save({ ...data, grants: { ...data.grants, [owner]: GrantSchema.parse(grant) } });
-  }
-
-  async delete(owner: string): Promise<void> {
-    const data = await this.load();
-    const grants = Object.fromEntries(
-      Object.entries(data.grants).filter(([learnerId]) => learnerId !== owner),
-    );
-    await this.save({ ...data, grants });
-  }
-
-  async selectModel(owner: string, model: string): Promise<void> {
-    const data = await this.load();
-    const grant = data.grants[owner];
-    if (grant === undefined) return;
-    await this.save({
-      ...data,
-      grants: { ...data.grants, [owner]: { ...grant, selectedModel: model } },
+    await this.mutate(async () => {
+      const data = (await this.load()) ?? this.empty();
+      await this.save({ ...data, grants: { ...data.grants, [owner]: GrantSchema.parse(grant) } });
     });
   }
 
-  private async load(): Promise<StoreData> {
+  async delete(owner: string): Promise<void> {
+    await this.mutate(async () => {
+      const data = await this.load();
+      if (data === null || data.grants[owner] === undefined) return;
+      const grants = Object.fromEntries(
+        Object.entries(data.grants).filter(([learnerId]) => learnerId !== owner),
+      );
+      await this.save({ ...data, grants });
+    });
+  }
+
+  async selectModel(owner: string, model: string): Promise<void> {
+    await this.mutate(async () => {
+      const data = await this.load();
+      const grant = data?.grants[owner];
+      if (data === null || grant === undefined)
+        throw new ApiError(401, "chatgpt_not_connected", "Connect ChatGPT for this learner first");
+      await this.save({
+        ...data,
+        grants: { ...data.grants, [owner]: { ...grant, selectedModel: model } },
+      });
+    });
+  }
+
+  private async load(): Promise<StoreData | null> {
     try {
       return StoreSchema.parse(JSON.parse(await readFile(this.path, "utf8")));
     } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "ENOENT") {
-        return { version: 1, hostId: crypto.randomUUID(), grants: {} };
+        return null;
       }
       throw error;
+    }
+  }
+
+  private empty(): StoreData {
+    return { version: 1, hostId: crypto.randomUUID(), grants: {} };
+  }
+
+  private async mutate<Result>(operation: () => Promise<Result>): Promise<Result> {
+    const key = resolve(this.path);
+    const previous = mutationTails.get(key) ?? Promise.resolve();
+    const current = previous.then(operation, operation);
+    const tail = current.then(
+      () => undefined,
+      () => undefined,
+    );
+    mutationTails.set(key, tail);
+    try {
+      return await current;
+    } finally {
+      if (mutationTails.get(key) === tail) mutationTails.delete(key);
     }
   }
 
