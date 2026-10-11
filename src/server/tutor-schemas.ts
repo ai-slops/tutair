@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { definitionScopeSchema, relationNecessitySchema } from "./knowledge-contracts.js";
+import { blockTypes } from "./knowledge-document-contracts.js";
 import type { threadOrigins } from "./thread-schemas.js";
 import type { LearnerId } from "./types.js";
 import { riskScopes } from "./types.js";
@@ -33,6 +34,7 @@ export const candidateSchema = z.object({
   riskScope: z.enum(riskScopes),
   confidence: z.number().min(0).max(1),
   sourceSpans: z.array(sourceSpanSchema).max(32),
+  classification: z.enum(["knowledge_unit", "material_request"]),
 });
 
 const relationTypes = [
@@ -120,7 +122,15 @@ export const resolutionSchema = z.object({
     )
     .max(24),
   provisional: z
-    .array(candidateSchema.extend({ reasonCodes: z.array(z.string().max(200)).max(16) }))
+    .array(
+      candidateSchema.extend({
+        review: z.enum(["create", "attach_material", "ignore"]),
+        independentlyValidated: z.boolean(),
+        knowledgeId: z.string().uuid().optional(),
+        revision: z.number().int().positive().optional(),
+        reasonCodes: z.array(z.string().max(200)).max(16),
+      }),
+    )
     .max(24),
 });
 
@@ -142,6 +152,14 @@ export const planningSchema = z.object({
   introducedUnits: z.array(z.string().max(200)).max(24),
   deferredUnits: z.array(z.string().max(200)).max(24),
   deferredQuestions: z.array(z.string().max(2_000)).max(12),
+  materialNeeds: z
+    .array(
+      z.object({
+        knowledgeRevisionId: z.string().uuid(),
+        blockTypes: z.array(z.enum(blockTypes)).min(1).max(9),
+      }),
+    )
+    .max(24),
   assessmentOpportunities: z
     .array(
       z.object({

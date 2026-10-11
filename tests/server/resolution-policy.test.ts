@@ -16,6 +16,7 @@ const candidate = {
   riskScope: "stable",
   confidence: 0.9,
   sourceSpans: [],
+  classification: "knowledge_unit",
 } satisfies z.infer<typeof candidateSchema>;
 const offered: KnowledgeContext = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -50,13 +51,13 @@ describe("conservative knowledge resolution", () => {
     expect(result.decisions[0]?.resolution).toBe("reuse");
   });
 
-  it("duplicates an uncertain match instead of silently merging", () => {
+  it("skips an uncertain match instead of silently merging or creating", () => {
     const result = normalizeResolution({
       candidates: [candidate],
       offeredKnowledge: [offered],
       resolution: { matches: [{ ...match, confidence: 0.05 }], provisional: [] },
     });
-    expect(result.decisions[0]?.resolution).toBe("new");
+    expect(result.decisions[0]?.resolution).toBe("skip");
   });
 
   it("does not reuse a match explicitly marked provisional", () => {
@@ -65,18 +66,16 @@ describe("conservative knowledge resolution", () => {
       offeredKnowledge: [offered],
       resolution: { matches: [{ ...match, decision: "provisional" }], provisional: [] },
     });
-    expect(result.decisions[0]?.resolution).toBe("new");
+    expect(result.decisions[0]?.resolution).toBe("skip");
   });
 
-  it("preserves an omitted original candidate", () => {
+  it("skips an omitted original candidate", () => {
     const result = normalizeResolution({
       candidates: [candidate],
       offeredKnowledge: [offered],
       resolution: { matches: [], provisional: [] },
     });
-    expect(result.decisions.map((item) => item.candidate.definition)).toEqual([
-      candidate.definition,
-    ]);
+    expect(result.decisions[0]?.resolution).toBe("skip");
   });
 
   it("does not accept a provider rewrite of the extracted definition", () => {
@@ -85,20 +84,38 @@ describe("conservative knowledge resolution", () => {
       offeredKnowledge: [],
       resolution: {
         matches: [],
-        provisional: [{ ...candidate, definition: "Ceremonial etiquette", reasonCodes: [] }],
+        provisional: [
+          {
+            ...candidate,
+            definition: "Ceremonial etiquette",
+            review: "create",
+            independentlyValidated: true,
+            reasonCodes: [],
+          },
+        ],
       },
     });
     expect(result.decisions[0]?.candidate.definition).toBe(candidate.definition);
   });
 
-  it("makes one new unit when the provider returns conflicting decisions", () => {
+  it("skips when the provider returns conflicting decisions", () => {
     const result = normalizeResolution({
       candidates: [candidate],
       offeredKnowledge: [offered],
-      resolution: { matches: [match], provisional: [{ ...candidate, reasonCodes: [] }] },
+      resolution: {
+        matches: [match],
+        provisional: [
+          {
+            ...candidate,
+            review: "create",
+            independentlyValidated: true,
+            reasonCodes: [],
+          },
+        ],
+      },
     });
     expect(result.decisions).toHaveLength(1);
-    expect(result.decisions[0]?.resolution).toBe("new");
+    expect(result.decisions[0]?.resolution).toBe("skip");
   });
 
   it("rejects unoffered IDs and incompatible senses even at high confidence", () => {
@@ -108,7 +125,7 @@ describe("conservative knowledge resolution", () => {
         offeredKnowledge: choices,
         resolution: { matches: [match], provisional: [] },
       });
-      expect(result.decisions[0]?.resolution).toBe("new");
+      expect(result.decisions[0]?.resolution).toBe("skip");
     }
   });
 
@@ -131,7 +148,7 @@ describe("conservative knowledge resolution", () => {
     });
 
     // Then
-    expect(result.decisions[0]?.resolution).toBe("new");
+    expect(result.decisions[0]?.resolution).toBe("skip");
   });
 
   it("records but never persists provider-invented candidate keys", () => {
@@ -140,10 +157,59 @@ describe("conservative knowledge resolution", () => {
       offeredKnowledge: [],
       resolution: {
         matches: [],
-        provisional: [{ ...candidate, key: "invented", reasonCodes: [] }],
+        provisional: [
+          {
+            ...candidate,
+            key: "invented",
+            review: "create",
+            independentlyValidated: true,
+            reasonCodes: [],
+          },
+        ],
       },
     });
     expect(result.ignoredKeys).toEqual(["invented"]);
     expect(result.decisions.map((item) => item.candidate.key)).toEqual(["formal"]);
+  });
+
+  it("creates only an explicitly reviewed independently validated knowledge unit", () => {
+    const result = normalizeResolution({
+      candidates: [candidate],
+      offeredKnowledge: [],
+      resolution: {
+        matches: [],
+        provisional: [
+          {
+            ...candidate,
+            review: "create",
+            independentlyValidated: true,
+            reasonCodes: ["named_definition_verified"],
+          },
+        ],
+      },
+    });
+    expect(result.decisions[0]?.resolution).toBe("new");
+  });
+
+  it("attaches material only to an offered exact revision", () => {
+    const material = { ...candidate, classification: "material_request" as const };
+    const result = normalizeResolution({
+      candidates: [material],
+      offeredKnowledge: [offered],
+      resolution: {
+        matches: [],
+        provisional: [
+          {
+            ...material,
+            review: "attach_material",
+            independentlyValidated: false,
+            knowledgeId: offered.id,
+            revision: offered.revision,
+            reasonCodes: ["supports_named_concept"],
+          },
+        ],
+      },
+    });
+    expect(result.decisions[0]?.resolution).toBe("attach");
   });
 });

@@ -11,7 +11,9 @@ type Decision = {
   readonly reasonCodes: readonly string[];
 } & (
   | { readonly resolution: "reuse"; readonly knowledge: KnowledgeContext }
+  | { readonly resolution: "attach"; readonly knowledge: KnowledgeContext }
   | { readonly resolution: "new" }
+  | { readonly resolution: "skip" }
 );
 
 export function normalizeResolution(input: {
@@ -43,6 +45,10 @@ export function normalizeResolution(input: {
     const offered = input.offeredKnowledge.find(
       (item) => item.id === match?.knowledgeId && item.revision === match.revision,
     );
+    const reviewed = proposed[0];
+    const attachment = input.offeredKnowledge.find(
+      (item) => item.id === reviewed?.knowledgeId && item.revision === reviewed.revision,
+    );
     if (
       matches.length === 1 &&
       proposed.length === 0 &&
@@ -60,19 +66,42 @@ export function normalizeResolution(input: {
         knowledge: offered,
         reasonCodes: [...match.reasonCodes, "offered_revision_verified", "scope_compatible"],
       });
+    } else if (
+      matches.length === 0 &&
+      proposed.length === 1 &&
+      reviewed?.review === "attach_material" &&
+      reviewed.classification === "material_request" &&
+      attachment !== undefined
+    ) {
+      decisions.push({
+        resolution: "attach",
+        candidate,
+        knowledge: attachment,
+        reasonCodes: [...reviewed.reasonCodes, "offered_revision_verified"],
+      });
+    } else if (
+      matches.length === 0 &&
+      proposed.length === 1 &&
+      reviewed?.review === "create" &&
+      reviewed.independentlyValidated &&
+      candidate.classification === "knowledge_unit"
+    ) {
+      decisions.push({ resolution: "new", candidate, reasonCodes: reviewed.reasonCodes });
     } else {
       decisions.push({
-        resolution: "new",
+        resolution: "skip",
         candidate,
         reasonCodes: [
-          ...(proposed[0]?.reasonCodes ?? []),
+          ...(reviewed?.reasonCodes ?? []),
           matches.length + proposed.length === 0
-            ? "omitted_candidate_preserved"
+            ? "omitted_candidate_skipped"
             : matches.length + proposed.length > 1
               ? "conflicting_resolution"
               : match
                 ? "equivalence_not_established"
-                : "provisional_requested",
+                : reviewed?.review === "ignore"
+                  ? "explicitly_ignored"
+                  : "creation_not_independently_validated",
         ],
       });
     }
