@@ -85,6 +85,51 @@ test("keeps a failed recorded stage inspectable after reload", async ({ page, re
   await expect(page.getByText("Drafting the answer failed", { exact: true })).toBeVisible();
 });
 
+test("shows exact answer revisions and opt-in official summaries at every viewport", async ({
+  page,
+}) => {
+  await page.getByRole("button", { name: "Open settings" }).click();
+  const settings = page.getByRole("dialog", { name: "Session & model" });
+  await settings
+    .getByRole("checkbox", { name: /Save provider reasoning summaries for debugging/ })
+    .check();
+  await expect(
+    settings.getByRole("checkbox", { name: /Save provider reasoning summaries for debugging/ }),
+  ).toBeChecked();
+  await settings.getByRole("button", { name: "Close dialog" }).click();
+  await page.getByRole("textbox", { name: "Ask your tutor" }).fill("Explain a transition guard");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(page.locator(".message-tutor")).toHaveCount(1);
+
+  const provenanceButton = page.getByRole("button", { name: "Sources & knowledge" });
+  await provenanceButton.click();
+  const provenance = page.locator(".answer-provenance-body");
+  await expect(provenance.getByRole("region", { name: "Provided to model" })).toBeVisible();
+  await expect(provenance.getByText("Created during this answer")).toBeVisible();
+  await expect(provenance.getByText("Exposed in answer")).toBeVisible();
+  await expect(provenance.getByText("Provider reasoning summary")).toBeVisible();
+  await expect(provenance.getByText(/Checked the recorded final inputs/)).toBeVisible();
+
+  for (const width of [375, 768, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.screenshot({
+      path: `.omo/evidence/answer-provenance-${width}.png`,
+      fullPage: true,
+    });
+  }
+
+  await provenance
+    .getByRole("region", { name: "Created during this answer" })
+    .getByRole("link")
+    .first()
+    .click();
+  await expect(page.getByRole("heading", { name: "Knowledge manager" })).toBeVisible();
+  await expect(page.locator(".manager-history details[open]")).toContainText("Revision 1");
+});
+
 test("serves fingerprinted assets with compression and immutable caching", async ({ request }) => {
   const indexResponse = await request.get("/");
   const html = await indexResponse.text();

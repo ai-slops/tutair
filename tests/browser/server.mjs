@@ -52,7 +52,16 @@ const { app, database } = createApp({
         pausedStage = null;
         await pausedStageGate;
       }
-      return demo.call(call);
+      const result = await demo.call(call);
+      return call.reasoningSummaryEnabled
+        ? {
+            ...result,
+            reasoningSummary: {
+              state: "available",
+              text: `Checked the recorded ${call.stage} inputs and required output.`,
+            },
+          }
+        : { ...result, reasoningSummary: { state: "disabled" } };
     },
   },
 });
