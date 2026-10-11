@@ -22,6 +22,7 @@ import type {
   ReviewAction,
   SearchResult,
 } from "./model";
+import type { AnswerProvenanceRecord, DebugSettings } from "./provenance-contract";
 
 export type WorkspaceSnapshot = {
   readonly conversations: readonly ConversationSummary[];
@@ -33,6 +34,7 @@ export type WorkspaceSnapshot = {
   readonly knowledge: readonly KnowledgeItem[];
   readonly provider: ProviderStatus;
   readonly chatgpt: ChatGptConnection;
+  readonly debugSettings: DebugSettings;
 };
 
 export interface WorkspaceApi {
@@ -78,6 +80,8 @@ export interface WorkspaceApi {
   beginChatGptManual(): Promise<string>;
   completeChatGptManual(callbackUrl: string): Promise<WorkspaceSnapshot>;
   disconnectChatGpt(): Promise<WorkspaceSnapshot>;
+  saveDebugSettings(value: DebugSettings): Promise<WorkspaceSnapshot>;
+  answerProvenance(target: GenerationTarget): Promise<AnswerProvenanceRecord>;
   search(query: string): Promise<SearchResponse>;
   generationPipeline(target: GenerationTarget, signal: AbortSignal): Promise<GenerationPipeline>;
   generationRun(
@@ -117,4 +121,5 @@ export const EMPTY_SNAPSHOT: WorkspaceSnapshot = {
     selectedModel: null,
     models: [],
   },
+  debugSettings: { saveProviderReasoningSummaries: false },
 };

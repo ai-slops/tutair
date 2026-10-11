@@ -12,6 +12,7 @@ import { learningActions } from "./api-learning";
 import { turnActions } from "./api-turns";
 import { WorkspaceClient } from "./api-workspace";
 import { GenerationPipelineSchema, GenerationRunDetailSchema } from "./generation-contract";
+import { AnswerProvenanceSchema, DebugSettingsSchema } from "./provenance-contract";
 import type { WorkspaceApi } from "./workspace";
 
 export function createWorkspaceApi(client: KyInstance): WorkspaceApi {
@@ -119,6 +120,24 @@ export function createWorkspaceApi(client: KyInstance): WorkspaceApi {
       await client.delete("chatgpt/connection");
       return workspace.snapshot(workspace.activeConversationId, generation);
     },
+    async saveDebugSettings(value) {
+      const generation = workspace.begin();
+      await request(
+        () => client.put("settings/debug", { json: value }).json(),
+        DebugSettingsSchema,
+      );
+      return workspace.snapshot(workspace.activeConversationId, generation);
+    },
+    answerProvenance: (target) =>
+      request(
+        () =>
+          client
+            .get(
+              `conversations/${target.conversationId}/tutor-turns/${target.requestId}/provenance`,
+            )
+            .json(),
+        AnswerProvenanceSchema,
+      ),
     search: (query) =>
       request(
         () => client.get("search", { searchParams: { q: query, limit: 20 } }).json(),
