@@ -19,6 +19,7 @@ type DemoCandidate = {
   readonly riskScope: "stable" | "definition-sensitive" | "current-contested" | "high-stakes";
   readonly confidence: number;
   readonly sourceSpans: readonly { readonly start: number; readonly end: number }[];
+  readonly classification: "knowledge_unit" | "material_request";
 };
 
 export const candidate = (
@@ -39,6 +40,7 @@ export const candidate = (
   riskScope: "stable",
   confidence: 0.72,
   sourceSpans: [],
+  classification: "knowledge_unit",
 });
 export const fsm = {
   ...candidate(

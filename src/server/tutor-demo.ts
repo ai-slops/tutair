@@ -86,7 +86,12 @@ export function demoCall(call: StructuredCall): unknown {
                   knownItem.semanticScope === item.semanticScope,
               ),
           )
-          .map((item) => ({ ...item, reasonCodes: ["no_compatible_existing_unit"] })),
+          .map((item) => ({
+            ...item,
+            review: "create" as const,
+            independentlyValidated: true,
+            reasonCodes: ["independently_validated_named_concept"],
+          })),
       };
     }
     case "planning":
@@ -99,6 +104,15 @@ export function demoCall(call: StructuredCall): unknown {
         introducedUnits: values(call.data, "knowledgeIds").slice(0, 3),
         deferredUnits: [],
         deferredQuestions: [],
+        materialNeeds: z.array(knownSchema).safeParse(call.data["knowledge"]).success
+          ? z
+              .array(knownSchema)
+              .parse(call.data["knowledge"])
+              .map((item) => ({
+                knowledgeRevisionId: item.revisionId,
+                blockTypes: ["definition", "example"] as const,
+              }))
+          : [],
         assessmentOpportunities: [
           {
             prompt: "Add the next state and transition for a jammed door.",
@@ -126,6 +140,13 @@ export function demoCall(call: StructuredCall): unknown {
                   item === undefined
                     ? "This concept supports the current learning goal."
                     : `${item.title} is ${item.definition}`,
+              },
+              {
+                type: "example",
+                content:
+                  item === undefined
+                    ? "A concrete example applies this concept to the current question."
+                    : `For the current question, use ${item.title} in a concrete worked example.`,
               },
             ],
             localizedBlocks: [],

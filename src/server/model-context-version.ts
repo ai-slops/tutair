@@ -1,13 +1,13 @@
 import { createHash } from "node:crypto";
 import type { Stage, StructuredCall } from "./provider.js";
 
-export const MODEL_CONTEXT_VERSION = "model-context-v1";
+export const MODEL_CONTEXT_VERSION = "model-context-v2";
 
 export const STAGE_VERSIONS = {
-  extraction: "phase1-v1",
-  resolution: "phase1-v1",
-  planning: "phase1-v1",
-  preparation: "document-v1",
+  extraction: "document-v2",
+  resolution: "document-v2",
+  planning: "document-v2",
+  preparation: "document-v2",
   draft: "phase1-v1",
   lint: "phase1-v1",
   final: "phase1-v1",
@@ -15,10 +15,10 @@ export const STAGE_VERSIONS = {
 } as const satisfies Readonly<Record<Stage, string>>;
 
 export const STAGE_SCHEMA_VERSIONS = {
-  extraction: "phase1-schema-v3",
-  resolution: "phase1-schema-v3",
-  planning: "phase1-schema-v2",
-  preparation: "document-schema-v1",
+  extraction: "document-schema-v2",
+  resolution: "document-schema-v2",
+  planning: "document-schema-v2",
+  preparation: "document-schema-v2",
   draft: "phase1-schema-v2",
   lint: "phase1-schema-v3",
   final: "phase1-schema-v2",
@@ -26,9 +26,9 @@ export const STAGE_SCHEMA_VERSIONS = {
 } as const satisfies Readonly<Record<Stage, string>>;
 
 export const PROMPT_SCHEMA_VERSIONS = {
-  prompt: "phase1-prompt-v2",
-  compatibilityPrompt: "phase1-prompt-v2-compatibility",
-  schema: "phase1-schema-v2",
+  prompt: "document-prompt-v2",
+  compatibilityPrompt: "document-prompt-v2-compatibility",
+  schema: "document-schema-v2",
   evaluationSchema: "phase1-evaluation-schema-v3",
 } as const;
 
