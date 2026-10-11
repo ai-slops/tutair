@@ -15,6 +15,20 @@ export const chatGptRoutes = (services: Services): Hono => {
     const started = await requiredAuth(services).begin(owner);
     return c.redirect(started.url, 302);
   });
+  app.post("/chatgpt/manual/authorize", async (c) => {
+    const auth = requiredAuth(services);
+    auth.assertManualOrigin(c.req.header("origin"));
+    const started = await auth.begin(ownerFor(c, services));
+    return c.redirect(started.url, 302);
+  });
+  app.post("/chatgpt/manual/callback", async (c) => {
+    const auth = requiredAuth(services);
+    auth.assertManualOrigin(c.req.header("origin"));
+    const body = z.object({ callbackUrl: z.url().max(8_192) }).parse(await jsonBody(c));
+    const owner = ownerFor(c, services);
+    await auth.completeManual(owner, body.callbackUrl);
+    return c.json(await auth.status(owner));
+  });
   app.delete("/chatgpt/connection", async (c) => {
     const owner = ownerFor(c, services);
     await requiredAuth(services).disconnect(owner);
