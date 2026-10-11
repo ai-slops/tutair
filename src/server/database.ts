@@ -1,5 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
+import { migrateDebugSettings } from "./debug-settings-migration.js";
 import { migrateExposures } from "./exposure-migration.js";
 import { migrateKnowledgeMetadata } from "./knowledge-migration.js";
 import { migrateKnowledgeReviews } from "./knowledge-review-migration.js";
@@ -88,6 +89,7 @@ export class Database {
       migrateExposures(this.raw);
       migrateModelContexts(this.raw);
       migrateModelRunInspection(this.raw);
+      migrateDebugSettings(this.raw);
       migrateKnowledgeMetadata(this.raw);
       migrateKnowledgeReviews(this.raw);
       migrateThreads(this.raw);
