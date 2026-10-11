@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { SearchResponseSchema } from "../../src/client/api-contract";
-import { resolveKnowledgeSelection, sendDraft } from "../../src/client/app-state";
+import {
+  learningThreadInput,
+  resolveKnowledgeSelection,
+  sendDraft,
+} from "../../src/client/app-state";
 import type { KnowledgeItem } from "../../src/client/model";
 import { createLatestRunner } from "../../src/client/useWorkspace";
 import type { WorkspaceSnapshot } from "../../src/client/workspace";
@@ -125,11 +129,48 @@ describe("workspace correctness", () => {
   });
 
   it("retains the draft when sending fails", async () => {
-    const clear = vi.fn();
+    const setDraft = vi.fn();
 
-    await sendDraft("Keep this question", () => Promise.resolve(false), clear);
+    await sendDraft("Keep this question", () => Promise.resolve(false), setDraft);
 
-    expect(clear).not.toHaveBeenCalled();
+    expect(setDraft).not.toHaveBeenCalled();
+  });
+
+  it("clears only the exact draft that completed", async () => {
+    let current = "A newer question";
+
+    await sendDraft(
+      "Original question",
+      () => Promise.resolve(true),
+      (update) => {
+        current = update(current);
+      },
+    );
+
+    expect(current).toBe("A newer question");
+  });
+
+  it("projects a learning thread into an editable dialog draft", () => {
+    expect(
+      learningThreadInput({
+        id: "thread-1",
+        conversationId: "conversation-1",
+        title: "Reducer study",
+        goal: "Understand reducers",
+        origin: "project",
+        whyNow: null,
+        desiredOutcome: "Explain reducer composition",
+        status: "open",
+        targetKnowledgeUnitIds: [],
+        deferredKnowledgeUnitIds: [],
+        updatedAt: "2026-10-11",
+      }),
+    ).toEqual({
+      title: "Reducer study",
+      desiredOutcome: "Explain reducer composition",
+      origin: "project",
+      whyNow: "",
+    });
   });
 
   it("accepts stable fields from the real search response", () => {

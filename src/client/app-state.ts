@@ -1,4 +1,15 @@
+import type { LearningThread, LearningThreadInput } from "./learning-model";
 import type { KnowledgeItem } from "./model";
+
+export function learningThreadInput(thread: LearningThread | null): LearningThreadInput {
+  if (thread === null) return { title: "", desiredOutcome: "", origin: "question", whyNow: "" };
+  return {
+    title: thread.title,
+    desiredOutcome: thread.desiredOutcome,
+    origin: thread.origin,
+    whyNow: thread.whyNow ?? "",
+  };
+}
 
 export function resolveKnowledgeSelection(
   items: readonly KnowledgeItem[],
@@ -11,11 +22,11 @@ export function resolveKnowledgeSelection(
 export async function sendDraft(
   draft: string,
   send: (content: string) => Promise<boolean>,
-  clear: () => void,
+  setDraft: (update: (current: string) => string) => void,
 ): Promise<void> {
   const content = draft.trim();
   if (content.length === 0) return;
-  if (await send(content)) clear();
+  if (await send(content)) clearMatchingRecoveredDraft(draft, setDraft);
 }
 
 export function clearMatchingRecoveredDraft(
