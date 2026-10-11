@@ -1,26 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
-import {
-  clearMatchingRecoveredDraft,
-  learningThreadInput,
-  resolveKnowledgeSelection,
-  sendDraft,
-} from "./app-state";
+import { clearMatchingRecoveredDraft, resolveKnowledgeSelection, sendDraft } from "./app-state";
 import { Conversation } from "./components/Conversation";
-import { Dialog } from "./components/Dialogs";
 import { KnowledgeManager } from "./components/KnowledgeManager";
-import { KnowledgePanel } from "./components/KnowledgePanel";
 import { RecoveryNotice } from "./components/RecoveryNotice";
 import { Sidebar } from "./components/Sidebar";
-import { ThreadDialog } from "./components/ThreadDialog";
 import { useThreadSearchShortcut } from "./components/useThreadSearchShortcut";
 import { WorkspaceHeader } from "./components/WorkspaceHeader";
 import { WorkspaceLoading } from "./components/WorkspaceLoading";
+import {
+  type DialogKind,
+  type ThreadDialogKind,
+  WorkspaceOverlays,
+} from "./components/WorkspaceOverlays";
 import type { CorrectionKind, SearchResult } from "./model";
+import { useGenerationExperience } from "./useGenerationExperience";
 import { useWorkspace } from "./useWorkspace";
 import "./styles/learning.css";
-
-type DialogKind = "settings" | "delete" | "correction";
 
 export function App() {
   const workspace = useWorkspace(api);
@@ -31,7 +27,7 @@ export function App() {
   const [knowledgeOpen, setKnowledgeOpen] = useState(false);
   const [selectedKnowledgeId, setSelectedKnowledgeId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<DialogKind | null>(null);
-  const [threadDialog, setThreadDialog] = useState<"create" | "edit" | null>(null);
+  const [threadDialog, setThreadDialog] = useState<ThreadDialogKind | null>(null);
   const [dialogValue, setDialogValue] = useState("");
   const [correctionKind, setCorrectionKind] = useState<CorrectionKind>("revise");
   const [knowledgeManagerOpen, setKnowledgeManagerOpen] = useState(
@@ -57,6 +53,23 @@ export function App() {
   const selected = useMemo(
     () => resolveKnowledgeSelection(workspace.snapshot.knowledge, selectedKnowledgeId),
     [selectedKnowledgeId, workspace.snapshot.knowledge],
+  );
+  const turnRunning = workspace.turnPending || workspace.snapshot.recovery?.kind === "running";
+  const recoveryTarget =
+    workspace.snapshot.recovery === null
+      ? null
+      : {
+          conversationId: workspace.snapshot.recovery.conversationId,
+          requestId: workspace.snapshot.recovery.requestId,
+        };
+  const generation = useGenerationExperience(
+    api,
+    workspace.snapshot.activeConversationId,
+    workspace.activeGeneration ?? recoveryTarget,
+    turnRunning,
+    () => {
+      if (!workspace.turnPending) void workspace.refresh();
+    },
   );
 
   if (!workspace.initialized) return <WorkspaceLoading />;
@@ -128,8 +141,6 @@ export function App() {
   }
 
   const recoveryCandidateThreadIds = new Set(workspace.snapshot.recovery?.candidateThreadIds ?? []);
-  const turnRunning = workspace.turnPending || workspace.snapshot.recovery?.kind === "running";
-
   return (
     <div className="app-shell">
       <Sidebar
@@ -190,6 +201,7 @@ export function App() {
           submitting={turnRunning}
           showProgress={workspace.turnPending && workspace.snapshot.recovery === null}
           error={workspace.snapshot.recovery?.kind === "running" ? null : workspace.error}
+          pipeline={generation.livePipeline}
           onDraft={setDraft}
           onSubmit={() => {
             void sendDraft(draft, workspace.send, setDraft);
@@ -198,6 +210,7 @@ export function App() {
             void workspace.refresh();
           }}
           onKnowledge={() => setKnowledgeOpen(true)}
+          onInspectGeneration={generation.open}
           recovery={
             workspace.snapshot.recovery === null ? null : (
               <RecoveryNotice
@@ -214,85 +227,33 @@ export function App() {
                 onRetry={workspace.retryTurn}
                 onRefresh={() => void workspace.refresh()}
                 onRecovered={(content) => clearMatchingRecoveredDraft(content, setDraft)}
+                onInspect={() => generation.open(workspace.snapshot.recovery?.requestId ?? "")}
               />
             )
           }
         />
       </main>
-      {threadsOpen || knowledgeOpen ? (
-        <div
-          className="drawer-backdrop"
-          data-layer={threadsOpen ? "threads" : "knowledge"}
-          aria-hidden="true"
-          onClick={() => {
-            if (threadsOpen) setThreadsOpen(false);
-            else setKnowledgeOpen(false);
-          }}
-        />
-      ) : null}
-      <KnowledgePanel
-        open={knowledgeOpen}
-        items={workspace.snapshot.knowledge}
+      <WorkspaceOverlays
+        workspace={workspace}
+        generation={generation}
+        threadsOpen={threadsOpen}
+        knowledgeOpen={knowledgeOpen}
+        setThreadsOpen={setThreadsOpen}
+        setKnowledgeOpen={setKnowledgeOpen}
         selected={selected}
-        error={workspace.error}
-        learningThread={workspace.snapshot.activeLearningThread}
-        onClose={() => setKnowledgeOpen(false)}
-        onSelect={(item) => setSelectedKnowledgeId(item.id)}
-        onCorrect={(item) => {
-          setSelectedKnowledgeId(item.id);
-          setDialog("correction");
-        }}
-        onPromote={(knowledgeId) =>
-          activeLearningThreadId === null
-            ? Promise.resolve(false)
-            : workspace.promoteKnowledge(activeLearningThreadId, knowledgeId)
-        }
-        onAddQuestion={(question) =>
-          activeLearningThreadId === null
-            ? Promise.resolve(false)
-            : workspace.addQuestion(activeLearningThreadId, question)
-        }
-        onSetQuestionStatus={(questionId, status) =>
-          activeLearningThreadId === null
-            ? Promise.resolve(false)
-            : workspace.setQuestionStatus(activeLearningThreadId, questionId, status)
-        }
+        setSelectedKnowledgeId={setSelectedKnowledgeId}
+        dialog={dialog}
+        dialogValue={dialogValue}
+        correctionKind={correctionKind}
+        setDialog={setDialog}
+        setDialogValue={setDialogValue}
+        setCorrectionKind={setCorrectionKind}
+        closeDialog={closeDialog}
+        confirmDialog={confirmDialog}
+        threadDialog={threadDialog}
+        setThreadDialog={setThreadDialog}
+        activeLearningThreadId={activeLearningThreadId}
       />
-      {dialog === null ? null : (
-        <Dialog
-          kind={dialog}
-          provider={workspace.snapshot.provider}
-          chatgpt={workspace.snapshot.chatgpt}
-          busy={workspace.loading}
-          correction={dialogValue}
-          correctionKind={correctionKind}
-          onCorrection={setDialogValue}
-          onCorrectionKind={setCorrectionKind}
-          onClose={closeDialog}
-          onConfirm={() => {
-            void confirmDialog();
-          }}
-          onSelectChatGptModel={workspace.selectChatGptModel}
-          onBeginChatGptManual={workspace.beginChatGptManual}
-          onCompleteChatGptManual={workspace.completeChatGptManual}
-          onDisconnectChatGpt={workspace.disconnectChatGpt}
-        />
-      )}
-      {threadDialog === null ? null : (
-        <ThreadDialog
-          mode={threadDialog}
-          initial={learningThreadInput(workspace.snapshot.activeLearningThread)}
-          error={workspace.error}
-          onClose={() => setThreadDialog(null)}
-          onSave={(input) =>
-            threadDialog === "create"
-              ? workspace.createLearningThread(input)
-              : activeLearningThreadId === null
-                ? Promise.resolve(false)
-                : workspace.updateLearningThread(activeLearningThreadId, input)
-          }
-        />
-      )}
     </div>
   );
 }

@@ -14,6 +14,7 @@ type RecoveryNoticeProps = {
   readonly onRetry: () => Promise<boolean>;
   readonly onRefresh: () => void;
   readonly onRecovered: (content: string) => void;
+  readonly onInspect?: () => void;
 };
 
 export function RecoveryNotice(props: RecoveryNoticeProps) {
@@ -58,15 +59,22 @@ export function RecoveryNotice(props: RecoveryNoticeProps) {
             <strong id="recovery-heading">Saved request in progress</strong>
             <p>{props.message}</p>
           </div>
-          <button
-            className="button button-secondary"
-            type="button"
-            disabled={pending}
-            onClick={() => void select("retry", props.onRetry)}
-          >
-            {selectingId === "retry" ? <span className="spinner" aria-hidden="true" /> : null}
-            Continue saved request
-          </button>
+          <div className="cluster">
+            {props.onInspect === undefined ? null : (
+              <button className="button button-secondary" type="button" onClick={props.onInspect}>
+                View generation details
+              </button>
+            )}
+            <button
+              className="button button-secondary"
+              type="button"
+              disabled={pending}
+              onClick={() => void select("retry", props.onRetry)}
+            >
+              {selectingId === "retry" ? <span className="spinner" aria-hidden="true" /> : null}
+              Continue saved request
+            </button>
+          </div>
         </div>
       </aside>
     );
@@ -80,10 +88,17 @@ export function RecoveryNotice(props: RecoveryNoticeProps) {
             <strong id="recovery-heading">Saved request needs attention</strong>
             <p>{props.message}</p>
           </div>
-          <button className="button button-secondary" type="button" onClick={props.onRefresh}>
-            <RefreshCcw className="icon" aria-hidden="true" />
-            Refresh conversation
-          </button>
+          <div className="cluster">
+            {props.onInspect === undefined ? null : (
+              <button className="button button-secondary" type="button" onClick={props.onInspect}>
+                View generation details
+              </button>
+            )}
+            <button className="button button-secondary" type="button" onClick={props.onRefresh}>
+              <RefreshCcw className="icon" aria-hidden="true" />
+              Refresh conversation
+            </button>
+          </div>
         </div>
       </aside>
     );

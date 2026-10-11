@@ -1,9 +1,11 @@
 import { ArrowRight, BookMarked, RefreshCcw, Send, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import type { GenerationPipeline } from "../generation-contract";
 import type { Message, ProviderStatus } from "../model";
 import { useMediaMatch } from "../useMediaMatch";
 import { TrackingNotice } from "./TrackingNotice";
+import { TutorProgress } from "./TutorProgress";
 
 const PROMPTS = [
   "Help me understand a difficult idea",
@@ -18,10 +20,12 @@ type ConversationProps = {
   readonly submitting: boolean;
   readonly showProgress: boolean;
   readonly error: string | null;
+  readonly pipeline?: GenerationPipeline | null;
   readonly onDraft: (value: string) => void;
   readonly onSubmit: () => void;
   readonly onRetry: () => void;
   readonly onKnowledge: () => void;
+  readonly onInspectGeneration?: (requestId: string) => void;
   readonly recovery: ReactNode;
 };
 
@@ -63,9 +67,19 @@ export function Conversation(props: ConversationProps) {
           {props.messages.length === 0 ? (
             <EmptyState onPrompt={props.onDraft} />
           ) : (
-            <MessageList messages={props.messages} />
+            <MessageList
+              messages={props.messages}
+              {...(props.onInspectGeneration === undefined
+                ? {}
+                : { onInspectGeneration: props.onInspectGeneration })}
+            />
           )}
-          {props.showProgress ? <TutorProgress /> : null}
+          {props.showProgress ? (
+            <TutorProgress
+              pipeline={props.pipeline ?? null}
+              onInspect={props.onInspectGeneration ?? (() => undefined)}
+            />
+          ) : null}
           <div ref={endRef} />
         </div>
       </div>
@@ -143,7 +157,13 @@ function EmptyState({ onPrompt }: { readonly onPrompt: (prompt: string) => void 
   );
 }
 
-function MessageList({ messages }: { readonly messages: readonly Message[] }) {
+function MessageList({
+  messages,
+  onInspectGeneration,
+}: {
+  readonly messages: readonly Message[];
+  readonly onInspectGeneration?: (requestId: string) => void;
+}) {
   return (
     <div className="message-list" aria-live="polite">
       {messages.map((message) => (
@@ -157,6 +177,19 @@ function MessageList({ messages }: { readonly messages: readonly Message[] }) {
               {message.status === "failed" ? <span>Not sent</span> : null}
             </div>
             <p>{message.content}</p>
+            {message.role === "assistant" && message.generationRequestId !== undefined ? (
+              <button
+                className="button button-ghost generation-answer-details"
+                type="button"
+                onClick={() => onInspectGeneration?.(message.generationRequestId ?? "")}
+              >
+                View generation details
+              </button>
+            ) : message.role === "assistant" ? (
+              <span className="generation-unavailable">
+                Generation details are unavailable for this historical answer.
+              </span>
+            ) : null}
           </article>
           {message.role === "assistant" && message.tracking !== undefined ? (
             <TrackingNotice status={message.tracking} />
@@ -164,33 +197,5 @@ function MessageList({ messages }: { readonly messages: readonly Message[] }) {
         </div>
       ))}
     </div>
-  );
-}
-
-function TutorProgress() {
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
-  useEffect(() => {
-    const startedAt = Date.now();
-    const timer = window.setInterval(
-      () => setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000)),
-      1000,
-    );
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const minutes = Math.floor(elapsedSeconds / 60);
-  const seconds = String(elapsedSeconds % 60).padStart(2, "0");
-  return (
-    <section className="tutor-progress">
-      <span className="spinner tutor-progress-spinner" aria-hidden="true" />
-      <div className="tutor-progress-copy" role="status" aria-atomic="true">
-        <strong>Preparing your answer</strong>
-        <span>Tutair reviews several learning signals, so this can take a few minutes.</span>
-      </div>
-      <span className="tutor-progress-elapsed" aria-hidden="true">
-        Elapsed {minutes}:{seconds}
-      </span>
-    </section>
   );
 }
