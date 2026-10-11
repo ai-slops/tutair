@@ -32,6 +32,7 @@ describe("Responses tutor provider", () => {
     expect(result).toEqual({
       value: { claims: [] },
       usage: { inputTokens: 9, outputTokens: 4, totalTokens: 13 },
+      resolvedModel: "gpt-fixture",
     });
     expect(authorization).toBe("Bearer learner-token");
     expect(body).toMatchObject({ model: "gpt-fixture", stream: true, store: false });

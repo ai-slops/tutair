@@ -32,6 +32,7 @@ export type ProviderUsage = {
 export type ProviderCallResult = {
   readonly value: unknown;
   readonly usage: ProviderUsage | null;
+  readonly resolvedModel?: string;
 };
 
 export interface TutorProvider {

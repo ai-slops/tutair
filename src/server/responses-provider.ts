@@ -171,6 +171,7 @@ export class ResponsesProvider implements TutorProvider {
     const usage = completed.response.usage;
     return {
       value,
+      resolvedModel: credential.model,
       usage:
         usage === null || usage === undefined
           ? null
