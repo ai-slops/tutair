@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import {
   clearMatchingRecoveredDraft,
@@ -8,6 +8,7 @@ import {
 } from "./app-state";
 import { Conversation } from "./components/Conversation";
 import { Dialog } from "./components/Dialogs";
+import { KnowledgeManager } from "./components/KnowledgeManager";
 import { KnowledgePanel } from "./components/KnowledgePanel";
 import { RecoveryNotice } from "./components/RecoveryNotice";
 import { Sidebar } from "./components/Sidebar";
@@ -33,6 +34,20 @@ export function App() {
   const [threadDialog, setThreadDialog] = useState<"create" | "edit" | null>(null);
   const [dialogValue, setDialogValue] = useState("");
   const [correctionKind, setCorrectionKind] = useState<CorrectionKind>("revise");
+  const [knowledgeManagerOpen, setKnowledgeManagerOpen] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      new URL(window.location.href).searchParams.get("view") === "knowledge",
+  );
+  useEffect(
+    () => () => {
+      if (typeof window === "undefined") return;
+      const url = new URL(window.location.href);
+      url.searchParams.delete("view");
+      window.history.replaceState(null, "", url);
+    },
+    [],
+  );
   const activeConversation = workspace.snapshot.conversations.find(
     (item) => item.id === workspace.snapshot.activeConversationId,
   );
@@ -45,6 +60,30 @@ export function App() {
   );
 
   if (!workspace.initialized) return <WorkspaceLoading />;
+
+  const setManagerView = (open: boolean): void => {
+    setKnowledgeManagerOpen(open);
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (open) url.searchParams.set("view", "knowledge");
+    else url.searchParams.delete("view");
+    window.history.replaceState(null, "", url);
+  };
+
+  if (knowledgeManagerOpen)
+    return (
+      <KnowledgeManager
+        items={workspace.snapshot.knowledge}
+        error={workspace.error}
+        onBack={() => setManagerView(false)}
+        onReview={workspace.review}
+        onCorrect={(item) => {
+          setSelectedKnowledgeId(item.id);
+          setDialog("correction");
+          setManagerView(false);
+        }}
+      />
+    );
 
   function openSearchResult(result: SearchResult): void {
     switch (result.entityType) {
@@ -141,6 +180,7 @@ export function App() {
           onThreads={() => setThreadsOpen(true)}
           onEditGoal={() => setThreadDialog("edit")}
           onKnowledge={() => setKnowledgeOpen(true)}
+          onKnowledgeManager={() => setManagerView(true)}
           onSettings={() => setDialog("settings")}
         />
         <Conversation

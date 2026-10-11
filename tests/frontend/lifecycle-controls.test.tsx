@@ -29,6 +29,7 @@ describe("learning lifecycle controls", () => {
         onThreads={vi.fn()}
         onEditGoal={vi.fn()}
         onKnowledge={vi.fn()}
+        onKnowledgeManager={vi.fn()}
         onSettings={vi.fn()}
       />,
     );
@@ -163,9 +164,21 @@ describe("learning lifecycle controls", () => {
             name: "Reducer composition",
             definition: "Reducers can be composed.",
             revision: 1,
+            scope: "provisional",
+            kind: "concept",
+            semanticScope: "",
             sources: [],
             evidence: [],
             learnerState: [],
+            reviewStatus: {
+              status: "unreviewed",
+              revision: 1,
+              revisionId: "revision-1",
+              reason: null,
+              updatedAt: null,
+            },
+            revisions: [],
+            reviewHistory: [],
           },
         ]}
         questions={[]}

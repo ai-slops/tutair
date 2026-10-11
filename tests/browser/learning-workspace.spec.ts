@@ -123,7 +123,7 @@ test("has keyboard-operable drawers and no horizontal overflow on mobile and tab
 }) => {
   for (const width of [375, 768]) {
     await page.setViewportSize({ width, height: 900 });
-    const trigger = page.getByRole("button", { name: /Open (knowledge|overview)/ });
+    const trigger = page.getByRole("button", { name: "Overview", exact: true });
     await trigger.click();
     await expect(page.locator(".knowledge-pane")).toHaveAttribute("data-open", "true");
     await expect(page.getByRole("dialog", { name: "Learning overview" })).toBeVisible();
@@ -157,4 +157,41 @@ test("keeps the composer visible and long questions readable inside bounded pane
   ).toBeGreaterThan(120);
   await expect(page.getByRole("textbox", { name: "Ask your tutor" })).toBeInViewport();
   expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(900);
+});
+
+test("browses and reviews knowledge without responsive overflow", async ({ page }) => {
+  await startThread(page, "FSM 지식 검토", "상태 전이 정의를 검토하기");
+  await page.getByRole("textbox", { name: "Ask your tutor" }).fill("Explain an FSM");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(page.locator(".message-tutor")).toHaveCount(1);
+  const created = await page.request.post("/api/knowledge", {
+    data: {
+      title: "상태 기계의 안전 전이",
+      statement: "허용된 상태와 전이 규칙만 사용해 잘못된 상태 변화를 막는 모델입니다.",
+      scope: "provisional",
+      riskScope: "stable",
+      confidence: 0.9,
+    },
+  });
+  expect(created.ok()).toBe(true);
+  await page.reload();
+  await page.getByRole("button", { name: "Manage knowledge" }).click();
+  await expect(page.getByRole("heading", { name: "Knowledge manager" })).toBeVisible();
+  await expect(page.locator(".manager-row").first()).toBeVisible();
+  await page.getByRole("searchbox", { name: "Search knowledge" }).fill("상태 기계");
+  await page.getByRole("button", { name: /상태 기계의 안전 전이/ }).click();
+
+  await page.getByRole("button", { name: "Mark reviewed" }).click();
+  await expect(page.locator(".manager-reader .status-badge")).toHaveText("reviewed");
+
+  for (const width of [1280, 768, 375]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.screenshot({
+      path: `.omo/evidence/knowledge-manager/manager-${width}.png`,
+      fullPage: true,
+    });
+  }
 });

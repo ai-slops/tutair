@@ -1,4 +1,4 @@
-import { BookMarked, PencilLine, Settings } from "lucide-react";
+import { BookMarked, Library, PencilLine, Settings } from "lucide-react";
 import type { ProviderStatus } from "../model";
 import { ThreadsTrigger } from "./Sidebar";
 
@@ -9,6 +9,7 @@ type WorkspaceHeaderProps = {
   readonly onThreads: () => void;
   readonly onEditGoal: () => void;
   readonly onKnowledge: () => void;
+  readonly onKnowledgeManager: () => void;
   readonly onSettings: () => void;
 };
 
@@ -16,6 +17,15 @@ export function WorkspaceHeader(props: WorkspaceHeaderProps) {
   return (
     <header className="main-header">
       <div className="header-actions">
+        <button
+          className="button button-secondary manager-trigger"
+          type="button"
+          onClick={props.onKnowledgeManager}
+          aria-label="Manage knowledge"
+        >
+          <Library className="icon" />
+          <span>Knowledge</span>
+        </button>
         <ThreadsTrigger onClick={props.onThreads} />
         <div className="title-wrap">
           <p className="eyebrow">Conversation</p>
