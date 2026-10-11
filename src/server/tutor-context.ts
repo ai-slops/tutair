@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Database } from "./database.js";
+import { eligibleKnowledgeIds } from "./knowledge-review.js";
 import { messageRecord } from "./records.js";
 import type { CoreRepository } from "./repository-core.js";
 import { retrievalDocument } from "./retrieval-documents.js";
@@ -128,7 +129,7 @@ export function loadTutorContext(
           selected.add(id);
     }
   }
-  const seedIds = [...selected].slice(0, 16);
+  const seedIds = eligibleKnowledgeIds(db, input.owner, [...selected]).slice(0, 16);
   const relationCandidates =
     seedIds.length === 0
       ? []
@@ -157,7 +158,8 @@ export function loadTutorContext(
     if (selectedKnowledge.size >= 24) break;
     selectedKnowledge.add(id);
   }
-  const selectedKnowledgeIds = [...selectedKnowledge];
+  const selectedKnowledgeIds = eligibleKnowledgeIds(db, input.owner, [...selectedKnowledge]);
+  const eligibleSet = new Set(selectedKnowledgeIds);
   return {
     currentGoal: thread?.goal ?? conversation.goal ?? input.content,
     threadId: thread?.id ?? null,
@@ -167,7 +169,10 @@ export function loadTutorContext(
     tutorTexts: recentContext
       .filter((message) => message.role === "tutor")
       .map((message) => message.content),
-    relations,
+    relations: relations.filter(
+      (relation) =>
+        eligibleSet.has(relation.from_knowledge_id) && eligibleSet.has(relation.to_knowledge_id),
+    ),
     assessments:
       thread === null
         ? []

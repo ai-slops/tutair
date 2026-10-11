@@ -9,19 +9,20 @@ export function loadTurnKnowledge(
   owner: LearnerId,
   ids: readonly string[],
 ) {
-  for (const id of ids) repository.rebuild(owner, id);
-  const placeholders = ids.map(() => "?").join(",");
+  const eligibleIds = repository.eligibleIds(owner, ids);
+  for (const id of eligibleIds) repository.rebuild(owner, id);
+  const placeholders = eligibleIds.map(() => "?").join(",");
   return {
-    knowledge: knowledgeContext(repository, owner, ids),
-    ...loadLearnerContext(repository.db, owner, ids),
+    knowledge: knowledgeContext(repository, owner, eligibleIds),
+    ...loadLearnerContext(repository.db, owner, eligibleIds),
     relations:
-      ids.length === 0
+      eligibleIds.length === 0
         ? []
         : repository.db.all(
             `SELECT * FROM knowledge_relations WHERE (learner_id IS NULL OR learner_id=?)
        AND from_knowledge_id IN (${placeholders}) AND to_knowledge_id IN (${placeholders})
        ORDER BY created_at DESC,id LIMIT 48`,
-            [owner, ...ids, ...ids],
+            [owner, ...eligibleIds, ...eligibleIds],
             z.record(z.string(), z.union([z.string(), z.number(), z.null()])),
           ),
   };

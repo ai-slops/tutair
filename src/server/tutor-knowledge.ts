@@ -55,7 +55,7 @@ export function knowledgeContext(
   owner: LearnerId,
   selectedUnitIds: readonly string[],
 ): readonly KnowledgeContext[] {
-  const selected = new Set(selectedUnitIds);
+  const selected = new Set(repository.eligibleIds(owner, selectedUnitIds));
   return repository
     .list(owner)
     .filter((raw) => selected.has(itemSchema.parse(raw).id))

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Database } from "./database.js";
+import { eligibleKnowledgeIds } from "./knowledge-review.js";
 import type { LearnerId } from "./types.js";
 
 export const retrievalDocument = z.object({
@@ -13,11 +14,23 @@ export const retrievalDocument = z.object({
 export type RetrievalDocument = z.infer<typeof retrievalDocument>;
 
 export function retrievalDocuments(db: Database, owner: LearnerId): readonly RetrievalDocument[] {
+  const eligible = eligibleKnowledgeIds(
+    db,
+    owner,
+    db
+      .all(
+        "SELECT id FROM knowledge_items WHERE learner_id IS NULL OR learner_id=?",
+        [owner],
+        z.object({ id: z.string() }),
+      )
+      .map((row) => row.id),
+  );
+  const clause = eligible.length === 0 ? "0" : `k.id IN (${eligible.map(() => "?").join(",")})`;
   return db.all(
     `SELECT k.id,'knowledge' AS entity_type,k.title,r.statement,k.scope,r.revision
      FROM knowledge_items k JOIN knowledge_revisions r
        ON r.knowledge_id=k.id AND r.revision=k.current_revision
-     WHERE k.learner_id IS NULL OR k.learner_id=?
+     WHERE (k.learner_id IS NULL OR k.learner_id=?) AND ${clause}
      UNION ALL
      SELECT m.id,'message','Message',m.content,'private',0 FROM messages m
        WHERE m.learner_id=? AND m.tombstoned_at IS NULL
@@ -29,8 +42,8 @@ export function retrievalDocuments(db: Database, owner: LearnerId): readonly Ret
      FROM evidence e JOIN messages m ON m.id=e.message_id
        JOIN knowledge_items k ON k.id=e.knowledge_id
        JOIN knowledge_revisions r ON r.knowledge_id=e.knowledge_id AND r.revision=e.revision
-     WHERE e.learner_id=? AND m.tombstoned_at IS NULL`,
-    [owner, owner, owner, owner],
+     WHERE e.learner_id=? AND m.tombstoned_at IS NULL AND ${clause}`,
+    [owner, ...eligible, owner, owner, owner, ...eligible],
     retrievalDocument,
   );
 }
