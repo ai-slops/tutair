@@ -98,9 +98,13 @@ button {
   *,
   *::before,
   *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: User motion preference overrides component behavior. */
     scroll-behavior: auto !important;
+    /* biome-ignore lint/complexity/noImportantStyles: User motion preference overrides component behavior. */
     transition-duration: 1ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: User motion preference overrides component behavior. */
     animation-duration: 1ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: User motion preference overrides component behavior. */
     animation-iteration-count: 1 !important;
   }
 }
