@@ -40,6 +40,9 @@ export async function loadKnowledge(client: KyInstance): Promise<readonly Knowle
         name: record.title,
         definition: revision?.statement ?? "No definition is available for this revision.",
         revision: record.currentRevision,
+        scope: record.scope,
+        kind: record.kind,
+        semanticScope: revision?.semanticScope ?? "",
         sources: revision?.sourceRef == null ? [] : [revision.sourceRef],
         evidence,
         learnerState: detail.learnerState.map((state) => ({
@@ -52,6 +55,17 @@ export async function loadKnowledge(client: KyInstance): Promise<readonly Knowle
           knowledgeRevisionId: state.knowledgeRevisionId,
           evidenceIds: state.evidenceIds,
         })),
+        reviewStatus: detail.reviewStatus,
+        revisions: detail.revisions.map((item) => ({
+          id: item.id,
+          revision: item.revision,
+          statement: item.statement,
+          semanticScope: item.semanticScope,
+          sourceType: item.sourceType,
+          sourceRef: item.sourceRef,
+          createdAt: item.createdAt,
+        })),
+        reviewHistory: detail.reviewHistory,
       };
     }),
   );

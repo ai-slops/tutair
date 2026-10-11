@@ -3,6 +3,7 @@ import { z } from "zod";
 import { TurnOutcomeSchema } from "./learning-contract";
 import type { ConversationSummary } from "./learning-model";
 import type { Message, ProviderStatus } from "./model";
+import { REVIEW_ACTIONS, REVIEW_STATUSES } from "./model";
 
 const DateSchema = z.string().min(1);
 export const IdSchema = z.string().min(1);
@@ -57,15 +58,38 @@ export const KnowledgeRecordSchema = z
     id: IdSchema,
     title: z.string(),
     currentRevision: z.number().int(),
+    scope: z.enum(["canonical", "provisional"]),
+    kind: z.string(),
     createdAt: DateSchema,
   })
   .catchall(z.unknown());
-export const KnowledgeListSchema = z.object({ items: z.array(KnowledgeRecordSchema) });
+const KnowledgeReviewStatusSchema = z.object({
+  status: z.enum(REVIEW_STATUSES),
+  revision: z.number().int().positive(),
+  revisionId: IdSchema,
+  reason: z.string().nullable(),
+  updatedAt: DateSchema.nullable(),
+});
+export const KnowledgeListSchema = z.object({
+  items: z.array(KnowledgeRecordSchema.extend({ reviewStatus: KnowledgeReviewStatusSchema })),
+});
 export const RevisionSchema = z
   .object({
+    id: IdSchema,
     revision: z.number().int(),
     statement: z.string(),
+    semanticScope: z.string(),
+    sourceType: z.string(),
     sourceRef: z.string().nullable(),
+    createdAt: DateSchema,
+  })
+  .catchall(z.unknown());
+export const KnowledgeReviewEventSchema = z
+  .object({
+    id: IdSchema,
+    revision: z.number().int().positive(),
+    action: z.enum(REVIEW_ACTIONS),
+    reason: z.string().nullable(),
     createdAt: DateSchema,
   })
   .catchall(z.unknown());
@@ -107,6 +131,8 @@ export const KnowledgeDetailSchema = z
     evidence: z.array(EvidenceRecordSchema),
     exposures: z.array(ExposureSchema),
     learnerState: z.array(LearnerStateSchema).default([]),
+    reviewStatus: KnowledgeReviewStatusSchema,
+    reviewHistory: z.array(KnowledgeReviewEventSchema),
   })
   .catchall(z.unknown());
 export const TutorTurnSchema = z
