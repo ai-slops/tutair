@@ -5,6 +5,7 @@ import { migrateKnowledgeMetadata } from "./knowledge-migration.js";
 import { migrateKnowledgeReviews } from "./knowledge-review-migration.js";
 import { projectionVersion } from "./learner-projection.js";
 import { migrateModelContexts } from "./model-context-migration.js";
+import { migrateModelRunInspection } from "./model-run-inspection-migration.js";
 import { migrateThreads } from "./thread-migration.js";
 import { migrateTurnRequests } from "./turn-request-migration.js";
 
@@ -86,6 +87,7 @@ export class Database {
       migrateLearnerState(this.raw);
       migrateExposures(this.raw);
       migrateModelContexts(this.raw);
+      migrateModelRunInspection(this.raw);
       migrateKnowledgeMetadata(this.raw);
       migrateKnowledgeReviews(this.raw);
       migrateThreads(this.raw);
