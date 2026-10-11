@@ -58,6 +58,8 @@ const scriptedValue = (call: StructuredCall): unknown => {
     case "extraction":
       return {
         goal: "Test the current claim",
+        sourceLanguage: "en",
+        responseLanguage: "en",
         targets: [candidate],
         prerequisites: [],
         terms: [],
@@ -91,19 +93,36 @@ const scriptedValue = (call: StructuredCall): unknown => {
       };
     case "draft":
       return { text: "Which example would test it?" };
+    case "preparation":
+      return {
+        materials: Array.isArray(call.data["missingKnowledgeRevisionIds"])
+          ? call.data["missingKnowledgeRevisionIds"].flatMap((knowledgeRevisionId) =>
+              typeof knowledgeRevisionId === "string"
+                ? [
+                    {
+                      knowledgeRevisionId,
+                      englishBlocks: [{ type: "example", content: "Which example would test it?" }],
+                      localizedBlocks: [],
+                    },
+                  ]
+                : [],
+            )
+          : [],
+      };
     case "lint":
       return { safe: true, issues: [], concepts: [], generatedCandidates: [], lintSkipped: false };
     case "final": {
-      const text = "Which example would test it?";
-      const knowledgeId = Array.isArray(call.data["allowedKnowledgeIds"])
-        ? call.data["allowedKnowledgeIds"].find((item): item is string => typeof item === "string")
-        : undefined;
       return {
-        text,
-        exposures:
-          knowledgeId === undefined
-            ? []
-            : [{ knowledgeId, sourceSpan: { start: 0, end: text.length } }],
+        segments: Array.isArray(call.data["availableBlocks"])
+          ? call.data["availableBlocks"].flatMap((block) =>
+              typeof block === "object" &&
+              block !== null &&
+              "id" in block &&
+              typeof block.id === "string"
+                ? [{ blockId: block.id, layout: "paragraph" }]
+                : [],
+            )
+          : [],
       };
     }
     case "evaluation":

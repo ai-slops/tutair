@@ -33,6 +33,8 @@ export function stageOutput(call: StructuredCall): unknown {
     case "extraction":
       return {
         goal: "Model a door controller",
+        sourceLanguage: "en",
+        responseLanguage: "en",
         targets: [machine],
         prerequisites: [],
         terms: [],
@@ -49,7 +51,16 @@ export function stageOutput(call: StructuredCall): unknown {
         relations: [],
       };
     case "resolution":
-      return { matches: [], provisional: [] };
+      return {
+        matches: [],
+        provisional: Array.isArray(call.data["candidates"])
+          ? call.data["candidates"].flatMap((candidate) =>
+              typeof candidate === "object" && candidate !== null
+                ? [{ ...candidate, reasonCodes: ["new"] }]
+                : [],
+            )
+          : [],
+      };
     case "planning":
       return {
         move: "answer_then_apply",
@@ -73,6 +84,22 @@ export function stageOutput(call: StructuredCall): unknown {
       };
     case "draft":
       return { text: "A finite-state machine models the controller." };
+    case "preparation": {
+      const missing = Array.isArray(call.data["missingKnowledgeRevisionIds"])
+        ? call.data["missingKnowledgeRevisionIds"].filter(
+            (id): id is string => typeof id === "string",
+          )
+        : [];
+      return {
+        materials: missing.map((knowledgeRevisionId) => ({
+          knowledgeRevisionId,
+          englishBlocks: [
+            { type: "definition", content: "A finite-state machine models the controller." },
+          ],
+          localizedBlocks: [],
+        })),
+      };
+    }
     case "lint":
       return {
         safe: true,
@@ -91,7 +118,18 @@ export function stageOutput(call: StructuredCall): unknown {
         lintSkipped: false,
       };
     case "final":
-      return { text: "A finite-state machine models the controller.", exposures: [] };
+      return {
+        segments: Array.isArray(call.data["availableBlocks"])
+          ? call.data["availableBlocks"].flatMap((block) =>
+              typeof block === "object" &&
+              block !== null &&
+              "id" in block &&
+              typeof block.id === "string"
+                ? [{ blockId: block.id, layout: "paragraph" }]
+                : [],
+            )
+          : [],
+      };
   }
 }
 

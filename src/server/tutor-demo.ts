@@ -18,6 +18,8 @@ export function demoCall(call: StructuredCall): unknown {
     case "extraction":
       return {
         goal: message || "Understand finite-state machines",
+        sourceLanguage: "en",
+        responseLanguage: "en",
         targets: [fsm],
         prerequisites: [state, transition],
         terms: [technicalFormal, ceremonialFormal],
@@ -108,6 +110,29 @@ export function demoCall(call: StructuredCall): unknown {
         responseStrategy: "concrete_model_then_check",
         interruptionJustified: false,
       };
+    case "preparation": {
+      const missing = values(call.data, "missingKnowledgeRevisionIds");
+      const knowledge = z.array(knownSchema).safeParse(call.data["knowledge"]);
+      const known = knowledge.success ? knowledge.data : [];
+      return {
+        materials: missing.map((revisionId) => {
+          const item = known.find((candidate) => candidate.revisionId === revisionId);
+          return {
+            knowledgeRevisionId: revisionId,
+            englishBlocks: [
+              {
+                type: "definition",
+                content:
+                  item === undefined
+                    ? "This concept supports the current learning goal."
+                    : `${item.title} is ${item.definition}`,
+              },
+            ],
+            localizedBlocks: [],
+          };
+        }),
+      };
+    }
     case "draft":
       return {
         text: "An FSM (finite-state machine) models behavior using a finite set of states and transitions. A state is the situation relevant to what can happen next; a transition is a rule for moving to another state after an event.\n\nFor a door: Locked --coin--> Unlocked, then Unlocked --push--> Locked. Here ‘formal’ means explicitly specified, not ceremonial.\n\nWhat state and transition would you add for a jammed door?",
@@ -146,24 +171,12 @@ export function demoCall(call: StructuredCall): unknown {
         ],
       };
     case "final": {
-      const text = String(call.data["draft"] ?? "");
-      const parsed = z.array(knownSchema).safeParse(call.data["knowledge"]);
-      const allowed = new Set(values(call.data, "allowedKnowledgeIds"));
+      const blocks = z.array(z.object({ id: z.string() })).safeParse(call.data["availableBlocks"]);
       return {
-        text,
-        exposures: parsed.success
-          ? parsed.data.flatMap((item) => {
-              const start = text.toLocaleLowerCase().indexOf(item.title.toLocaleLowerCase());
-              return allowed.has(item.id) && start >= 0
-                ? [
-                    {
-                      knowledgeId: item.id,
-                      sourceSpan: { start, end: start + item.title.length },
-                    },
-                  ]
-                : [];
-            })
-          : [],
+        segments: (blocks.success ? blocks.data : []).map((block) => ({
+          blockId: block.id,
+          layout: "paragraph",
+        })),
       };
     }
     case "evaluation": {
