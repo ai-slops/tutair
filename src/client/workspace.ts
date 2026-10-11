@@ -55,6 +55,7 @@ export interface WorkspaceApi {
   ): Promise<WorkspaceSnapshot>;
   deleteAll(): Promise<WorkspaceSnapshot>;
   selectChatGptModel(slug: string): Promise<WorkspaceSnapshot>;
+  completeChatGptManual(callbackUrl: string): Promise<WorkspaceSnapshot>;
   disconnectChatGpt(): Promise<WorkspaceSnapshot>;
   search(query: string): Promise<SearchResponse>;
   exportUrl(): string;
@@ -82,5 +83,11 @@ export const EMPTY_SNAPSHOT: WorkspaceSnapshot = {
   messages: [],
   knowledge: [],
   provider: EMPTY_PROVIDER,
-  chatgpt: { enabled: false, connected: false, selectedModel: null, models: [] },
+  chatgpt: {
+    enabled: false,
+    connected: false,
+    manualCallback: false,
+    selectedModel: null,
+    models: [],
+  },
 };

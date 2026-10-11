@@ -82,6 +82,11 @@ export function createWorkspaceApi(client: KyInstance): WorkspaceApi {
       await client.put("chatgpt/model", { json: { slug } });
       return workspace.snapshot(workspace.activeConversationId, generation);
     },
+    async completeChatGptManual(callbackUrl) {
+      const generation = workspace.begin();
+      await client.post("chatgpt/manual/callback", { json: { callbackUrl } });
+      return workspace.snapshot(workspace.activeConversationId, generation);
+    },
     async disconnectChatGpt() {
       const generation = workspace.begin();
       await client.delete("chatgpt/connection");

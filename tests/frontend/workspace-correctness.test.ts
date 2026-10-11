@@ -35,7 +35,13 @@ const snapshot = (activeConversationId: string): WorkspaceSnapshot => ({
     label: "Test provider",
     guidance: "Available",
   },
-  chatgpt: { enabled: false, connected: false, selectedModel: null, models: [] },
+  chatgpt: {
+    enabled: false,
+    connected: false,
+    manualCallback: false,
+    selectedModel: null,
+    models: [],
+  },
 });
 
 describe("workspace correctness", () => {

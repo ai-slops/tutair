@@ -175,6 +175,7 @@ export class WorkspaceClient {
       chatgpt: {
         enabled: capabilities.chatgpt.enabled,
         connected: capabilities.chatgpt.connected,
+        manualCallback: capabilities.chatgpt.manualCallback,
         selectedModel: capabilities.chatgpt.selectedModel ?? null,
         models: chatgptModels.models,
       },

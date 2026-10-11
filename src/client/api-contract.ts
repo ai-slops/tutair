@@ -44,9 +44,10 @@ export const CapabilitiesSchema = z.object({
     .object({
       enabled: z.boolean(),
       connected: z.boolean(),
+      manualCallback: z.boolean().default(false),
       selectedModel: z.string().nullable().optional(),
     })
-    .default({ enabled: false, connected: false }),
+    .default({ enabled: false, connected: false, manualCallback: false }),
 });
 export const ChatGptModelsSchema = z.object({
   models: z.array(z.object({ slug: z.string().min(1), displayName: z.string().min(1) })),
