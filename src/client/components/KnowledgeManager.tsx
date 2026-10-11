@@ -137,7 +137,8 @@ export function KnowledgeManager(props: KnowledgeManagerProps) {
             </select>
           </label>
           <p className="muted">
-            Review records definition accuracy. They never change mastery or authority.
+            Unreviewed definitions remain available to the tutor. Incorrect revisions and retired
+            units are excluded; review records accuracy, never mastery or authority.
           </p>
         </aside>
         <section className="manager-list" aria-labelledby="manager-list-heading">

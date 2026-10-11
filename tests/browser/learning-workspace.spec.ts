@@ -297,14 +297,55 @@ test("browses and reviews knowledge without responsive overflow", async ({ page 
   await page.getByRole("button", { name: "Mark reviewed" }).click();
   await expect(page.locator(".manager-reader .status-badge")).toHaveText("reviewed");
 
-  for (const width of [1280, 768, 375]) {
+  await expect(
+    page.getByText(/Unreviewed definitions remain available to the tutor/),
+  ).toBeVisible();
+
+  for (const [index, width] of [1280, 768, 375].entries()) {
     await page.setViewportSize({ width, height: 900 });
+    await page.evaluate(() => scrollTo(0, 0));
+    await page.locator(".manager-detail").evaluate((element) => {
+      element.scrollTop = 0;
+    });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
+    await page.getByRole("button", { name: "Suggest correction" }).click();
+    await expect(page.getByRole("dialog", { name: "Suggest a correction" })).toBeVisible();
+    await expect(page.getByLabel("Correction intent")).toHaveValue("revise");
+    await page
+      .getByRole("textbox", { name: "Correction" })
+      .fill(`허용된 상태와 명시된 전이만 따르는 안전 모델입니다. 검토 ${index + 1}`);
+    await page.screenshot({
+      path: `.omo/evidence/knowledge-manager/correction-${width}.png`,
+      fullPage: true,
+    });
+    await page.getByRole("button", { name: "Submit correction" }).click();
+    await page.getByRole("button", { name: "Manage knowledge" }).click();
+    await page.getByRole("searchbox", { name: "Search knowledge" }).fill("상태 기계");
+    await page.getByRole("button", { name: /상태 기계의 안전 전이/ }).click();
+    await expect(page.locator(".manager-reader .status-badge")).toHaveText("unreviewed");
+    await expect(page.getByText(`Revision ${index + 2}`, { exact: true }).first()).toBeVisible();
     await page.screenshot({
       path: `.omo/evidence/knowledge-manager/manager-${width}.png`,
       fullPage: true,
+    });
+    await page.locator(".manager-definition").scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: `.omo/evidence/knowledge-manager/definition-${width}.png`,
+    });
+    if (width > 720) {
+      await page.locator(".manager-detail").evaluate((element) => {
+        element.scrollTop = element.scrollHeight;
+      });
+    } else {
+      await page.locator(".knowledge-manager-shell").evaluate((element) => {
+        element.scrollTop = element.scrollHeight;
+      });
+    }
+    await expect(page.getByText("Revision 1", { exact: true }).first()).toBeVisible();
+    await page.screenshot({
+      path: `.omo/evidence/knowledge-manager/history-${width}.png`,
     });
   }
 });

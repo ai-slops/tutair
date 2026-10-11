@@ -126,6 +126,8 @@ beforeEach(() => {
   HTMLElement.prototype.scrollIntoView = vi.fn();
   state.workspace.review.mockReset();
   state.workspace.review.mockResolvedValue(true);
+  state.workspace.correct.mockReset();
+  state.workspace.correct.mockResolvedValue(true);
 });
 afterEach(cleanup);
 
@@ -166,6 +168,28 @@ describe("knowledge manager", () => {
     expect(screen.getByRole("alert").textContent).toContain("could not be saved");
     expect(action.disabled).toBe(false);
     expect(screen.getByRole("heading", { name: "상태 기계" })).toBeTruthy();
+  });
+
+  it("explains unreviewed eligibility and opens revise correction for the selected unit", async () => {
+    // Given
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: "Manage knowledge" }));
+    expect(screen.getByText(/Unreviewed definitions remain available/i)).toBeTruthy();
+
+    // When
+    await user.click(screen.getByRole("button", { name: "Suggest correction" }));
+
+    // Then
+    expect(screen.getByRole("dialog", { name: "Suggest a correction" })).toBeTruthy();
+    expect(screen.getByLabelText<HTMLSelectElement>("Correction intent").value).toBe("revise");
+    await user.type(screen.getByLabelText("Correction"), "더 정확한 새 정의입니다.");
+    await user.click(screen.getByRole("button", { name: "Submit correction" }));
+    expect(state.workspace.correct).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "knowledge-1", revision: 2 }),
+      "더 정확한 새 정의입니다.",
+      "revise",
+    );
   });
 
   it("requires a reason for marking a definition incorrect and preserves the draft on failure", async () => {
