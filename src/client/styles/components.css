@@ -199,7 +199,15 @@
   align-items: center;
   gap: var(--space-2);
 }
-@media (max-width: 45rem) {
+.main-header > .header-actions:first-child,
+.title-wrap {
+  min-inline-size: 0;
+  flex: 1;
+}
+.main-header > .header-actions:last-child {
+  flex: none;
+}
+@media (max-width: 70rem) {
   .provider-status {
     inline-size: var(--control-min);
     padding: 0;

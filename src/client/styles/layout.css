@@ -144,6 +144,14 @@
   .pane-header {
     padding-inline: var(--space-4);
   }
+  .main-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .main-header > .header-actions:last-child {
+    inline-size: 100%;
+    justify-content: flex-end;
+  }
   .conversation {
     padding: var(--space-8) var(--space-4);
   }

@@ -67,6 +67,8 @@ Radius tokens: `--radius-sm` 6px, `--radius-md` 10px, `--radius-lg` 16px, `--rad
 
 Desktop is a fixed-sidenav shell: 288px thread index, fluid conversation, optional 336px evidence folio. The shell is bounded by `100dvh`; each pane owns vertical scroll. Tablet hides the evidence folio in an overlay drawer. Mobile uses one visible layer with thread and evidence drawers; the composer stays in normal grid flow at the bottom of the main shell. Primary content never scrolls horizontally.
 
+The workspace header keeps every primary action visible. Its title cluster may shrink and truncate, the provider label compacts before controls collide, and mobile reflows the action clusters into two rows rather than clipping or hiding controls.
+
 The knowledge manager is a deliberate full-page list-detail workspace, not an evidence-folio extension. At wide widths it uses a compact filter rail, a bounded knowledge list, and a fluid detail reader. Tablet folds filters into a toolbar above list and detail; mobile stacks filters, list, and detail in document order. Its header and filter/list/detail regions remain fixed or independently scrollable inside `100dvh` on wide screens.
 
 The outer grid has one explicit `minmax(0, 1fr)` row and a definite `100dvh` height;

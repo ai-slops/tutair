@@ -11,6 +11,19 @@ async function startThread(page: Page, title: string, outcome: string) {
   await expect(dialog).toBeHidden();
 }
 
+async function expectHeaderControlsWithinViewport(page: Page) {
+  const controls = page.locator(".main-header button:visible");
+  expect(await controls.count()).toBeGreaterThan(0);
+  expect(
+    await controls.evaluateAll((elements) =>
+      elements.every((element) => {
+        const bounds = element.getBoundingClientRect();
+        return bounds.left >= 0 && bounds.right <= innerWidth;
+      }),
+    ),
+  ).toBe(true);
+}
+
 test.beforeEach(async ({ page, request }) => {
   await request.post("/__test__/evaluation", { data: { fail: false } });
   await request.post("/__test__/generation", { data: {} });
@@ -112,6 +125,9 @@ test("shows exact answer revisions and opt-in official summaries at every viewpo
 
   for (const width of [375, 768, 1280]) {
     await page.setViewportSize({ width, height: 900 });
+    if (width <= 720) await expect(page.locator(".thread-pane")).toHaveCSS("opacity", "0");
+    if (width <= 1120) await expect(page.locator(".knowledge-pane")).toHaveCSS("opacity", "0");
+    await expectHeaderControlsWithinViewport(page);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
