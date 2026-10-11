@@ -28,9 +28,10 @@ type ConversationProps = {
 export function Conversation(props: ConversationProps) {
   const endRef = useRef<HTMLDivElement>(null);
   const reducedMotion = useMediaMatch("(prefers-reduced-motion: reduce)");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: message count and progress visibility are intentional scroll triggers.
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "end" });
-  }, [reducedMotion]);
+  }, [props.messages.length, props.showProgress, reducedMotion]);
 
   return (
     <>
