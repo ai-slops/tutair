@@ -175,8 +175,10 @@ metadata updates preserve before/after snapshots in the event history.
 ## Knowledge and evidence
 
 - `GET /api/knowledge?scope=canonical|provisional|all` -> `{ items: KnowledgeItem[] }`. Each item includes the authenticated learner's projected `reviewStatus`.
-- `GET /api/knowledge/:id` -> `{ item, revisions, relations, evidence, exposures, learnerState, reviewStatus, reviewHistory }`
+- `GET /api/knowledge/:id` -> `{ item, revisions, relations, evidence, exposures, learnerState, reviewStatus, reviewHistory, documents }`. `documents` contains immutable language/role/version snapshots and ordered blocks for the current semantic revision.
 - `GET /api/knowledge/:id/revisions/:revision` -> `{ revision, evidence, learnerState }`
+- `GET /api/knowledge/:id/revisions/:revision/documents` -> `{ documents }`
+- `POST /api/knowledge/:id/revisions/:revision/documents` with an immutable document snapshot -> `201 document`. Localizations must link to the exact matching English source document and each localized block to its source block.
 - `POST /api/knowledge` `{ title, statement, scope?: "provisional", riskScope?: RiskScope, confidence?: number }` -> `201 { item, revision }`
 - `POST /api/knowledge/import` `{ format: "yaml", content: string }` -> `201 { imported }`. Requires both a learner session and the `x-tutair-canonical-token` header matching server-side `TUTOR_CANONICAL_IMPORT_TOKEN`. Imports are disabled without an operator token. Generated model output is rejected.
 - `POST /api/knowledge/:id/reviews` `{ revision, action: "reviewed"|"mark_incorrect"|"retire"|"restore", reason?, confirmed? }` -> `201 { event, reviewStatus }`. `mark_incorrect` and `retire` require a non-empty reason; `restore` requires `confirmed: true`.
