@@ -1,7 +1,9 @@
 import { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
+import { migrateAnswerCompositions } from "./answer-composition-migration.js";
 import { migrateDebugSettings } from "./debug-settings-migration.js";
 import { migrateExposures } from "./exposure-migration.js";
+import { migrateKnowledgeDocuments } from "./knowledge-document-migration.js";
 import { migrateKnowledgeMetadata } from "./knowledge-migration.js";
 import { migrateKnowledgeReviews } from "./knowledge-review-migration.js";
 import { projectionVersion } from "./learner-projection.js";
@@ -94,6 +96,8 @@ export class Database {
       migrateKnowledgeReviews(this.raw);
       migrateThreads(this.raw);
       migrateTurnRequests(this.raw);
+      migrateKnowledgeDocuments(this.raw);
+      migrateAnswerCompositions(this.raw);
     } catch (error) {
       this.raw.close();
       throw error;
