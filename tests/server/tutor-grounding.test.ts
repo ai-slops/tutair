@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import type { Database } from "../../src/server/database.js";
+import type { StructuredCall } from "../../src/server/provider.js";
 import { TutorPipeline } from "../../src/server/tutor.js";
+import { extractionSchema } from "../../src/server/tutor-schemas.js";
 import {
   createTutorTestContext,
   learnerMessage,
+  machine,
   providerFor,
   stageOutput,
 } from "./tutor-test-fixtures.js";
@@ -64,5 +67,67 @@ describe("tutor reply grounding", () => {
     expect(message.content).toContain("finite-state machine");
     expect(exposures.length).toBeGreaterThan(0);
     expect(composition).not.toBeNull();
+  });
+
+  it("repairs duplicate extraction keys before resolution and completes the pipeline", async () => {
+    const context = createTutorTestContext(databases, "Logic", "Compare two logics");
+    const calls: StructuredCall[] = [];
+    let extractionAttempts = 0;
+    let knowledgeCountAtRepair: number | null = null;
+    const provider = providerFor((call) => {
+      calls.push(call);
+      if (call.stage !== "extraction") return stageOutput(call);
+      extractionAttempts += 1;
+      const validOutput = extractionSchema.parse(stageOutput(call));
+      if (extractionAttempts === 2)
+        knowledgeCountAtRepair = context.knowledge.list(context.owner).length;
+      return extractionAttempts === 1
+        ? {
+            ...validOutput,
+            distinctions: [machine, ...validOutput.distinctions],
+            claims: validOutput.distinctions,
+          }
+        : validOutput;
+    });
+
+    const result = await new TutorPipeline(
+      context.database,
+      context.core,
+      context.knowledge,
+      provider,
+    ).turn({
+      owner: context.owner,
+      conversationId: context.conversationId,
+      messageId: learnerMessage(context, "Compare two logics"),
+      content: "Compare two logics",
+      assistance: "none",
+      selfReport: "neutral",
+    });
+    const resolutionCall = calls.find((call) => call.stage === "resolution");
+    const resolutionCandidates = z
+      .array(z.object({ key: z.string() }))
+      .parse(resolutionCall?.data["candidates"]);
+    const extractionRuns = context.database.all(
+      `SELECT r.status,i.attempt,i.repair_of_run_id FROM model_runs r
+       JOIN model_run_inspection i ON i.run_id=r.id WHERE r.stage='extraction'
+       ORDER BY r.created_at`,
+      [],
+      z.object({
+        status: z.string(),
+        attempt: z.number(),
+        repair_of_run_id: z.string().nullable(),
+      }),
+    );
+
+    expect(z.object({ status: z.literal("completed") }).parse(result.run).status).toBe("completed");
+    expect(extractionAttempts).toBe(2);
+    expect(knowledgeCountAtRepair).toBe(0);
+    expect(extractionRuns.map((run) => run.status)).toEqual(["failed", "completed"]);
+    expect(extractionRuns.map((run) => run.attempt)).toEqual([1, 2]);
+    expect(extractionRuns[1]?.repair_of_run_id).not.toBeNull();
+    expect(resolutionCandidates.map((candidate) => candidate.key)).toHaveLength(
+      new Set(resolutionCandidates.map((candidate) => candidate.key)).size,
+    );
+    expect(context.knowledge.list(context.owner)).toHaveLength(2);
   });
 });

@@ -71,10 +71,7 @@ export const extractionSchema = z
       .max(48),
   })
   .superRefine((value, context) => {
-    const seen = new Map<
-      string,
-      { readonly definition: string; readonly kind: string; readonly semanticScope: string }
-    >();
+    const seen = new Set<string>();
     const candidates = [
       ...value.targets,
       ...value.prerequisites,
@@ -90,21 +87,13 @@ export const extractionSchema = z
         message: "Extraction cannot introduce more than 24 candidates",
       });
     for (const candidate of candidates) {
-      const prior = seen.get(candidate.key);
-      if (prior === undefined) {
-        seen.set(candidate.key, candidate);
-        continue;
-      }
-      if (
-        prior.definition !== candidate.definition ||
-        prior.kind !== candidate.kind ||
-        prior.semanticScope !== candidate.semanticScope
-      )
+      if (seen.has(candidate.key))
         context.addIssue({
           code: "custom",
           path: ["candidateKey", candidate.key],
-          message: "One extraction key cannot identify candidates with different meanings",
+          message: "Extraction candidate keys must be globally unique across all categories",
         });
+      else seen.add(candidate.key);
     }
   });
 

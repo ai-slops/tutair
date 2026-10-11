@@ -31,7 +31,14 @@ describe("tutor orchestration contracts", () => {
     expect(linted.generatedCandidates.map((item) => item.label)).toEqual(["determinism"]);
   });
 
-  it("rejects conflicting candidate meanings that reuse one extraction key", () => {
+  it.each([
+    machine,
+    {
+      ...machine,
+      definition: "A ceremonial machine with no transition semantics.",
+      semanticScope: "ceremony",
+    },
+  ])("rejects candidate key reuse across extraction categories", (duplicate) => {
     const base = extractionSchema.parse(
       stageOutput({
         stage: "extraction",
@@ -44,16 +51,9 @@ describe("tutor orchestration contracts", () => {
     expect(() =>
       extractionSchema.parse({
         ...base,
-        prerequisites: [
-          {
-            ...machine,
-            definition: "A ceremonial machine with no transition semantics.",
-            semanticScope: "ceremony",
-          },
-        ],
+        prerequisites: [duplicate],
       }),
-    ).toThrowError(z.ZodError);
-    expect(() => extractionSchema.parse({ ...base, prerequisites: [machine] })).not.toThrow();
+    ).toThrow(z.ZodError);
   });
 
   it("requires BCP 47 language tags at the extraction boundary", () => {
