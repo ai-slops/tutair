@@ -34,6 +34,10 @@ const chatgptAuth = new ChatGptAuth({
   store: tokenStore,
 });
 let failEvaluation = false;
+let failStage = null;
+let pausedStage = null;
+let releasePausedStage = null;
+let pausedStageGate = Promise.resolve();
 const { app, database } = createApp({
   databasePath: ":memory:",
   chatgptAuth,
@@ -43,6 +47,11 @@ const { app, database } = createApp({
     async call(call) {
       if (failEvaluation && call.stage === "evaluation")
         throw new Error("Test evaluator unavailable");
+      if (failStage === call.stage) throw new Error(`Test ${call.stage} unavailable`);
+      if (pausedStage === call.stage) {
+        pausedStage = null;
+        await pausedStageGate;
+      }
       return demo.call(call);
     },
   },
@@ -56,6 +65,24 @@ app.post("/__test__/evaluation", async (context) => {
   const body = await context.req.json();
   failEvaluation = body.fail === true;
   return context.json({ enabled: failEvaluation });
+});
+app.post("/__test__/generation", async (context) => {
+  const body = await context.req.json();
+  failStage = typeof body.failStage === "string" ? body.failStage : null;
+  pausedStage = typeof body.pauseStage === "string" ? body.pauseStage : null;
+  releasePausedStage?.();
+  pausedStageGate =
+    pausedStage === null
+      ? Promise.resolve()
+      : new Promise((resolve) => {
+          releasePausedStage = resolve;
+        });
+  return context.json({ failStage, pausedStage });
+});
+app.post("/__test__/generation/release", (context) => {
+  releasePausedStage?.();
+  releasePausedStage = null;
+  return context.body(null, 204);
 });
 app.post("/__test__/chatgpt", async (context) => {
   const body = await context.req.json();

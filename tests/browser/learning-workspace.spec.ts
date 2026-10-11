@@ -13,8 +13,76 @@ async function startThread(page: Page, title: string, outcome: string) {
 
 test.beforeEach(async ({ page, request }) => {
   await request.post("/__test__/evaluation", { data: { fail: false } });
+  await request.post("/__test__/generation", { data: {} });
   await page.goto("/");
   await expect(page.getByRole("button", { name: /Synthetic demo provider/ })).toBeVisible();
+});
+
+test("shows recorded stages during a pending turn and recovers them after reload", async ({
+  page,
+  request,
+}) => {
+  await request.post("/__test__/generation", { data: { pauseStage: "extraction" } });
+  await page.getByRole("textbox", { name: "Ask your tutor" }).fill("Show each real stage");
+  await page.getByRole("button", { name: "Send message" }).click();
+
+  await expect(page.getByText("Extracting relevant concepts", { exact: true })).toBeVisible();
+  const inspectorTrigger = page.getByRole("button", { name: "View generation details" });
+  await inspectorTrigger.click();
+  const inspector = page.getByRole("dialog", { name: "Generation details" });
+  await expect(inspector).toBeVisible();
+  await expect(inspector.getByText("Evaluated your latest message", { exact: true })).toBeVisible();
+  for (const width of [375, 768, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(inspector).toBeVisible();
+    await expect(inspector).toHaveCSS("transform", "none");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    expect(
+      await inspector.evaluate((element) => {
+        const bounds = element.getBoundingClientRect();
+        return (
+          bounds.left >= 0 &&
+          bounds.right <= innerWidth &&
+          element.scrollWidth <= element.clientWidth
+        );
+      }),
+    ).toBe(true);
+    await expect(page.locator(".generation-backdrop")).toBeAttached();
+    await page.screenshot({
+      path: `.omo/evidence/generation-inspector-${width}.png`,
+      fullPage: true,
+    });
+  }
+  await inspector.getByRole("button", { name: "Inspect" }).first().click();
+  await expect(inspector.getByRole("heading", { name: "evaluation · attempt 1" })).toBeVisible();
+  await expect(inspector.getByText("Recorded structured call", { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(inspector).toBeHidden();
+  await expect(inspectorTrigger).toBeFocused();
+  await page.reload();
+
+  await expect(page.getByText("Saved request in progress", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "View generation details" }).click();
+  await expect(page.getByText("Extracting relevant concepts", { exact: true })).toBeVisible();
+  await request.post("/__test__/generation/release");
+  await expect(page.locator(".message-tutor")).toHaveCount(1);
+  await expect(page.getByText("Saved request in progress", { exact: true })).toBeHidden();
+});
+
+test("keeps a failed recorded stage inspectable after reload", async ({ page, request }) => {
+  await request.post("/__test__/generation", { data: { failStage: "draft" } });
+  await page.getByRole("textbox", { name: "Ask your tutor" }).fill("Fail with provenance");
+  await page.getByRole("button", { name: "Send message" }).click();
+
+  await expect(page.getByText("Saved request needs attention", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "View generation details" }).click();
+  await expect(page.getByText("Drafting the answer failed", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("Saved request needs attention", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "View generation details" }).click();
+  await expect(page.getByText("Drafting the answer failed", { exact: true })).toBeVisible();
 });
 
 test("serves fingerprinted assets with compression and immutable caching", async ({ request }) => {
