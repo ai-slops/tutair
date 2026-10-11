@@ -19,6 +19,113 @@ beforeEach(() => {
 });
 
 describe("tutor progress", () => {
+  it("shows only recorded stages and opens generation details", () => {
+    const inspect = vi.fn();
+    render(
+      <Conversation
+        messages={[]}
+        provider={{ mode: "configured", label: "Tutor ready", guidance: "Ready" }}
+        draft=""
+        submitting={true}
+        showProgress={true}
+        error={null}
+        onDraft={vi.fn()}
+        onSubmit={vi.fn()}
+        onRetry={vi.fn()}
+        onKnowledge={vi.fn()}
+        onInspectGeneration={inspect}
+        pipeline={{
+          requestId: "request-1",
+          userMessageId: "message-1",
+          tutorMessageId: null,
+          state: "running",
+          startedAt: "2026-10-11T00:00:00.000Z",
+          finishedAt: null,
+          error: null,
+          flags: null,
+          stages: [
+            {
+              runId: "run-1",
+              stage: "evaluation",
+              status: "completed",
+              attempt: 1,
+              repairOfRunId: null,
+              startedAt: "2026-10-11T00:00:00.000Z",
+              finishedAt: "2026-10-11T00:00:01.000Z",
+              durationMs: 1000,
+              provider: "demo",
+              model: null,
+              outputMode: null,
+              usage: null,
+              errorCode: null,
+              fallbackStatus: "none",
+              versions: { stage: "v1", prompt: "p1", schema: "s1", context: "c1" },
+              contextHash: "hash",
+            },
+            {
+              runId: "run-2",
+              stage: "extraction",
+              status: "running",
+              attempt: 1,
+              repairOfRunId: null,
+              startedAt: "2026-10-11T00:00:01.000Z",
+              finishedAt: null,
+              durationMs: null,
+              provider: "demo",
+              model: null,
+              outputMode: null,
+              usage: null,
+              errorCode: null,
+              fallbackStatus: null,
+              versions: { stage: "v1", prompt: "p1", schema: "s1", context: "c1" },
+              contextHash: "hash",
+            },
+          ],
+        }}
+        recovery={null}
+      />,
+    );
+
+    expect(screen.getByText("Evaluated your latest message")).toBeDefined();
+    expect(screen.getByText("Extracting relevant concepts")).toBeDefined();
+    expect(screen.queryByText("Planning the explanation")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "View generation details" }));
+    expect(inspect).toHaveBeenCalledWith("request-1");
+  });
+
+  it("offers persisted generation details from a completed tutor answer", () => {
+    const inspect = vi.fn();
+    render(
+      <Conversation
+        messages={[
+          {
+            id: "answer-1",
+            role: "assistant",
+            content: "A completed answer",
+            createdAt: "2026-10-11T00:01:00.000Z",
+            status: "complete",
+            generationRequestId: "request-1",
+          },
+        ]}
+        provider={{ mode: "configured", label: "Tutor ready", guidance: "Ready" }}
+        draft=""
+        submitting={false}
+        showProgress={false}
+        error={null}
+        onDraft={vi.fn()}
+        onSubmit={vi.fn()}
+        onRetry={vi.fn()}
+        onKnowledge={vi.fn()}
+        onInspectGeneration={inspect}
+        pipeline={null}
+        recovery={null}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "View generation details" }));
+    expect(inspect).toHaveBeenCalledWith("request-1");
+  });
+
   it("scrolls when progress starts and an answer arrives without following elapsed ticks", () => {
     vi.useFakeTimers();
     const scrollIntoView = vi.mocked(HTMLElement.prototype.scrollIntoView);
