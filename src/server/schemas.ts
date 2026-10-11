@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { evidenceEvaluatorSchema } from "./knowledge-contracts.js";
 import { evidenceTypes } from "./knowledge-inputs.js";
+import { reviewActions } from "./knowledge-review.js";
 import { threadOrigins } from "./thread-schemas.js";
 
 export {
@@ -97,3 +98,26 @@ export const correctionSchema = z
     targetId: z.string().uuid().optional(),
   })
   .strict();
+
+export const knowledgeReviewSchema = z
+  .object({
+    revision: z.number().int().positive(),
+    action: z.enum(reviewActions),
+    reason: z.string().trim().min(1).max(2000).nullable().optional(),
+    confirmed: z.boolean().default(false),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if ((value.action === "mark_incorrect" || value.action === "retire") && value.reason == null)
+      context.addIssue({
+        code: "custom",
+        path: ["reason"],
+        message: "A reason is required for incorrect and retire actions",
+      });
+    if (value.action === "restore" && !value.confirmed)
+      context.addIssue({
+        code: "custom",
+        path: ["confirmed"],
+        message: "Restore requires explicit confirmation",
+      });
+  });

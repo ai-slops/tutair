@@ -42,6 +42,7 @@ export const exportRoutes = (services: Services): Hono => {
       exposures: owned("exposures"),
       learnerState: owned("learner_state"),
       corrections: owned("corrections"),
+      knowledgeReviewEvents: owned("knowledge_review_events"),
       qualityObservations: owned("quality_observations"),
       modelRuns: owned("model_runs"),
       modelRunDetails: services.db.all(

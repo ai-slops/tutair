@@ -9,7 +9,7 @@ import {
 } from "./knowledge-contracts.js";
 import { genericRecord } from "./records.js";
 import { registerEvidenceRoutes } from "./routes-evidence.js";
-import { importSchema } from "./schemas.js";
+import { importSchema, knowledgeReviewSchema } from "./schemas.js";
 import { searchKnowledge } from "./search.js";
 import { ApiError, isoNow, newId } from "./types.js";
 
@@ -21,7 +21,7 @@ export const knowledgeRoutes = (services: Services): Hono => {
       .enum(["canonical", "provisional", "all"])
       .catch("all")
       .parse(c.req.query("scope"));
-    return c.json({ items: services.knowledge.list(owner, scope) });
+    return c.json({ items: services.knowledge.listWithReview(owner, scope) });
   });
   app.get("/knowledge/:id", (c) => {
     const owner = ownerFor(c, services);
@@ -42,7 +42,28 @@ export const knowledgeRoutes = (services: Services): Hono => {
         genericRecord,
       ),
       learnerState: services.knowledge.learnerState(owner, id, item.current_revision),
+      reviewStatus: services.knowledge.reviewStatus(owner, id, item.current_revision),
+      reviewHistory: services.knowledge.reviewHistory(owner, id),
     });
+  });
+  app.post("/knowledge/:id/reviews", async (c) => {
+    const owner = ownerFor(c, services);
+    const knowledgeId = c.req.param("id");
+    services.knowledge.item(owner, knowledgeId);
+    const body = knowledgeReviewSchema.parse(await jsonBody(c));
+    return c.json(
+      {
+        event: services.knowledge.review(owner, {
+          knowledgeId,
+          revision: body.revision,
+          action: body.action,
+          reason: body.reason ?? null,
+          confirmed: body.confirmed,
+        }),
+        reviewStatus: services.knowledge.reviewStatus(owner, knowledgeId, body.revision),
+      },
+      201,
+    );
   });
   app.get("/knowledge/:id/revisions/:revision", (c) => {
     const owner = ownerFor(c, services);
