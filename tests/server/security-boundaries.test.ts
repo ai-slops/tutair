@@ -6,6 +6,20 @@ describe("Phase 1 mutation boundaries", () => {
   beforeEach(harness.reset);
   afterEach(harness.cleanup);
 
+  it("rejects an opaque browser origin without raising an internal error", async () => {
+    // Given
+    const { client } = harness.setup();
+
+    // When
+    const response = await client.call("/api/health", {
+      headers: { host: "localhost", origin: "null" },
+    });
+
+    // Then
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({ error: { code: "cross_origin_denied" } });
+  });
+
   it("blocks deletion when a conversation has preserved message history", async () => {
     // Given
     const { client } = harness.setup();

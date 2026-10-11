@@ -59,7 +59,11 @@ export const createApp = (
   app.use("/api/*", async (c, next) => {
     const origin = c.req.header("origin");
     const host = c.req.header("host");
-    if (origin !== undefined && host !== undefined && new URL(origin).host !== host)
+    if (
+      origin !== undefined &&
+      host !== undefined &&
+      (!URL.canParse(origin) || new URL(origin).host !== host)
+    )
       throw new ApiError(401, "cross_origin_denied", "Cross-origin requests are not allowed");
     c.header("Cache-Control", "no-store");
     c.header("X-Content-Type-Options", "nosniff");
