@@ -3,10 +3,17 @@ import type { Database } from "./database.js";
 import { knowledgeScopeFingerprint, migrateRevisionMetadata } from "./knowledge-contracts.js";
 import type {
   CorrectionInput,
+  KnowledgeReviewInput,
   NewEvidence,
   NewKnowledge,
   NewRevision,
 } from "./knowledge-inputs.js";
+import {
+  appendReview,
+  eligibleKnowledgeIds,
+  reviewHistory,
+  reviewStatus,
+} from "./knowledge-review.js";
 import { insertKnowledgeRevision } from "./knowledge-revision-store.js";
 import { knowledgeRecord, learnerStateRecord, revisionRecord } from "./records.js";
 import { insertEvidence, listEvidence, rebuildEvidenceProjections } from "./repository-evidence.js";
@@ -27,6 +34,16 @@ export class KnowledgeRepository {
       scope === "canonical" ? [] : [owner],
       knowledgeRecord,
     );
+  }
+  listWithReview(owner: LearnerId, scope = "all"): readonly unknown[] {
+    return this.list(owner, scope).map((raw) => {
+      const item = knowledgeRecord.parse(raw);
+      const revision = revisionRecord.parse(this.revision(owner, item.id, item.current_revision));
+      return {
+        ...item,
+        review_status: reviewStatus(this.db, owner, item.id, item.current_revision, revision.id),
+      };
+    });
   }
   item(owner: LearnerId, id: string) {
     const row = this.db.one(
@@ -187,5 +204,20 @@ export class KnowledgeRepository {
   }
   correct(owner: LearnerId, input: CorrectionInput) {
     return applyCorrection(this.db, this, owner, input);
+  }
+  review(owner: LearnerId, input: KnowledgeReviewInput) {
+    const revision = revisionRecord.parse(this.revision(owner, input.knowledgeId, input.revision));
+    return appendReview(this.db, owner, revision.id, input);
+  }
+  reviewHistory(owner: LearnerId, knowledgeId: string) {
+    this.item(owner, knowledgeId);
+    return reviewHistory(this.db, owner, knowledgeId);
+  }
+  reviewStatus(owner: LearnerId, knowledgeId: string, revision: number) {
+    const found = revisionRecord.parse(this.revision(owner, knowledgeId, revision));
+    return reviewStatus(this.db, owner, knowledgeId, revision, found.id);
+  }
+  eligibleIds(owner: LearnerId, ids: readonly string[]): readonly string[] {
+    return eligibleKnowledgeIds(this.db, owner, ids);
   }
 }

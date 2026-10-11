@@ -1,4 +1,5 @@
 import type { DefinitionScope, EvidenceEvaluator } from "./knowledge-contracts.js";
+import type { ReviewAction } from "./knowledge-review.js";
 import type { KnowledgeDimension } from "./learner-projection.js";
 import type { RiskScope } from "./types.js";
 
@@ -101,4 +102,12 @@ export type CorrectionInput = {
   readonly evidenceIds: readonly string[];
   readonly targetType: "knowledge" | "revision" | "evidence" | "meaning";
   readonly targetId?: string;
+};
+
+export type KnowledgeReviewInput = {
+  readonly knowledgeId: string;
+  readonly revision: number;
+  readonly action: ReviewAction;
+  readonly reason: string | null;
+  readonly confirmed: boolean;
 };
