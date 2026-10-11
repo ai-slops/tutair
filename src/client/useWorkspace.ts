@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   LearningThreadInput,
   LearningThreadStatus,
@@ -61,6 +61,7 @@ type WorkspaceState = {
   readonly snapshot: WorkspaceSnapshot;
   readonly initialized: boolean;
   readonly loading: boolean;
+  readonly turnPending: boolean;
   readonly error: string | null;
   readonly refresh: () => Promise<boolean>;
   readonly createConversation: () => Promise<boolean>;
@@ -97,6 +98,8 @@ export function useWorkspace(api: WorkspaceApi): WorkspaceState {
   const [snapshot, setSnapshot] = useState<WorkspaceSnapshot>(EMPTY_SNAPSHOT);
   const [initialized, setInitialized] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [turnPending, setTurnPending] = useState(false);
+  const turnPendingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState<SearchState>({
     results: [],
@@ -137,6 +140,20 @@ export function useWorkspace(api: WorkspaceApi): WorkspaceState {
       }),
     [],
   );
+  const runTurn = useCallback(
+    async (operation: () => Promise<WorkspaceSnapshot>): Promise<boolean> => {
+      if (turnPendingRef.current) return false;
+      turnPendingRef.current = true;
+      setTurnPending(true);
+      try {
+        return await run(operation, () => api.load());
+      } finally {
+        turnPendingRef.current = false;
+        setTurnPending(false);
+      }
+    },
+    [api, run],
+  );
 
   const refresh = useCallback(() => run(() => api.load()), [api, run]);
   useEffect(() => {
@@ -147,27 +164,16 @@ export function useWorkspace(api: WorkspaceApi): WorkspaceState {
     snapshot,
     initialized,
     loading,
+    turnPending,
     error,
     refresh,
     createConversation: () => run(() => api.createConversation()),
     createLearningThread: (input) => run(() => api.createLearningThread(input)),
     openConversation: (id) => run(() => api.openConversation(id)),
     openSearchThread: (id) => run(() => api.openSearchThread(id)),
-    send: (content) =>
-      run(
-        () => api.sendMessage(snapshot.activeConversationId, content),
-        () => api.load(),
-      ),
-    resolveTurn: (choice) =>
-      run(
-        () => api.resolveTurn(choice),
-        () => api.load(),
-      ),
-    retryTurn: () =>
-      run(
-        () => api.retryTurn(),
-        () => api.load(),
-      ),
+    send: (content) => runTurn(() => api.sendMessage(snapshot.activeConversationId, content)),
+    resolveTurn: (choice) => runTurn(() => api.resolveTurn(choice)),
+    retryTurn: () => runTurn(() => api.retryTurn()),
     updateLearningThread: (id, input) => run(() => api.updateLearningThread(id, input)),
     setThreadStatus: (id, status) => run(() => api.setThreadStatus(id, status)),
     addQuestion: (id, text) => run(() => api.addQuestion(id, text)),
