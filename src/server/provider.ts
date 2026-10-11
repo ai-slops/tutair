@@ -23,7 +23,12 @@ export type StructuredCall = {
   readonly system: string;
   readonly data: Readonly<Record<string, unknown>>;
   readonly jsonSchema: object;
+  readonly reasoningSummaryEnabled?: boolean;
 };
+export type ProviderReasoningSummary =
+  | { readonly state: "disabled" }
+  | { readonly state: "unavailable" }
+  | { readonly state: "available"; readonly text: string };
 export type ProviderUsage = {
   readonly inputTokens: number;
   readonly outputTokens: number;
@@ -33,6 +38,7 @@ export type ProviderCallResult = {
   readonly value: unknown;
   readonly usage: ProviderUsage | null;
   readonly resolvedModel?: string;
+  readonly reasoningSummary?: ProviderReasoningSummary;
 };
 
 export interface TutorProvider {

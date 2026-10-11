@@ -19,6 +19,7 @@ const eventSchema = z.discriminatedUnion("type", [
               total_tokens: z.number().int().nonnegative(),
             })
             .nullish(),
+          output: z.array(z.unknown()).default([]),
         })
         .loose(),
     })
@@ -115,6 +116,7 @@ export class ResponsesProvider implements TutorProvider {
           },
           stream: true,
           store: false,
+          ...(call.reasoningSummaryEnabled ? { reasoning: { summary: "auto" } } : {}),
         },
       });
       content = await response.text();
@@ -169,6 +171,18 @@ export class ResponsesProvider implements TutorProvider {
       throw error;
     }
     const usage = completed.response.usage;
+    const summaryItem = z
+      .object({
+        type: z.literal("reasoning"),
+        summary: z.array(
+          z.object({ type: z.literal("summary_text"), text: z.string().min(1).max(10_000) }),
+        ),
+      })
+      .loose();
+    const summary = completed.response.output.flatMap((item) => {
+      const parsed = summaryItem.safeParse(item);
+      return parsed.success ? parsed.data.summary.map((part) => part.text) : [];
+    });
     return {
       value,
       resolvedModel: credential.model,
@@ -180,6 +194,11 @@ export class ResponsesProvider implements TutorProvider {
               outputTokens: usage.output_tokens,
               totalTokens: usage.total_tokens,
             },
+      reasoningSummary: call.reasoningSummaryEnabled
+        ? summary.length === 0
+          ? { state: "unavailable" }
+          : { state: "available", text: summary.join("\n\n") }
+        : { state: "disabled" },
     };
   }
 }

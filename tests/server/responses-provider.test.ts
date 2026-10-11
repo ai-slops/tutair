@@ -27,12 +27,13 @@ describe("Responses tutor provider", () => {
     });
     const provider = providerFor(baseUrl);
 
-    const result = await provider.call(call(), "learner-1");
+    const result = await provider.call(call(false), "learner-1");
 
     expect(result).toEqual({
       value: { claims: [] },
       usage: { inputTokens: 9, outputTokens: 4, totalTokens: 13 },
       resolvedModel: "gpt-fixture",
+      reasoningSummary: { state: "disabled" },
     });
     expect(authorization).toBe("Bearer learner-token");
     expect(body).toMatchObject({ model: "gpt-fixture", stream: true, store: false });
@@ -59,6 +60,63 @@ describe("Responses tutor provider", () => {
     });
     expect(body).not.toHaveProperty("temperature");
     expect(body).not.toHaveProperty("previous_response_id");
+    expect(body).not.toHaveProperty("reasoning");
+  });
+
+  it("requests and returns only an official Responses reasoning summary when enabled", async () => {
+    // Given
+    let body: Record<string, unknown> = {};
+    const baseUrl = await fixture((request, response) => {
+      readJson(request).then((value) => {
+        body = value;
+        response.writeHead(200, { "content-type": "text/event-stream" });
+        response.end(
+          events(
+            { type: "response.output_text.delta", delta: '{"claims":[]}' },
+            {
+              type: "response.completed",
+              response: {
+                usage: null,
+                output: [
+                  {
+                    type: "reasoning",
+                    summary: [{ type: "summary_text", text: "Checked the supplied definition." }],
+                  },
+                ],
+              },
+            },
+          ),
+        );
+      });
+    });
+
+    // When
+    const result = await providerFor(baseUrl).call(call(true), "learner-1");
+
+    // Then
+    expect(body).toMatchObject({ reasoning: { summary: "auto" } });
+    expect(result).toMatchObject({
+      reasoningSummary: { state: "available", text: "Checked the supplied definition." },
+    });
+  });
+
+  it("reports unavailable when an enabled Responses model returns no public summary", async () => {
+    // Given
+    const baseUrl = await fixture((_request, response) => {
+      response.writeHead(200, { "content-type": "text/event-stream" });
+      response.end(
+        events(
+          { type: "response.output_text.delta", delta: '{"claims":[]}' },
+          { type: "response.completed", response: { usage: null, output: [] } },
+        ),
+      );
+    });
+
+    // When
+    const result = await providerFor(baseUrl).call(call(true), "learner-1");
+
+    // Then
+    expect(result).toMatchObject({ reasoningSummary: { state: "unavailable" } });
   });
 
   it.each([
@@ -175,7 +233,7 @@ function providerFor(baseUrl: string, requestTimeoutMs?: number): ResponsesProvi
   });
 }
 
-function call() {
+function call(reasoningSummaryEnabled = false) {
   return {
     stage: "extraction" as const,
     version: "phase1-v1",
@@ -189,6 +247,7 @@ function call() {
         metadata: { type: "object", properties: { source: { type: "string" } } },
       },
     },
+    reasoningSummaryEnabled,
   };
 }
 
