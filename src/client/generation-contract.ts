@@ -7,7 +7,16 @@ const UsageSchema = z.object({
 });
 export const GenerationStageSchema = z.object({
   runId: z.string(),
-  stage: z.enum(["evaluation", "extraction", "resolution", "planning", "draft", "lint", "final"]),
+  stage: z.enum([
+    "evaluation",
+    "extraction",
+    "resolution",
+    "planning",
+    "preparation",
+    "draft",
+    "lint",
+    "final",
+  ]),
   status: z.enum(["running", "completed", "failed"]),
   attempt: z.number().int().positive(),
   repairOfRunId: z.string().nullable(),

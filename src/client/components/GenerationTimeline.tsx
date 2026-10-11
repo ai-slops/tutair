@@ -15,6 +15,10 @@ const labels = {
   extraction: { running: "Extracting relevant concepts", completed: "Extracted relevant concepts" },
   resolution: { running: "Resolving concept references", completed: "Resolved concept references" },
   planning: { running: "Planning the explanation", completed: "Planned the explanation" },
+  preparation: {
+    running: "Preparing reusable answer material",
+    completed: "Prepared reusable answer material",
+  },
   draft: { running: "Drafting the answer", completed: "Drafted the answer" },
   lint: { running: "Checking the draft", completed: "Checked the draft" },
   final: { running: "Finalizing the response", completed: "Finalized the response" },

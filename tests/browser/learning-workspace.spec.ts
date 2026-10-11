@@ -79,23 +79,25 @@ test("shows recorded stages during a pending turn and recovers them after reload
   await expect(page.getByText("Saved request in progress", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "View generation details" }).click();
   await expect(page.getByText("Extracting relevant concepts", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Close generation details" }).click();
   await request.post("/__test__/generation/release");
+  await page.getByRole("button", { name: "Continue saved request" }).click();
   await expect(page.locator(".message-tutor")).toHaveCount(1);
   await expect(page.getByText("Saved request in progress", { exact: true })).toBeHidden();
 });
 
 test("keeps a failed recorded stage inspectable after reload", async ({ page, request }) => {
-  await request.post("/__test__/generation", { data: { failStage: "draft" } });
+  await request.post("/__test__/generation", { data: { failStage: "final" } });
   await page.getByRole("textbox", { name: "Ask your tutor" }).fill("Fail with provenance");
   await page.getByRole("button", { name: "Send message" }).click();
 
   await expect(page.getByText("Saved request needs attention", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "View generation details" }).click();
-  await expect(page.getByText("Drafting the answer failed", { exact: true })).toBeVisible();
+  await expect(page.getByText("Finalizing the response failed", { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByText("Saved request needs attention", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "View generation details" }).click();
-  await expect(page.getByText("Drafting the answer failed", { exact: true })).toBeVisible();
+  await expect(page.getByText("Finalizing the response failed", { exact: true })).toBeVisible();
 });
 
 test("shows exact answer revisions and opt-in official summaries at every viewport", async ({
