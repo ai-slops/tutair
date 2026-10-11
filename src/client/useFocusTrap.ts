@@ -23,9 +23,8 @@ export function useFocusTrap(
     const container = containerRef.current;
     if (container === null) return;
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const frame = requestAnimationFrame(() => {
+    if (!container.contains(document.activeElement))
       container.querySelector<HTMLElement>(FOCUSABLE)?.focus();
-    });
     const listener = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !blockedRef.current) {
         event.preventDefault();
@@ -48,7 +47,6 @@ export function useFocusTrap(
     };
     window.addEventListener("keydown", listener);
     return () => {
-      cancelAnimationFrame(frame);
       window.removeEventListener("keydown", listener);
       previous?.focus();
     };
