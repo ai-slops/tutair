@@ -22,7 +22,7 @@ describe("complete safety and knowledge context", () => {
     expect(context["draft"]).toBe(draft);
   });
 
-  it("keeps a retrieved existing unit in final generation and both lint passes", async () => {
+  it("keeps a retrieved existing unit in preparation, final selection, and lint", async () => {
     const context = createTutorTestContext(databases, "FSM", "FSM");
     const existing = z.object({ item: z.object({ id: z.string() }) }).parse(
       context.knowledge.create(context.owner, {
@@ -47,9 +47,9 @@ describe("complete safety and knowledge context", () => {
       selfReport: "neutral",
     });
     const stages = calls.filter((call) =>
-      ["planning", "draft", "lint", "final"].includes(call.stage),
+      ["planning", "preparation", "lint", "final"].includes(call.stage),
     );
-    expect(stages).toHaveLength(5);
+    expect(stages).toHaveLength(4);
     for (const call of stages)
       expect(
         z

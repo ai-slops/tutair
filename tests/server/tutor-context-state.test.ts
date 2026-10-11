@@ -80,9 +80,7 @@ describe("tutor context state", () => {
     });
     const evaluation = calls.find((call) => call.stage === "evaluation");
     const planning = calls.find((call) => call.stage === "planning");
-    const initialLint = calls.find(
-      (call) => call.stage === "lint" && call.data["finalReview"] !== true,
-    );
+    const finalLint = calls.find((call) => call.stage === "lint");
     expect(evaluation?.data["selfReport"]).toBe("confident");
     expect(evaluation?.data["confidence"]).toBe(0.8);
     expect(planning?.data["supportingEvidence"]).toEqual(
@@ -91,7 +89,7 @@ describe("tutor context state", () => {
     expect(planning?.data["learnerStates"]).toEqual(
       expect.arrayContaining([expect.objectContaining({ knowledge_id: created.item.id })]),
     );
-    expect(initialLint?.data["knownStates"]).toEqual(
+    expect(finalLint?.data["knownStates"]).toEqual(
       expect.arrayContaining([expect.objectContaining({ knowledge_id: created.item.id })]),
     );
   });
