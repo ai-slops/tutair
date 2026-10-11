@@ -88,10 +88,12 @@ rejects authorization initiation from non-loopback origins. Its credential file
 defaults to `~/.config/tutair/chatgpt.json`, is replaced atomically with mode
 `0600`, and is never included in UI responses or learning exports. Each grant is
 bound to the authenticated local learner, issued client, validated subject, and
-persistent host ID. Privacy deletion and Disconnect remove that learner's local
-grant. The store coordinates same-path mutations within one server process; do
-not share one credential path between multiple Tutair processes. A real browser
-login is not exercised by the automated fixture suite.
+persistent `urn:uuid:<UUIDv4>` host ID. Existing stores with a legacy bare UUID
+are migrated without changing that UUID or any learner grants. Privacy deletion
+and Disconnect remove that learner's local grant. The store coordinates same-path
+mutations within one server process; do not share one credential path between
+multiple Tutair processes. A real browser login is not exercised by the automated
+fixture suite.
 
 For a controlled remote Tutair origin where port forwarding is unavailable, an
 app-specific manual relay can be enabled explicitly:
@@ -107,6 +109,10 @@ the legitimate OpenAI authorization. When the browser cannot load the resulting
 return to the same Tutair learner, paste it into **Full localhost callback URL**,
 and complete the connection. The field is posted in the request body and clears
 after success; Tutair does not put it in browser history or logs.
+
+Authorization state is in memory. After restarting Tutair, close any authorization
+page opened before the restart and choose **Continue with ChatGPT** again; an old
+URL cannot complete the new server session.
 
 This relay is a Tutair fallback, not OpenAI's documented remote-VM procedure. The
 registered redirect remains the exact loopback URL, and all state, PKCE, nonce,
