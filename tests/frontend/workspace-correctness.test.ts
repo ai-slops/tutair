@@ -46,6 +46,7 @@ const snapshot = (activeConversationId: string): WorkspaceSnapshot => ({
     selectedModel: null,
     models: [],
   },
+  debugSettings: { saveProviderReasoningSummaries: false },
 });
 
 describe("workspace correctness", () => {

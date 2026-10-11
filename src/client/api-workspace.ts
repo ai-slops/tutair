@@ -18,6 +18,7 @@ import {
   LearningThreadsSchema,
 } from "./learning-contract";
 import type { TurnRecovery } from "./learning-model";
+import { DebugSettingsSchema } from "./provenance-contract";
 import type { WorkspaceSnapshot } from "./workspace";
 
 export class WorkspaceClient {
@@ -84,11 +85,12 @@ export class WorkspaceClient {
     generation = this.generation,
   ): Promise<WorkspaceSnapshot> {
     await this.ensureSession();
-    const [capabilities, conversations, threads, knowledge] = await Promise.all([
+    const [capabilities, conversations, threads, knowledge, debugSettings] = await Promise.all([
       request(() => this.http.get("capabilities").json(), CapabilitiesSchema),
       request(() => this.http.get("conversations").json(), ConversationsSchema),
       request(() => this.http.get("threads").json(), LearningThreadsSchema),
       loadKnowledge(this.http),
+      request(() => this.http.get("settings/debug").json(), DebugSettingsSchema),
     ]);
     const detail =
       conversationId === null
@@ -186,6 +188,7 @@ export class WorkspaceClient {
         selectedModel: capabilities.chatgpt.selectedModel ?? null,
         models: chatgptModels.models,
       },
+      debugSettings,
     };
   }
 }

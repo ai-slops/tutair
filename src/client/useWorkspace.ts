@@ -7,6 +7,7 @@ import type {
   RecoveryChoice,
 } from "./learning-model";
 import type { CorrectionKind, KnowledgeItem, ReviewAction, SearchResult } from "./model";
+import type { DebugSettings } from "./provenance-contract";
 import {
   EMPTY_SNAPSHOT,
   type SearchResponse,
@@ -99,6 +100,7 @@ type WorkspaceState = {
   readonly beginChatGptManual: () => Promise<string | null>;
   readonly completeChatGptManual: (callbackUrl: string) => Promise<boolean>;
   readonly disconnectChatGpt: () => Promise<boolean>;
+  readonly saveDebugSettings: (value: DebugSettings) => Promise<boolean>;
   readonly search: SearchState & { readonly run: (query: string) => Promise<void> };
 };
 
@@ -217,6 +219,13 @@ export function useWorkspace(api: WorkspaceApi): WorkspaceState {
     },
     completeChatGptManual: (callbackUrl) => run(() => api.completeChatGptManual(callbackUrl)),
     disconnectChatGpt: () => run(() => api.disconnectChatGpt()),
+    saveDebugSettings: async (value) => {
+      const previous = snapshot.debugSettings;
+      setSnapshot((current) => ({ ...current, debugSettings: value }));
+      const succeeded = await run(() => api.saveDebugSettings(value));
+      if (!succeeded) setSnapshot((current) => ({ ...current, debugSettings: previous }));
+      return succeeded;
+    },
     search: {
       ...search,
       async run(query) {
