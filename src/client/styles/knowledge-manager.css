@@ -1,0 +1,281 @@
+.knowledge-manager-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  block-size: 100dvh;
+  overflow: hidden;
+  background: var(--color-canvas);
+}
+.manager-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-5);
+  min-block-size: 5.5rem;
+  padding: var(--space-4) var(--space-6);
+  background: var(--color-paper);
+  border-block-end: 1px solid var(--color-rule);
+}
+.manager-title,
+.manager-metadata,
+.manager-actions,
+.confirmation-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.manager-title h1 {
+  font-family: var(--font-serif);
+  font-size: var(--type-h2);
+}
+.manager-count,
+.manager-section-heading span {
+  color: var(--color-ink-muted);
+  font-size: var(--type-small);
+}
+.knowledge-manager-body {
+  display: grid;
+  grid-template-columns: 15rem 22rem minmax(0, 1fr);
+  min-block-size: 0;
+}
+.manager-filters,
+.manager-list,
+.manager-detail {
+  min-block-size: 0;
+  min-inline-size: 0;
+  overflow-y: auto;
+}
+.manager-filters {
+  display: grid;
+  align-content: start;
+  gap: var(--space-5);
+  padding: var(--space-6) var(--space-5);
+  background: var(--color-paper-muted);
+  border-inline-end: 1px solid var(--color-rule);
+}
+.manager-filters h2,
+.manager-section-heading h2 {
+  font-size: var(--type-h3);
+}
+.field-stack {
+  display: grid;
+  gap: var(--space-2);
+  font-size: var(--type-small);
+  font-weight: 700;
+}
+.field-stack select,
+.field-stack textarea {
+  inline-size: 100%;
+  min-block-size: var(--control-min);
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-ink);
+  background: var(--color-paper);
+  border: 1px solid var(--color-rule-strong);
+  border-radius: var(--radius-sm);
+}
+.manager-list {
+  background: var(--color-paper);
+  border-inline-end: 1px solid var(--color-rule);
+}
+.manager-section-heading {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: var(--space-5);
+  background: var(--color-paper);
+  border-block-end: 1px solid var(--color-rule);
+}
+.manager-list-rows {
+  display: grid;
+}
+.manager-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  text-align: start;
+  border-block-end: 1px solid var(--color-rule);
+}
+.manager-row:hover,
+.manager-row[aria-current="true"] {
+  background: var(--color-forest-wash);
+}
+.manager-row-heading {
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+.manager-row-summary {
+  display: -webkit-box;
+  grid-column: 1 / -1;
+  overflow: hidden;
+  color: var(--color-ink-muted);
+  font-size: var(--type-small);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.status-badge {
+  align-self: start;
+  padding: var(--space-1) var(--space-2);
+  color: var(--color-ink-muted);
+  background: var(--color-paper-muted);
+  border-radius: var(--radius-round);
+  font-size: var(--type-label);
+  font-weight: 700;
+  text-transform: capitalize;
+}
+.status-reviewed {
+  color: var(--color-success);
+  background: var(--color-forest-wash);
+}
+.status-incorrect,
+.status-retired {
+  color: var(--color-error);
+  background: var(--color-error-wash);
+}
+.manager-detail {
+  background: var(--color-paper);
+}
+.manager-reader {
+  inline-size: min(100%, 54rem);
+  margin-inline: auto;
+  padding: var(--space-8);
+}
+.manager-reader-header,
+.manager-reader-section,
+.manager-definition {
+  display: grid;
+  gap: var(--space-4);
+  padding-block: var(--space-6);
+  border-block-end: 1px solid var(--color-rule);
+}
+.manager-reader-header h2 {
+  margin-block-start: var(--space-3);
+  font-family: var(--font-serif);
+  font-size: var(--type-h1);
+  overflow-wrap: anywhere;
+}
+.manager-metadata {
+  flex-wrap: wrap;
+  color: var(--color-ink-muted);
+  font-size: var(--type-small);
+}
+.manager-actions {
+  display: grid;
+  grid-template-columns: repeat(2, max-content);
+  align-items: stretch;
+}
+.manager-definition > p:not(.eyebrow) {
+  max-inline-size: 68ch;
+  font-family: var(--font-serif);
+  font-size: var(--type-body-lg);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.manager-history,
+.review-history {
+  display: grid;
+  gap: var(--space-3);
+}
+.manager-history details,
+.review-history li {
+  padding: var(--space-4);
+  background: var(--color-paper-muted);
+  border-radius: var(--radius-sm);
+}
+.manager-history summary {
+  min-block-size: var(--control-min);
+  color: var(--color-forest);
+  font-weight: 700;
+  cursor: pointer;
+}
+.review-history {
+  padding: 0;
+  list-style: none;
+}
+.review-history li {
+  display: grid;
+  gap: var(--space-2);
+}
+.review-history span {
+  color: var(--color-ink-muted);
+  font-size: var(--type-small);
+}
+.manager-empty {
+  padding: var(--space-8) var(--space-5);
+  color: var(--color-ink-muted);
+}
+.review-dialog-actions {
+  justify-content: flex-end;
+}
+.confirmation-row {
+  align-items: flex-start;
+  min-block-size: var(--control-min);
+}
+.confirmation-row input {
+  inline-size: var(--icon-md);
+  block-size: var(--icon-md);
+}
+@media (max-width: 70rem) {
+  .knowledge-manager-body {
+    grid-template-columns: 19rem minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .manager-filters {
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(12rem, 1fr) repeat(2, minmax(10rem, auto));
+    align-items: end;
+    padding: var(--space-3) var(--space-5);
+  }
+  .manager-filters h2,
+  .manager-filters .muted {
+    display: none;
+  }
+}
+@media (max-width: 45rem) {
+  .knowledge-manager-shell {
+    display: block;
+    overflow-y: auto;
+  }
+  .manager-header {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 2;
+    grid-template-columns: auto minmax(0, 1fr);
+    min-block-size: auto;
+    padding: var(--space-3) var(--space-4);
+  }
+  .manager-header .button span,
+  .manager-title .eyebrow,
+  .manager-count {
+    display: none;
+  }
+  .manager-title .brand-mark {
+    display: none;
+  }
+  .knowledge-manager-body {
+    display: block;
+  }
+  .manager-filters {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--space-4);
+    border-inline-end: 0;
+    border-block-end: 1px solid var(--color-rule);
+  }
+  .manager-list,
+  .manager-detail {
+    overflow: visible;
+    border-inline-end: 0;
+  }
+  .manager-reader {
+    padding: var(--space-4);
+  }
+  .manager-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .manager-actions .button {
+    inline-size: 100%;
+  }
+}
