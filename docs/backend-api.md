@@ -106,11 +106,12 @@ metadata updates preserve before/after snapshots in the event history.
 
 ## Knowledge and evidence
 
-- `GET /api/knowledge?scope=canonical|provisional|all` -> `{ items: KnowledgeItem[] }`
-- `GET /api/knowledge/:id` -> `{ item, revisions, relations, evidence, exposures, learnerState }`
+- `GET /api/knowledge?scope=canonical|provisional|all` -> `{ items: KnowledgeItem[] }`. Each item includes the authenticated learner's projected `reviewStatus`.
+- `GET /api/knowledge/:id` -> `{ item, revisions, relations, evidence, exposures, learnerState, reviewStatus, reviewHistory }`
 - `GET /api/knowledge/:id/revisions/:revision` -> `{ revision, evidence, learnerState }`
 - `POST /api/knowledge` `{ title, statement, scope?: "provisional", riskScope?: RiskScope, confidence?: number }` -> `201 { item, revision }`
 - `POST /api/knowledge/import` `{ format: "yaml", content: string }` -> `201 { imported }`. Requires both a learner session and the `x-tutair-canonical-token` header matching server-side `TUTOR_CANONICAL_IMPORT_TOKEN`. Imports are disabled without an operator token. Generated model output is rejected.
+- `POST /api/knowledge/:id/reviews` `{ revision, action: "reviewed"|"mark_incorrect"|"retire"|"restore", reason?, confirmed? }` -> `201 { event, reviewStatus }`. `mark_incorrect` and `retire` require a non-empty reason; `restore` requires `confirmed: true`.
 - `GET /api/evidence?knowledgeId?=&revision?=` -> `{ evidence: Evidence[] }`
 - `POST /api/evidence` `{ knowledgeId, revision, messageId, polarity: "positive"|"negative", strength?: number, assistance?: "none"|"hint"|"worked_example", confidence?: number, ambiguous?: boolean }` -> `201 { evidence }`
 - `POST /api/evidence/rebuild` `{ knowledgeId?: string }` -> `{ rebuilt }`
@@ -133,6 +134,15 @@ a distinct provisional unit while retaining the original unit and its evidence.
 Every correction reference is validated against the authenticated learner, unit,
 and exact revision before the correction is written; the entire mutation and
 projection rebuild commit or roll back together.
+
+Knowledge review events are immutable, append-only, and scoped to the authenticated
+learner. `reviewed` and `mark_incorrect` apply to the submitted immutable revision;
+new revisions therefore begin unreviewed and are not covered by an older incorrect
+mark. `retire` applies to the unit across revisions until a later `restore` event.
+Incorrect or retired definitions are excluded from retrieval documents, selected
+thread/direct knowledge, relations, and tutor generation context for that learner.
+These actions do not alter learner-state dimensions, canonical authority, evidence,
+exposures, conversations, or historical revisions.
 
 ## Knowledge metadata
 
@@ -177,7 +187,7 @@ knowledge, without deleting shared canonical definitions.
 ## Search and privacy
 
 - `GET /api/search?q=...&limit?=...` -> `{ results, mode: "hybrid"|"fts-only" }`
-- `GET /api/export` -> `{ exportedAt, projectionVersion, learner, conversations, messages, threads, knowledge, revisions, evidence, exposures, learnerState, corrections, modelRuns, traces }`
+- `GET /api/export` -> `{ exportedAt, projectionVersion, learner, conversations, messages, threads, knowledge, revisions, evidence, exposures, learnerState, corrections, knowledgeReviewEvents, modelRuns, traces }`
 - `DELETE /api/privacy` -> `204`, clears learner-owned rows and session cookie.
 
 Common records use UUID `id` and ISO `createdAt` fields. Knowledge records include
