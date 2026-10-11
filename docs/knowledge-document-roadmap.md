@@ -17,10 +17,10 @@ Current checkpoint: October 11, 2026. Normative target:
 - Existing duplicate nodes are not destructively merged. Paraphrase equivalence
   is not guaranteed by exact-text reuse and still requires conservative resolution.
 
-These changes do not yet implement English source documents, localization records,
-or complete document-derived final answers.
+These foundations now feed immutable English source documents, localization
+records, and document-derived final answers.
 
-## 2. Document storage and management: next
+## 2. Document storage and management: implemented
 
 Add immutable English source documents, explanation blocks, localized expressions,
 and exact version links. Expose rich scope/features/claims/relations currently
@@ -35,7 +35,12 @@ Acceptance checks:
 - Korean and English search resolve to the same underlying knowledge identity.
 - Management, export, review exclusion, and privacy deletion cover new records.
 
-## 3. Preparation and final composition: next after storage
+The implementation stores immutable document, block, and exact block-topic rows;
+migrates existing statements byte-for-byte as `legacy` / `und`; creates English
+documents for canonical imports and model-prepared provisional knowledge; and
+shows language, role, version, staleness, and ordered blocks in Knowledge manager.
+
+## 3. Preparation and final composition: implemented
 
 Introduce a recorded preparation stage, persist reusable source/localized blocks,
 then plan/select/render exclusively from eligible saved blocks. Extend progress
@@ -50,6 +55,11 @@ Acceptance checks:
 - Incorrect/retired material cannot re-enter through planning, direct IDs, or
   localization. Generated canonical expressions remain learner-private.
 - Public reasoning-summary settings do not affect document/exposure recording.
+
+The recorded `preparation` stage may run once plus one bounded material retry.
+The `final` stage accepts only ordered block IDs and layout enums. Server rendering,
+segment offsets, hashes, answer composition, tutor message, and exposures are saved
+in one transaction; reconstruction verifies the persisted answer hash.
 
 ## 4. Quality and operational evaluation
 
