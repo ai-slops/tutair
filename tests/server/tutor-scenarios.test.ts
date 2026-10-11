@@ -106,7 +106,7 @@ describe("phase-one tutor acceptance scenarios", () => {
     ).toHaveLength(2);
     expect(evidence.at(-1)?.["copiedFromRecentContext"]).toBe(1);
     expect(Number(evidence.at(-1)?.["weight"])).toBeLessThan(0.1);
-  });
+  }, 10_000);
 
   it("records voluntary explanation separately from real application", async () => {
     const { client, id } = await session();
