@@ -348,7 +348,7 @@ or explicitly unavailable rather than being reconstructed.
 
 Final `npm run verify` passed:
 
-- **296 tests passed, one opt-in local-embedding test skipped, 69 test files passed.**
+- **300 tests passed, one opt-in local-embedding test skipped, 71 test files passed.**
 - Strict type checking, Biome, server compilation, and the production Vite build
   passed. Biome reported no warnings or errors.
 - TypeScript LSP diagnostics reported zero errors across the scanned `src` and
@@ -366,6 +366,12 @@ inspectable after reload. Fresh generation-inspector captures are:
 All three browser states asserted no horizontal document overflow. They use the
 synthetic paused provider fixture and demonstrate application behavior and
 responsive layout, not external model quality. No paid model call was made.
+
+Targeted inspector regressions also verify that selected run details expose
+persisted duration, token usage, error, and fallback metadata; a selected running
+detail reloads when its summary becomes terminal and aborts that reload when the
+drawer closes; and the progress clock adopts the persisted pipeline `startedAt`
+instead of restarting after reload.
 
 The isolated port-1455 process was rebuilt and restarted with its existing
 database path, ChatGPT credential store location, callback settings, and exact
