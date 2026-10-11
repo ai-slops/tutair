@@ -52,7 +52,10 @@ and rotating credentials. Keep the containing directory owner-only and do not
 copy the file into the repository, exports, support transcripts, or screenshots.
 Writes use a same-directory temporary file, fsync, mode `0600`, and atomic rename.
 Successful refreshes serialize per learner and replace the refresh token as one
-record. A host ID is attribution, not proof of host identity.
+record. UUID host IDs use the supported `urn:uuid:<UUIDv4>` form for the host
+lifecycle. A legacy persisted bare UUID is rewritten to that URI without changing
+the underlying UUID or learner grants. A host ID is attribution, not proof of host
+identity.
 
 The official callback always targets `127.0.0.1` on
 `TUTOR_CHATGPT_CALLBACK_PORT`. In a container or VM, use SSH or the container
@@ -71,6 +74,9 @@ bound to that learner before it can be consumed or invalidated. Submitted callba
 URLs must exactly match the configured loopback scheme, host, port, and path;
 denials consume only their owner's attempt, expired/replayed attempts fail, and
 codes or callback URLs are never logged or persisted.
+
+Pending authorization state is process-local. After a server restart, discard any
+previously opened authorization URL and start again from **Continue with ChatGPT**.
 
 The relay transports the authorizing user's newly issued OAuth response; it does
 not import browser sessions, credentials from another client, or private Codex
