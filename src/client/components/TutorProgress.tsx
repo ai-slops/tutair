@@ -1,5 +1,5 @@
 import { Activity } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { GenerationPipeline } from "../generation-contract";
 import { GenerationTimeline } from "./GenerationTimeline";
 
@@ -9,15 +9,17 @@ type TutorProgressProps = {
 };
 
 export function TutorProgress({ pipeline, onInspect }: TutorProgressProps) {
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const fallbackStartedAt = useRef(Date.now());
+  const persistedStartedAt = pipeline === null ? Number.NaN : Date.parse(pipeline.startedAt);
+  const startedAt = Number.isFinite(persistedStartedAt)
+    ? persistedStartedAt
+    : fallbackStartedAt.current;
+  const [elapsedSeconds, setElapsedSeconds] = useState(() => elapsedSince(startedAt));
   useEffect(() => {
-    const startedAt = Date.now();
-    const timer = window.setInterval(
-      () => setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000)),
-      1000,
-    );
+    setElapsedSeconds(elapsedSince(startedAt));
+    const timer = window.setInterval(() => setElapsedSeconds(elapsedSince(startedAt)), 1000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [startedAt]);
   const minutes = Math.floor(elapsedSeconds / 60);
   const seconds = String(elapsedSeconds % 60).padStart(2, "0");
   return (
@@ -44,4 +46,8 @@ export function TutorProgress({ pipeline, onInspect }: TutorProgressProps) {
       </span>
     </section>
   );
+}
+
+function elapsedSince(startedAt: number): number {
+  return Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
 }
