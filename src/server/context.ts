@@ -2,6 +2,7 @@ import type { Context } from "hono";
 import { getCookie } from "hono/cookie";
 import type { ChatGptAuth } from "./chatgpt-auth.js";
 import type { Database } from "./database.js";
+import type { KnowledgeDocumentRepository } from "./knowledge-document-repository.js";
 import type { TutorProvider } from "./provider.js";
 import type { CoreRepository } from "./repository-core.js";
 import type { KnowledgeRepository } from "./repository-knowledge.js";
@@ -13,6 +14,7 @@ export type Services = {
   readonly db: Database;
   readonly core: CoreRepository;
   readonly knowledge: KnowledgeRepository;
+  readonly documents: KnowledgeDocumentRepository;
   readonly provider: TutorProvider;
   readonly tutor: TutorPipeline;
   readonly turnLocks: Set<string>;

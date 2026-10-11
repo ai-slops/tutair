@@ -4,6 +4,7 @@ import { ZodError } from "zod";
 import type { ChatGptAuth } from "./chatgpt-auth.js";
 import { createChatGptAuth } from "./chatgpt-config.js";
 import { Database } from "./database.js";
+import { KnowledgeDocumentRepository } from "./knowledge-document-repository.js";
 import { presentJson } from "./presentation.js";
 import type { TutorProvider } from "./provider.js";
 import { createProvider } from "./provider-factory.js";
@@ -32,6 +33,7 @@ export const createApp = (
   const provider = options.provider ?? createProvider(options.env ?? process.env, chatgptAuth);
   const core = new CoreRepository(database);
   const knowledge = new KnowledgeRepository(database);
+  const documents = new KnowledgeDocumentRepository(database);
   const configuredImportToken =
     options.env?.["TUTOR_CANONICAL_IMPORT_TOKEN"] ??
     process.env["TUTOR_CANONICAL_IMPORT_TOKEN"] ??
@@ -41,6 +43,7 @@ export const createApp = (
     provider,
     core,
     knowledge,
+    documents,
     tutor: new TutorPipeline(database, core, knowledge, provider),
     turnLocks: new Set<string>(),
     turnAttempts: new Map<string, number[]>(),
