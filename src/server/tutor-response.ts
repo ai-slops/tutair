@@ -1,118 +1,103 @@
 import type { z } from "zod";
+import { finalSelectionSchema, renderSelection } from "./answer-composition.js";
+import { DocumentPreparationService } from "./document-preparation.js";
+import type { KnowledgeDocumentRepository } from "./knowledge-document-repository.js";
 import type { KnowledgeRepository } from "./repository-knowledge.js";
-import { TutorFinalReviewer } from "./tutor-final.js";
-import {
-  type KnowledgeContext,
-  orderedResolutionCandidates,
-  persistResolution,
-} from "./tutor-knowledge.js";
+import type { KnowledgeContext } from "./tutor-knowledge.js";
 import { boundModelContext } from "./tutor-model-context.js";
-import {
-  finalSchema,
-  generatedSchema,
-  lintedSchema,
-  type planningSchema,
-  resolutionSchema,
-} from "./tutor-schemas.js";
+import { unsafeRiskyFinal } from "./tutor-policies.js";
+import { lintedSchema, type planningSchema } from "./tutor-schemas.js";
 import type { TutorStageRunner } from "./tutor-stage.js";
-import { loadTurnKnowledge } from "./tutor-turn-context.js";
+import { ApiError } from "./types.js";
 
 type ResponseRequest = {
   readonly common: Readonly<Record<string, unknown>>;
   readonly plan: z.infer<typeof planningSchema>;
   readonly knowledge: readonly KnowledgeContext[];
-  readonly allowedKnowledgeIds: readonly string[];
+  readonly responseLanguage: string;
 };
 
 export class TutorResponseService {
   constructor(
     readonly knowledge: KnowledgeRepository,
+    readonly documents: KnowledgeDocumentRepository,
     readonly stages: TutorStageRunner,
   ) {}
 
   async generate(request: ResponseRequest) {
-    const input = this.stages.input;
-    const draft = await this.stages.stage({
-      stage: "draft",
-      schema: generatedSchema,
+    const prepared = await new DocumentPreparationService(this.documents, this.stages).prepare(
+      request.knowledge,
+      request.responseLanguage,
+      boundModelContext({ ...request.common, plan: request.plan }),
+    );
+    const selected = await this.stages.stage({
+      stage: "final",
+      schema: finalSelectionSchema,
       data: boundModelContext({
         ...request.common,
         plan: request.plan,
-        assistance: input.assistance,
+        responseLanguage: request.responseLanguage,
+        availableBlocks: prepared.blocks.map((block) => ({
+          id: block.id,
+          type: block.type,
+          content: block.content,
+          knowledgeRevisionIds: block.topicRevisionIds,
+        })),
       }),
     });
+    const rendered = renderSelection(selected.value, prepared.blocks);
     const checked = await this.stages.withFallback({
       stage: "lint",
       schema: lintedSchema,
       data: boundModelContext({
         ...request.common,
-        draft: draft.value.text,
+        knowledge: request.knowledge,
+        draft: rendered.text,
         plan: request.plan,
-        knownStates: request.common["learnerStates"],
+        knownStates: request.common["learnerStates"] ?? [],
+        finalReview: true,
       }),
       fallback: {
-        safe: true,
+        safe: false,
         issues: ["lint_skipped"],
         concepts: [],
         generatedCandidates: [],
         lintSkipped: true,
       },
     });
-    let changes: readonly unknown[] = [];
-    let allowedIds = request.allowedKnowledgeIds;
-    if (checked.value.generatedCandidates.length > 0) {
-      const candidates = checked.value.generatedCandidates;
-      const resolved = await this.stages.stage({
-        stage: "resolution",
-        schema: resolutionSchema,
-        data: boundModelContext({
-          ...request.common,
-          candidates,
-          resolutionCandidates: orderedResolutionCandidates(
-            request.knowledge,
-            Array.isArray(request.common["relevantHistory"])
-              ? request.common["relevantHistory"]
-              : [],
-            candidates.map((candidate) => candidate.label),
-          ),
-          independentOfGeneration: true,
-        }),
-      });
-      const persisted = persistResolution({
-        repository: this.knowledge,
-        owner: input.owner,
-        conversationId: input.conversationId,
-        messageId: input.messageId,
-        runId: resolved.runId,
-        resolution: resolved.value,
-        candidates,
-        offeredKnowledge: request.knowledge,
-      });
-      changes = persisted.changes;
-      allowedIds = [...new Set([...allowedIds, ...persisted.knowledgeIds])];
+    if (unsafeRiskyFinal(checked.value, request.knowledge))
+      throw new ApiError(
+        422,
+        "unsafe_tutor_output",
+        "Unsafe high-stakes or current-contested tutor output was blocked",
+      );
+    const knowledgeByRevision = new Map(request.knowledge.map((item) => [item.revisionId, item]));
+    const exposureByKnowledge = new Map<
+      string,
+      { knowledgeId: string; sourceSpan: { start: number; end: number }; sourceQuote: null }
+    >();
+    for (const segment of rendered.segments) {
+      for (const revisionId of segment.topicRevisionIds) {
+        const item = knowledgeByRevision.get(revisionId);
+        if (item !== undefined && !exposureByKnowledge.has(item.id))
+          exposureByKnowledge.set(item.id, {
+            knowledgeId: item.id,
+            sourceSpan: { start: segment.start, end: segment.end },
+            sourceQuote: null,
+          });
+      }
     }
-    const generationContext = loadTurnKnowledge(this.knowledge, input.owner, allowedIds);
-    const common = boundModelContext({ ...request.common, ...generationContext });
-    const generationKnowledge = generationContext.knowledge;
-    const final = await this.stages.stage({
-      stage: "final",
-      schema: finalSchema,
-      data: boundModelContext({
-        ...common,
-        plan: request.plan,
-        draft: draft.value.text,
-        lint: checked.value,
-        knowledge: generationKnowledge,
-        allowedKnowledgeIds: generationKnowledge.map((item) => item.id),
-      }),
-    });
-    const reviewed = await new TutorFinalReviewer(this.stages).review({
-      common,
-      plan: request.plan,
-      initialLint: checked.value,
-      final,
-      knowledge: generationKnowledge,
-    });
-    return { ...reviewed, changes, runId: final.runId };
+    return {
+      final: {
+        runId: selected.runId,
+        value: { text: rendered.text, exposures: [...exposureByKnowledge.values()] },
+        discardedExposures: [],
+        rendered,
+      },
+      knowledge: request.knowledge,
+      lintSkipped: checked.value.lintSkipped,
+      changes: [],
+      runId: selected.runId,
+    };
   }
 }
