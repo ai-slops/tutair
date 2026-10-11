@@ -162,6 +162,17 @@ unbroken tokens rather than a zero-width text column.
 - Live polling begins immediately for the actual request target, repeats every two seconds only while active work remains, stops on a terminal response, and aborts stale work on target change or unmount. Opening a recovery target with equivalent IDs must not restart the request because an object was re-created during render.
 - Accessibility: the drawer uses the Modal focus trap, semantic dialog naming, Escape close, visible close control, status text in addition to icons, and responsive single-column reflow without horizontal overflow at 375px.
 
+### AnswerProvenance
+- Every tutor answer ends with a visible “Sources & knowledge” disclosure, independent of debug settings. Its body loads lazily only when opened so conversation refresh and generation polling never carry full call snapshots.
+- The disclosure separates exact immutable revisions actually provided to a model, revisions created during that answer, and verified answer exposures. Exposure is explicitly labeled non-exhaustive because omitted annotations are not reconstructed.
+- Revision links open Knowledge manager with the referenced historical revision expanded. A historical revision is never labeled current when a newer revision exists.
+- Provider reasoning summaries appear only when the official Responses API returned a public summary for a run whose private setting was enabled at run start. Disabled, pending, and unsupported/unavailable states remain distinct; hidden chain-of-thought is never requested or displayed.
+- States: collapsed, loading, loaded with empty groups, partial historical availability, request error, and unavailable legacy answer. At 375px, labels and links wrap without horizontal overflow.
+
+### DebugSettings
+- Lives in Session & model under “Private debugging.” The owner-scoped toggle is off by default and saves immediately to the server; browser storage is not used.
+- Copy states that summaries may contain private learner context, apply only to new model runs, and remain until privacy erasure. The control never implies access to raw model reasoning.
+
 ### DimensionStrip
 - Exactly six labels: Recognition, Recall, Explanation, Application, Discrimination, Transfer.
 - The selected concept shows the server projection for its current immutable revision: estimate, uncertainty, status, effective evidence, supporting evidence IDs, projection version, and knowledge revision ID.
