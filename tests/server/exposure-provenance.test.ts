@@ -57,17 +57,8 @@ describe("exposure provenance", () => {
           changed = true;
         }
         if (call.stage !== "final") return stageOutput(call);
-        const snapshot = snapshotSchema.parse(supplied);
-        const text = "An FSM has states and transition rules.";
-        return {
-          text,
-          exposures: [
-            {
-              knowledgeId: snapshot.id,
-              ...(changeAt === "repair" && finalCalls === 1 ? {} : { sourceQuote: text }),
-            },
-          ],
-        };
+        if (changeAt === "repair" && finalCalls === 1) return { text: "invalid free prose" };
+        return stageOutput(call);
       });
 
       // When
@@ -102,11 +93,8 @@ describe("exposure provenance", () => {
   it("retains the original tutor event after message edits and tombstones", async () => {
     // Given
     const context = createTutorTestContext(databases, "FSM", "Explain an FSM");
-    const text = "An FSM has states and transition rules.";
     const provider = providerFor((call) => {
-      if (call.stage !== "final") return stageOutput(call);
-      const first = snapshotSchema.parse(z.array(z.unknown()).parse(call.data["knowledge"])[0]);
-      return { text, exposures: [{ knowledgeId: first.id, sourceQuote: text }] };
+      return stageOutput(call);
     });
     const result = await new TutorPipeline(
       context.database,
@@ -122,6 +110,7 @@ describe("exposure provenance", () => {
       selfReport: "neutral",
     });
     const messageId = z.object({ id: z.string() }).parse(result.tutorMessage).id;
+    const originalContent = z.object({ content: z.string() }).parse(result.tutorMessage).content;
 
     // When
     context.core.editMessage(context.owner, context.conversationId, messageId, "Edited answer");
@@ -132,13 +121,19 @@ describe("exposure provenance", () => {
       context.database.one("SELECT * FROM exposures", [], z.record(z.string(), z.unknown())),
     );
     expect(exposure.message_id).toBe(messageId);
-    expect(
-      context.database.one(
-        "SELECT content,event_type FROM message_events WHERE id=?",
-        [exposure.message_event_id],
-        z.object({ content: z.string(), event_type: z.string() }),
-      ),
-    ).toEqual({ content: text, event_type: "created" });
+    const createdContent = z
+      .object({ content: z.string(), event_type: z.string() })
+      .parse(
+        context.database.one(
+          "SELECT content,event_type FROM message_events WHERE id=?",
+          [exposure.message_event_id],
+          z.object({ content: z.string(), event_type: z.string() }),
+        ),
+      );
+    expect(createdContent).toEqual({
+      content: originalContent,
+      event_type: "created",
+    });
     expect(context.knowledge.evidence(context.owner, exposure.knowledge_id)).toEqual([]);
   });
 });

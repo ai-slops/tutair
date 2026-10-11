@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Database } from "./database.js";
+import { KnowledgeDocumentRepository } from "./knowledge-document-repository.js";
 import { ModelRunner } from "./model-runner.js";
 import type { TutorProvider } from "./provider.js";
 import type { CoreRepository } from "./repository-core.js";
@@ -127,6 +128,8 @@ export class TutorPipeline {
       schema: extractionSchema,
       fallback: {
         goal: context.currentGoal,
+        sourceLanguage: "en",
+        responseLanguage: "en",
         targets: [],
         prerequisites: [],
         terms: [],
@@ -184,11 +187,15 @@ export class TutorPipeline {
       planned,
       turnKnowledge.knowledge.map((item) => item.id),
     );
-    const reviewed = await new TutorResponseService(this.knowledge, stages).generate({
+    const reviewed = await new TutorResponseService(
+      this.knowledge,
+      new KnowledgeDocumentRepository(this.db),
+      stages,
+    ).generate({
       common: turnCommon,
       plan: planned.value,
       knowledge: turnKnowledge.knowledge,
-      allowedKnowledgeIds: turnKnowledge.knowledge.map((item) => item.id),
+      responseLanguage: extracted.value.responseLanguage,
     });
     const tutorMessage = store.reply(
       input,

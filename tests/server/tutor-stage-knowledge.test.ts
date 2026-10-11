@@ -11,7 +11,7 @@ describe("same-turn knowledge propagation", () => {
     for (const database of databases.splice(0)) database.close();
   });
 
-  it("supplies newly resolved revision definitions and unknown state to planning, draft and lint", async () => {
+  it("supplies newly resolved revision definitions and unknown state to planning, preparation and lint", async () => {
     const calls: StructuredCall[] = [];
     const context = createTutorTestContext(databases, "New topic", "Explain the controller");
     await new TutorPipeline(
@@ -28,10 +28,7 @@ describe("same-turn knowledge propagation", () => {
       selfReport: "neutral",
     });
     const stages = calls.filter(
-      (call) =>
-        call.stage === "planning" ||
-        call.stage === "draft" ||
-        (call.stage === "lint" && call.data["finalReview"] !== true),
+      (call) => call.stage === "planning" || call.stage === "preparation" || call.stage === "lint",
     );
     expect(stages).toHaveLength(3);
     const definition = z.object({ id: z.string(), revisionId: z.string(), definition: z.string() });

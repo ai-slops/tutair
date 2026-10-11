@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AnswerCompositionStore, type RenderedAnswer } from "./answer-composition.js";
 import type { Database } from "./database.js";
 import { type DiscardedExposure, exposureGroundingFailure } from "./exposure-grounding.js";
 import type { CoreRepository } from "./repository-core.js";
@@ -98,6 +99,7 @@ export class TutorTurnStore {
     input: TurnInput,
     final: StageResult<z.infer<typeof finalSchema>> & {
       readonly discardedExposures?: readonly DiscardedExposure[];
+      readonly rendered: RenderedAnswer;
     },
     generationKnowledge: readonly KnowledgeContext[],
     synthetic: boolean,
@@ -127,6 +129,12 @@ export class TutorTurnStore {
         synthetic,
       );
       const tutorMessageId = z.object({ id: z.string() }).parse(tutorMessage).id;
+      new AnswerCompositionStore(this.db).save({
+        owner: input.owner,
+        messageId: tutorMessageId,
+        runId: final.runId,
+        rendered: final.rendered,
+      });
       const sourceEvent = z
         .object({ id: z.string() })
         .parse(
