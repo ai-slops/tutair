@@ -61,9 +61,9 @@ describe("knowledge review context boundaries", () => {
 
     // Then
     const stages = calls.filter((call) =>
-      ["evaluation", "planning", "draft", "lint", "final"].includes(call.stage),
+      ["evaluation", "planning", "preparation", "lint", "final"].includes(call.stage),
     );
-    expect(stages).toHaveLength(6);
+    expect(stages).toHaveLength(5);
     for (const call of stages) {
       const knowledge = z.array(z.object({ id: z.string() })).parse(call.data["knowledge"]);
       expect(knowledge.map((item) => item.id)).not.toContain(unit.item.id);

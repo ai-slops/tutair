@@ -32,6 +32,13 @@ export function retrievalDocuments(db: Database, owner: LearnerId): readonly Ret
        ON r.knowledge_id=k.id AND r.revision=k.current_revision
      WHERE (k.learner_id IS NULL OR k.learner_id=?) AND ${clause}
      UNION ALL
+     SELECT k.id,'knowledge',k.title,b.content,k.scope,r.revision
+     FROM knowledge_document_blocks b JOIN knowledge_documents d ON d.id=b.document_id
+       JOIN knowledge_revisions r ON r.id=d.knowledge_revision_id
+       JOIN knowledge_items k ON k.id=r.knowledge_id
+     WHERE (d.owner_learner_id=? OR (d.owner_learner_id IS NULL AND k.learner_id IS NULL))
+       AND ${clause}
+     UNION ALL
      SELECT m.id,'message','Message',m.content,'private',0 FROM messages m
        WHERE m.learner_id=? AND m.tombstoned_at IS NULL
      UNION ALL
@@ -43,7 +50,7 @@ export function retrievalDocuments(db: Database, owner: LearnerId): readonly Ret
        JOIN knowledge_items k ON k.id=e.knowledge_id
        JOIN knowledge_revisions r ON r.knowledge_id=e.knowledge_id AND r.revision=e.revision
      WHERE e.learner_id=? AND m.tombstoned_at IS NULL AND ${clause}`,
-    [owner, ...eligible, owner, owner, owner, ...eligible],
+    [owner, ...eligible, owner, ...eligible, owner, owner, owner, ...eligible],
     retrievalDocument,
   );
 }
@@ -73,13 +80,17 @@ export function lexicalRanking(
         ]);
       }
     });
-    return db
-      .all(
-        "SELECT id FROM temp.tutor_search_fts WHERE tutor_search_fts MATCH ? ORDER BY bm25(tutor_search_fts),id",
-        [expression],
-        z.object({ id: z.string() }),
-      )
-      .map((row) => row.id);
+    return [
+      ...new Set(
+        db
+          .all(
+            "SELECT id FROM temp.tutor_search_fts WHERE tutor_search_fts MATCH ? ORDER BY bm25(tutor_search_fts),id",
+            [expression],
+            z.object({ id: z.string() }),
+          )
+          .map((row) => row.id),
+      ),
+    ];
   } finally {
     db.raw.exec("DROP TABLE temp.tutor_search_fts");
   }
