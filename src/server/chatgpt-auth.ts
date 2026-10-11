@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { ChatGptApi, type ChatGptEndpoints } from "./chatgpt-api.js";
+import { callbackUri, issuedClientId, manualCallbackParams } from "./chatgpt-callback.js";
 import type { ProtectedTokenStore, StoredGrant } from "./chatgpt-token-store.js";
 import { OwnerMutationGate } from "./owner-mutation-gate.js";
 import { ApiError } from "./types.js";
@@ -27,6 +28,8 @@ export type ChatGptAuthConfig = ChatGptEndpoints & {
   readonly jwksUrl: string;
   readonly issuer: string;
   readonly apiBaseUrl: string;
+  readonly manualCallback?: boolean;
+  readonly manualOrigins?: readonly string[];
   readonly store: ProtectedTokenStore;
   readonly now?: () => number;
 };
@@ -80,19 +83,30 @@ export class ChatGptAuth {
     return { url: url.toString(), state };
   }
 
-  async complete(params: URLSearchParams): Promise<string> {
+  async complete(params: URLSearchParams, expectedOwner?: string): Promise<string> {
     const state = params.get("state") ?? "";
     const pending = this.pending.get(state);
-    if (pending === undefined || this.now() - pending.createdAt > 600_000)
+    if (pending === undefined || (expectedOwner !== undefined && pending.owner !== expectedOwner))
       throw new ApiError(401, "oauth_state_invalid", "Authorization state is invalid or expired");
+    if (this.now() - pending.createdAt > 600_000) {
+      this.pending.delete(state);
+      throw new ApiError(401, "oauth_state_invalid", "Authorization state is invalid or expired");
+    }
     this.pending.delete(state);
-    if (params.get("error") === "access_denied")
-      throw new ApiError(401, "oauth_access_denied", "ChatGPT authorization was denied");
+    const oauthError = params.get("error");
+    if (oauthError !== null)
+      throw new ApiError(
+        401,
+        oauthError === "access_denied" ? "oauth_access_denied" : "oauth_authorization_failed",
+        oauthError === "access_denied"
+          ? "ChatGPT authorization was denied"
+          : "ChatGPT authorization did not complete",
+      );
     const code = params.get("code");
     if (code === null)
       throw new ApiError(400, "oauth_code_missing", "Authorization code is missing");
     const suppliedClient = params.get("client_id");
-    const clientId = this.resolveClient(pending, suppliedClient);
+    const clientId = issuedClientId(pending.clientId, suppliedClient);
     const token = await this.api.exchangeCode({
       code,
       clientId,
@@ -138,10 +152,15 @@ export class ChatGptAuth {
   async status(owner: string): Promise<Readonly<Record<string, unknown>>> {
     const grant = await this.config.store.read(owner);
     return grant === null
-      ? { enabled: this.config.enabled, connected: false }
+      ? {
+          enabled: this.config.enabled,
+          connected: false,
+          manualCallback: this.config.manualCallback === true,
+        }
       : {
           enabled: this.config.enabled,
           connected: true,
+          manualCallback: this.config.manualCallback === true,
           subject: grant.subject,
           clientId: grant.clientId,
           selectedModel: grant.selectedModel,
@@ -172,6 +191,21 @@ export class ChatGptAuth {
     for (const [state, pending] of this.pending)
       if (pending.owner === owner) this.pending.delete(state);
     await this.mutations.run(owner, () => this.config.store.delete(owner));
+  }
+
+  async completeManual(owner: string, callbackUrl: string): Promise<void> {
+    this.requireEnabled();
+    if (this.config.manualCallback !== true)
+      throw new ApiError(404, "chatgpt_manual_disabled", "Manual callback mode is disabled");
+    await this.complete(manualCallbackParams(callbackUrl, this.redirectUri()), owner);
+  }
+
+  assertManualOrigin(origin: string | undefined): void {
+    this.requireEnabled();
+    if (this.config.manualCallback !== true)
+      throw new ApiError(404, "chatgpt_manual_disabled", "Manual callback mode is disabled");
+    if (origin === undefined || !(this.config.manualOrigins ?? []).includes(origin))
+      throw new ApiError(403, "chatgpt_manual_origin_denied", "This origin cannot relay callbacks");
   }
 
   async models(
@@ -230,24 +264,13 @@ export class ChatGptAuth {
     if (this.refreshes.get(owner) === refresh) this.refreshes.delete(owner);
   }
 
-  private resolveClient(pending: PendingAuthorization, supplied: string | null): string {
-    if (pending.clientId === DYNAMIC_CLIENT) {
-      if (supplied === null || supplied === DYNAMIC_CLIENT)
-        throw new ApiError(401, "oauth_client_mismatch", "Authorization omitted the issued client");
-      return supplied;
-    }
-    if (supplied !== null && supplied !== pending.clientId)
-      throw new ApiError(401, "oauth_client_mismatch", "Authorization client did not match");
-    return pending.clientId;
-  }
-
   private requireEnabled(): void {
     if (!this.config.enabled)
       throw new ApiError(404, "chatgpt_personal_disabled", "Personal ChatGPT mode is disabled");
   }
 
   private redirectUri(): string {
-    return `http://127.0.0.1:${this.config.callbackPort}/auth/callback`;
+    return callbackUri(this.config.callbackPort);
   }
 
   private now(): number {
