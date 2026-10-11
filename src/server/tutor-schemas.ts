@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { definitionScopeSchema, relationNecessitySchema } from "./knowledge-contracts.js";
-import { blockTypes } from "./knowledge-document-contracts.js";
+import { blockTypes, languageTagSchema } from "./knowledge-document-contracts.js";
 import type { threadOrigins } from "./thread-schemas.js";
 import type { LearnerId } from "./types.js";
 import { riskScopes } from "./types.js";
@@ -50,8 +50,8 @@ const relationTypes = [
 export const extractionSchema = z
   .object({
     goal: z.string().min(1).max(2_000),
-    sourceLanguage: z.string().min(2).max(35).default("en"),
-    responseLanguage: z.string().min(2).max(35).default("en"),
+    sourceLanguage: languageTagSchema.default("en"),
+    responseLanguage: languageTagSchema.default("en"),
     targets: z.array(candidateSchema).max(24),
     prerequisites: z.array(candidateSchema).max(24),
     terms: z.array(candidateSchema).max(24),

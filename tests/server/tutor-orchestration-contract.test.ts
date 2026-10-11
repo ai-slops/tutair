@@ -56,6 +56,24 @@ describe("tutor orchestration contracts", () => {
     expect(() => extractionSchema.parse({ ...base, prerequisites: [machine] })).not.toThrow();
   });
 
+  it("requires BCP 47 language tags at the extraction boundary", () => {
+    const base = extractionSchema.parse(
+      stageOutput({
+        stage: "extraction",
+        version: "v",
+        system: "",
+        data: {},
+        jsonSchema: {},
+      }),
+    );
+
+    expect(extractionSchema.safeParse({ ...base, responseLanguage: "한국어" }).success).toBe(false);
+    expect(extractionSchema.safeParse({ ...base, sourceLanguage: "English" }).success).toBe(false);
+    expect(
+      extractionSchema.safeParse({ ...base, sourceLanguage: "en", responseLanguage: "ko" }).success,
+    ).toBe(true);
+  });
+
   it("rejects oversized extraction candidate text and aggregate candidate counts", () => {
     const base = extractionSchema.parse(
       stageOutput({

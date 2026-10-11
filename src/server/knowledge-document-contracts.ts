@@ -13,7 +13,7 @@ export const blockTypes = [
   "procedure_step",
 ] as const;
 
-const languageTag = z
+export const languageTagSchema = z
   .string()
   .regex(/^(?:und|[a-z]{2,3}(?:-[A-Z][a-z]{3})?(?:-[A-Z]{2}|-[0-9]{3})?)$/);
 const blockInput = z.object({
@@ -26,7 +26,7 @@ const documentCreateObject = z.object({
   owner: z.string().uuid().nullable(),
   knowledgeRevisionId: z.string().uuid(),
   role: z.enum(documentRoles),
-  languageTag,
+  languageTag: languageTagSchema,
   baseDocumentId: z.string().uuid().optional(),
   supersedesDocumentId: z.string().uuid().optional(),
   sourceType: z.enum(["canonical_import", "learner_manual", "model_generated"]),
