@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import { preparationSchema } from "./document-answer-contracts.js";
+import type { blockTypes } from "./knowledge-document-contracts.js";
 import type { KnowledgeDocumentRepository } from "./knowledge-document-repository.js";
 import type { KnowledgeContext } from "./tutor-knowledge.js";
 import type { TutorStageRunner } from "./tutor-stage.js";
@@ -14,6 +15,10 @@ export type PreparedBlock = {
   readonly documentId: string;
   readonly topicRevisionIds: readonly string[];
 };
+type MaterialNeed = {
+  readonly knowledgeRevisionId: string;
+  readonly blockTypes: readonly (typeof blockTypes)[number][];
+};
 
 export class DocumentPreparationService {
   constructor(
@@ -24,6 +29,7 @@ export class DocumentPreparationService {
   async prepare(
     knowledge: readonly KnowledgeContext[],
     responseLanguage: string,
+    materialNeeds: readonly MaterialNeed[],
     context: Readonly<Record<string, unknown>>,
   ): Promise<{ readonly blocks: readonly PreparedBlock[]; readonly created: readonly string[] }> {
     if (knowledge.length === 0)
@@ -32,12 +38,21 @@ export class DocumentPreparationService {
         "unresolved_answer_topic",
         "No resolved knowledge revision is available for composition",
       );
-    const revisionIds = knowledge.map((item) => item.revisionId);
+    const knowledgeIds = new Set(knowledge.map((item) => item.revisionId));
+    const needs = materialNeeds.filter((need) => knowledgeIds.has(need.knowledgeRevisionId));
+    if (needs.length === 0)
+      throw new ApiError(422, "missing_material_plan", "Planning selected no answer material");
     const created: string[] = [];
     for (let materialCycle = 0; materialCycle <= 1; materialCycle += 1) {
-      const available = this.available(revisionIds, responseLanguage);
-      const missing = revisionIds.filter(
-        (id) => !available.some((block) => block.topicRevisionIds.includes(id)),
+      const available = this.available(needs, responseLanguage);
+      const missing = needs.filter(
+        (need) =>
+          !need.blockTypes.every((type) =>
+            available.some(
+              (block) =>
+                block.type === type && block.topicRevisionIds.includes(need.knowledgeRevisionId),
+            ),
+          ),
       );
       if (missing.length === 0) return { blocks: available, created };
       const prepared = await this.stages.stage({
@@ -47,12 +62,23 @@ export class DocumentPreparationService {
           ...context,
           responseLanguage,
           materialCycle,
-          missingKnowledgeRevisionIds: missing,
+          materialNeeds: missing,
+          missingKnowledgeRevisionIds: missing.map((need) => need.knowledgeRevisionId),
           existingBlocks: available,
-          knowledge: knowledge.filter((item) => missing.includes(item.revisionId)),
+          knowledge: knowledge.filter((item) =>
+            missing.some((need) => need.knowledgeRevisionId === item.revisionId),
+          ),
         },
       });
-      this.persist(prepared.runId, prepared.value, missing, responseLanguage, created);
+      this.documents.transaction(() =>
+        this.persist(
+          prepared.runId,
+          prepared.value,
+          missing.map((need) => need.knowledgeRevisionId),
+          responseLanguage,
+          created,
+        ),
+      );
     }
     throw new ApiError(
       422,
@@ -61,15 +87,26 @@ export class DocumentPreparationService {
     );
   }
 
-  private available(revisionIds: readonly string[], language: string): readonly PreparedBlock[] {
-    return revisionIds.flatMap((revisionId) => {
-      const documents = this.documents.forRevision(revisionId);
+  private available(needs: readonly MaterialNeed[], language: string): readonly PreparedBlock[] {
+    return needs.flatMap((need) => {
+      const documents = this.documents.forRevision(
+        this.stages.input.owner,
+        need.knowledgeRevisionId,
+      );
       const role = language === "en" ? "english_base" : "localization";
       const matches = documents.filter(
         (document) =>
           document.role === role && document.languageTag === language && !document.stale,
       );
-      const latest = matches.toSorted((left, right) => right.version - left.version)[0];
+      const latest = matches
+        .filter((document) =>
+          need.blockTypes.every((type) => document.blocks.some((block) => block.type === type)),
+        )
+        .toSorted(
+          (left, right) =>
+            Number(right.owner === null) - Number(left.owner === null) ||
+            right.version - left.version,
+        )[0];
       return latest === undefined
         ? []
         : latest.blocks.map((block) => ({
@@ -96,9 +133,25 @@ export class DocumentPreparationService {
           "Preparation returned an unknown revision",
         );
       const existingEnglish = this.documents
-        .forRevision(material.knowledgeRevisionId)
+        .forRevision(this.stages.input.owner, material.knowledgeRevisionId)
         .filter((document) => document.role === "english_base" && document.languageTag === "en")
-        .toSorted((left, right) => right.version - left.version)[0];
+        .toSorted(
+          (left, right) =>
+            Number(right.owner === null) - Number(left.owner === null) ||
+            right.version - left.version,
+        )[0];
+      const priorDefinition = existingEnglish?.blocks.find((block) => block.type === "definition");
+      const nextDefinition = material.englishBlocks.find((block) => block.type === "definition");
+      if (
+        priorDefinition !== undefined &&
+        nextDefinition !== undefined &&
+        priorDefinition.content !== nextDefinition.content
+      )
+        throw new ApiError(
+          422,
+          "automatic_definition_change",
+          "Preparation cannot change an existing concept definition",
+        );
       const english =
         material.englishBlocks.length === 0
           ? existingEnglish
@@ -137,7 +190,12 @@ export class DocumentPreparationService {
                 "invalid_preparation_source",
                 "Localized block source index is unavailable",
               );
-            return { type: block.type, content: block.content, sourceBlockId: source.id };
+            return {
+              type: block.type,
+              content: block.content,
+              sourceBlockId: source.id,
+              topicRevisionIds: source.topicRevisionIds,
+            };
           }),
         });
         created.push(localized.id);

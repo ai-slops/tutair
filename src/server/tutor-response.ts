@@ -28,6 +28,7 @@ export class TutorResponseService {
     const prepared = await new DocumentPreparationService(this.documents, this.stages).prepare(
       request.knowledge,
       request.responseLanguage,
+      request.plan.materialNeeds,
       boundModelContext({ ...request.common, plan: request.plan }),
     );
     const selected = await this.stages.stage({
@@ -97,6 +98,7 @@ export class TutorResponseService {
       knowledge: request.knowledge,
       lintSkipped: checked.value.lintSkipped,
       changes: [],
+      createdDocumentIds: prepared.created,
       runId: selected.runId,
     };
   }
