@@ -24,6 +24,7 @@ export const machine = {
   riskScope: "stable",
   confidence: 0.9,
   sourceSpans: [{ start: 0, end: 8 }],
+  classification: "knowledge_unit",
 } as const;
 
 export function stageOutput(call: StructuredCall): unknown {
@@ -56,7 +57,14 @@ export function stageOutput(call: StructuredCall): unknown {
         provisional: Array.isArray(call.data["candidates"])
           ? call.data["candidates"].flatMap((candidate) =>
               typeof candidate === "object" && candidate !== null
-                ? [{ ...candidate, reasonCodes: ["new"] }]
+                ? [
+                    {
+                      ...candidate,
+                      review: "create",
+                      independentlyValidated: true,
+                      reasonCodes: ["test_validated"],
+                    },
+                  ]
                 : [],
             )
           : [],
@@ -71,6 +79,14 @@ export function stageOutput(call: StructuredCall): unknown {
         introducedUnits: [],
         deferredUnits: [],
         deferredQuestions: [],
+        materialNeeds: z
+          .array(z.object({ revisionId: z.string() }))
+          .catch([])
+          .parse(call.data["knowledge"])
+          .map((item) => ({
+            knowledgeRevisionId: item.revisionId,
+            blockTypes: ["definition"] as const,
+          })),
         assessmentOpportunities: [
           {
             prompt: "Ask for the next transition",

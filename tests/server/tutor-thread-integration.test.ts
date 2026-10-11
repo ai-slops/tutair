@@ -20,6 +20,13 @@ describe("thread-aware tutor API", () => {
         targetUnits: ids.slice(0, 1),
         deferredUnits: ids.slice(1),
         deferredQuestions: ["Why is the machine finite?"],
+        materialNeeds: z
+          .array(z.object({ revisionId: z.string() }))
+          .parse(call.data["knowledge"])
+          .map((item) => ({
+            knowledgeRevisionId: item.revisionId,
+            blockTypes: ["definition"] as const,
+          })),
       };
     });
     const { client } = harness.setup(provider);

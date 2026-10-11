@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { z } from "zod";
 import { createApp } from "../../src/server/app.js";
 import type { StructuredCall, TutorProvider } from "../../src/server/provider.js";
 
@@ -53,6 +54,7 @@ const scriptedValue = (call: StructuredCall): unknown => {
     riskScope: "stable",
     confidence: 0.4,
     sourceSpans: [],
+    classification: "knowledge_unit",
   } as const;
   switch (call.stage) {
     case "extraction":
@@ -73,7 +75,16 @@ const scriptedValue = (call: StructuredCall): unknown => {
         matches: [],
         provisional: Array.isArray(call.data["candidates"])
           ? call.data["candidates"].flatMap((item) =>
-              typeof item === "object" && item !== null ? [{ ...item, reasonCodes: ["new"] }] : [],
+              typeof item === "object" && item !== null
+                ? [
+                    {
+                      ...item,
+                      review: "create",
+                      independentlyValidated: true,
+                      reasonCodes: ["test_validated"],
+                    },
+                  ]
+                : [],
             )
           : [],
       };
@@ -87,6 +98,14 @@ const scriptedValue = (call: StructuredCall): unknown => {
         introducedUnits: [],
         deferredUnits: [],
         deferredQuestions: [],
+        materialNeeds: z
+          .array(z.object({ revisionId: z.string() }))
+          .catch([])
+          .parse(call.data["knowledge"])
+          .map((item) => ({
+            knowledgeRevisionId: item.revisionId,
+            blockTypes: ["definition", "example"] as const,
+          })),
         assessmentOpportunities: [],
         responseStrategy: "probe",
         interruptionJustified: false,
@@ -101,7 +120,10 @@ const scriptedValue = (call: StructuredCall): unknown => {
                 ? [
                     {
                       knowledgeRevisionId,
-                      englishBlocks: [{ type: "example", content: "Which example would test it?" }],
+                      englishBlocks: [
+                        { type: "definition", content: "Tentative claim" },
+                        { type: "example", content: "Which example would test it?" },
+                      ],
                       localizedBlocks: [],
                     },
                   ]
