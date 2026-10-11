@@ -35,6 +35,9 @@ export function App() {
       typeof window !== "undefined" &&
       new URL(window.location.href).searchParams.get("view") === "knowledge",
   );
+  const initialManagerSelection =
+    typeof window === "undefined" ? null : new URL(window.location.href).searchParams;
+  const initialRevision = Number(initialManagerSelection?.get("revision"));
   useEffect(
     () => () => {
       if (typeof window === "undefined") return;
@@ -88,6 +91,10 @@ export function App() {
       <KnowledgeManager
         items={workspace.snapshot.knowledge}
         error={workspace.error}
+        initialSelectedId={initialManagerSelection?.get("knowledge") ?? null}
+        initialRevision={
+          Number.isInteger(initialRevision) && initialRevision > 0 ? initialRevision : null
+        }
         onBack={() => setManagerView(false)}
         onReview={workspace.review}
         onCorrect={(item) => {
@@ -211,6 +218,12 @@ export function App() {
           }}
           onKnowledge={() => setKnowledgeOpen(true)}
           onInspectGeneration={generation.open}
+          onLoadProvenance={(requestId) => {
+            const conversationId = workspace.snapshot.activeConversationId;
+            if (conversationId === null)
+              return Promise.reject(new Error("Conversation provenance is unavailable"));
+            return api.answerProvenance({ conversationId, requestId });
+          }}
           recovery={
             workspace.snapshot.recovery === null ? null : (
               <RecoveryNotice

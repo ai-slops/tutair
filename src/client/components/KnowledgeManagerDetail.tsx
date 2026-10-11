@@ -7,6 +7,7 @@ type DetailProps = {
   readonly onReviewed: () => void;
   readonly onAction: (action: Exclude<ReviewAction, "reviewed">) => void;
   readonly onCorrect: () => void;
+  readonly selectedRevision: number | null;
 };
 
 const actionLabel = (action: KnowledgeItem["reviewHistory"][number]["action"]): string => {
@@ -116,7 +117,10 @@ export function KnowledgeManagerDetail(props: DetailProps) {
         </h3>
         <div className="manager-history">
           {item.revisions.toReversed().map((revision) => (
-            <details key={revision.id} open={revision.revision === item.revision}>
+            <details
+              key={revision.id}
+              open={revision.revision === (props.selectedRevision ?? item.revision)}
+            >
               <summary>
                 <span>Revision {revision.revision}</span> · {revision.sourceType}
               </summary>

@@ -7,6 +7,8 @@ import { KnowledgeReviewDialog } from "./KnowledgeReviewDialog";
 type KnowledgeManagerProps = {
   readonly items: readonly KnowledgeItem[];
   readonly error: string | null;
+  readonly initialSelectedId?: string | null;
+  readonly initialRevision?: number | null;
   readonly onBack: () => void;
   readonly onReview: (
     itemId: string,
@@ -25,7 +27,9 @@ export function KnowledgeManager(props: KnowledgeManagerProps) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [scope, setScope] = useState<ScopeFilter>("all");
-  const [selectedId, setSelectedId] = useState<string | null>(props.items[0]?.id ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    props.initialSelectedId ?? props.items[0]?.id ?? null,
+  );
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [reviewing, setReviewing] = useState<ReviewAction | null>(null);
   const [inlineReviewFailed, setInlineReviewFailed] = useState(false);
@@ -192,6 +196,9 @@ export function KnowledgeManager(props: KnowledgeManagerProps) {
                 setPendingAction(action);
               }}
               onCorrect={() => props.onCorrect(selected)}
+              selectedRevision={
+                selected.id === props.initialSelectedId ? (props.initialRevision ?? null) : null
+              }
             />
           )}
         </main>
