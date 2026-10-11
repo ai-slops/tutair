@@ -1,4 +1,9 @@
 import type {
+  GenerationPipeline,
+  GenerationRunDetail,
+  GenerationTarget,
+} from "./generation-contract";
+import type {
   ConversationSummary,
   LearningThread,
   LearningThreadDetail,
@@ -36,9 +41,16 @@ export interface WorkspaceApi {
   createLearningThread(input: LearningThreadInput): Promise<WorkspaceSnapshot>;
   openConversation(conversationId: string): Promise<WorkspaceSnapshot>;
   openSearchThread(threadId: string): Promise<WorkspaceSnapshot>;
-  sendMessage(conversationId: string | null, content: string): Promise<WorkspaceSnapshot>;
-  resolveTurn(choice: RecoveryChoice): Promise<WorkspaceSnapshot>;
-  retryTurn(): Promise<WorkspaceSnapshot>;
+  sendMessage(
+    conversationId: string | null,
+    content: string,
+    onStarted?: (target: GenerationTarget) => void,
+  ): Promise<WorkspaceSnapshot>;
+  resolveTurn(
+    choice: RecoveryChoice,
+    onStarted?: (target: GenerationTarget) => void,
+  ): Promise<WorkspaceSnapshot>;
+  retryTurn(onStarted?: (target: GenerationTarget) => void): Promise<WorkspaceSnapshot>;
   updateLearningThread(threadId: string, input: LearningThreadInput): Promise<WorkspaceSnapshot>;
   setThreadStatus(threadId: string, status: LearningThreadStatus): Promise<WorkspaceSnapshot>;
   addQuestion(threadId: string, text: string): Promise<WorkspaceSnapshot>;
@@ -67,6 +79,12 @@ export interface WorkspaceApi {
   completeChatGptManual(callbackUrl: string): Promise<WorkspaceSnapshot>;
   disconnectChatGpt(): Promise<WorkspaceSnapshot>;
   search(query: string): Promise<SearchResponse>;
+  generationPipeline(target: GenerationTarget, signal: AbortSignal): Promise<GenerationPipeline>;
+  generationRun(
+    target: GenerationTarget,
+    runId: string,
+    signal: AbortSignal,
+  ): Promise<GenerationRunDetail>;
   exportUrl(): string;
 }
 

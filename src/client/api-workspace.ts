@@ -152,6 +152,11 @@ export class WorkspaceClient {
           : [],
       ) ?? [],
     );
+    const requestByTutorMessage = new Map(
+      detail?.turnOutcomes.flatMap((turn) =>
+        turn.tutorMessageId === null ? [] : [[turn.tutorMessageId, turn.requestId] as const],
+      ) ?? [],
+    );
     const chatgptModels = capabilities.chatgpt.connected
       ? await request(() => this.http.get("chatgpt/models").json(), ChatGptModelsSchema)
       : { models: [] };
@@ -165,9 +170,11 @@ export class WorkspaceClient {
       messages:
         detail?.messages.map((record) => {
           const tracking = trackingByMessage.get(record.id);
+          const generationRequestId = requestByTutorMessage.get(record.id);
           return {
             ...mapMessage(record),
             ...(tracking === undefined ? {} : { tracking }),
+            ...(generationRequestId === undefined ? {} : { generationRequestId }),
           };
         }) ?? [],
       knowledge,

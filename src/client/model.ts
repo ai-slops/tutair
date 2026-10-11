@@ -25,6 +25,7 @@ export type Message = {
   readonly createdAt: string;
   readonly status: "complete" | "sending" | "failed";
   readonly tracking?: TrackingStatus;
+  readonly generationRequestId?: string;
 };
 
 export type Evidence = {
