@@ -36,6 +36,9 @@ describe("Responses tutor provider", () => {
     expect(authorization).toBe("Bearer learner-token");
     expect(body).toMatchObject({ model: "gpt-fixture", stream: true, store: false });
     expect(body).toMatchObject({
+      input: [{ role: "user", content: JSON.stringify({ message: "data" }) }],
+    });
+    expect(body).toMatchObject({
       text: {
         format: {
           schema: {
@@ -121,6 +124,28 @@ describe("Responses tutor provider", () => {
       status: 429,
       code: "subscription_sharing_usage_limit_exceeded",
       details: { requestId: "req_fixture" },
+    });
+  });
+
+  it("preserves sanitized direct-admission diagnostics and request IDs", async () => {
+    // Given
+    const baseUrl = await fixture((_request, response) => {
+      response.writeHead(400, {
+        "content-type": "application/json",
+        "x-request-id": "req_admission_fixture",
+      });
+      response.end(JSON.stringify({ detail: "Input must be an array" }));
+    });
+
+    // When
+    const request = providerFor(baseUrl).call(call(), "learner-1");
+
+    // Then
+    await expect(request).rejects.toMatchObject({
+      status: 400,
+      code: "provider_http_error",
+      message: "Input must be an array",
+      details: { requestId: "req_admission_fixture" },
     });
   });
 
