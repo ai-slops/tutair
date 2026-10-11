@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Database } from "./database.js";
 import { type DocumentCreate, documentCreateSchema } from "./knowledge-document-contracts.js";
 import { migrateLegacyDocuments } from "./knowledge-document-migration.js";
+import { KnowledgeDocumentValidator } from "./knowledge-document-validator.js";
 import type { LearnerId } from "./types.js";
 import { ApiError, isoNow, newId } from "./types.js";
 
@@ -32,7 +33,11 @@ const blockRow = z.object({
 const idRow = z.object({ id: z.string() });
 
 export class KnowledgeDocumentRepository {
-  constructor(private readonly db: Database) {}
+  private readonly validator: KnowledgeDocumentValidator;
+
+  constructor(private readonly db: Database) {
+    this.validator = new KnowledgeDocumentValidator(db);
+  }
 
   migrateLegacy(): void {
     migrateLegacyDocuments(this.db.raw);
@@ -44,10 +49,10 @@ export class KnowledgeDocumentRepository {
 
   create(raw: DocumentCreate) {
     const input = documentCreateSchema.parse(raw);
-    this.assertRevision(input);
+    this.validator.assertRevision(input);
     const base = input.baseDocumentId === undefined ? null : this.document(input.baseDocumentId);
-    this.assertBase(input, base);
-    this.assertSupersedes(input);
+    this.validator.assertBase(input, base);
+    this.validator.assertSupersedes(input);
     const version = this.nextVersion(input);
     const id = newId();
     this.db.transaction(() => {
@@ -66,7 +71,7 @@ export class KnowledgeDocumentRepository {
         isoNow(),
       ]);
       input.blocks.forEach((block, position) => {
-        this.assertSourceBlock(input, base, block.sourceBlockId);
+        this.validator.assertSourceBlock(input, base?.id ?? null, block.sourceBlockId);
         const blockId = newId();
         this.db.run("INSERT INTO knowledge_document_blocks VALUES(?,?,?,?,?,?,?)", [
           blockId,
@@ -79,7 +84,7 @@ export class KnowledgeDocumentRepository {
         ]);
         const topics = block.topicRevisionIds ?? [input.knowledgeRevisionId];
         for (const topic of new Set(topics)) {
-          this.assertTopic(input, topic);
+          this.validator.assertTopic(input, topic);
           this.db.run("INSERT INTO knowledge_document_block_topics VALUES(?,?)", [blockId, topic]);
         }
       });
@@ -164,117 +169,6 @@ export class KnowledgeDocumentRepository {
     return row;
   }
 
-  private assertRevision(input: DocumentCreate): void {
-    const row = this.db.one(
-      `SELECT r.id,k.learner_id FROM knowledge_revisions r JOIN knowledge_items k ON k.id=r.knowledge_id WHERE r.id=?`,
-      [input.knowledgeRevisionId],
-      z.object({ id: z.string(), learner_id: z.string().nullable() }),
-    );
-    if (row === null || (row.learner_id !== null && row.learner_id !== input.owner))
-      throw new ApiError(
-        422,
-        "invalid_document_owner",
-        "Document owner cannot access this revision",
-      );
-    if (row.learner_id === null && input.sourceType === "model_generated" && input.owner === null)
-      throw new ApiError(
-        422,
-        "shared_generated_document",
-        "Generated canonical expressions must be learner-private",
-      );
-  }
-
-  private assertBase(input: DocumentCreate, base: z.infer<typeof documentRow> | null): void {
-    if (base === null) return;
-    if (
-      base.role !== "english_base" ||
-      base.language_tag !== "en" ||
-      base.knowledge_revision_id !== input.knowledgeRevisionId ||
-      !(
-        base.owner_learner_id === input.owner ||
-        (base.owner_learner_id === null && this.sharedRevision(input.knowledgeRevisionId))
-      )
-    )
-      throw new ApiError(
-        422,
-        "invalid_localization_base",
-        "Localization base must be matching English document",
-      );
-  }
-
-  private assertSupersedes(input: DocumentCreate): void {
-    if (input.supersedesDocumentId === undefined) return;
-    const prior = this.document(input.supersedesDocumentId);
-    if (
-      prior.owner_learner_id !== input.owner ||
-      prior.knowledge_revision_id !== input.knowledgeRevisionId ||
-      prior.role !== input.role ||
-      prior.language_tag !== input.languageTag
-    )
-      throw new ApiError(
-        422,
-        "invalid_document_predecessor",
-        "Superseded document must have the same identity",
-      );
-  }
-
-  private assertSourceBlock(
-    input: DocumentCreate,
-    base: z.infer<typeof documentRow> | null,
-    sourceBlockId?: string,
-  ): void {
-    if (input.role !== "localization") return;
-    const source =
-      sourceBlockId === undefined
-        ? null
-        : this.db.one(
-            "SELECT id,block_type FROM knowledge_document_blocks WHERE id=? AND document_id=?",
-            [sourceBlockId, base?.id ?? ""],
-            z.object({ id: z.string(), block_type: z.string() }),
-          );
-    if (source === null)
-      throw new ApiError(
-        422,
-        "invalid_source_block",
-        "Localized block must link to its exact source block",
-      );
-    const localized = input.blocks.find((block) => block.sourceBlockId === sourceBlockId);
-    if (localized === undefined || source.block_type !== localized.type)
-      throw new ApiError(
-        422,
-        "localized_block_type_mismatch",
-        "Localized block type must match its English source block",
-      );
-    const sourceTopics = this.db
-      .all(
-        "SELECT knowledge_revision_id AS id FROM knowledge_document_block_topics WHERE block_id=? ORDER BY knowledge_revision_id",
-        [source.id],
-        idRow,
-      )
-      .map((topic) => topic.id);
-    const localizedTopics = [...(localized.topicRevisionIds ?? [input.knowledgeRevisionId])].sort();
-    if (JSON.stringify(sourceTopics) !== JSON.stringify(localizedTopics))
-      throw new ApiError(
-        422,
-        "localized_block_topic_mismatch",
-        "Localized block topics must match its English source block",
-      );
-  }
-
-  private assertTopic(input: DocumentCreate, topic: string): void {
-    const row = this.db.one(
-      `SELECT r.id,k.learner_id FROM knowledge_revisions r JOIN knowledge_items k ON k.id=r.knowledge_id WHERE r.id=?`,
-      [topic],
-      z.object({ id: z.string(), learner_id: z.string().nullable() }),
-    );
-    if (row === null || (row.learner_id !== null && row.learner_id !== input.owner))
-      throw new ApiError(
-        422,
-        "invalid_block_topic",
-        "Block topic is not an accessible knowledge revision",
-      );
-  }
-
   private nextVersion(input: DocumentCreate): number {
     const row = this.db.one(
       `SELECT COALESCE(MAX(version),0) AS version FROM knowledge_documents
@@ -283,16 +177,5 @@ export class KnowledgeDocumentRepository {
       z.object({ version: z.number() }),
     );
     return (row?.version ?? 0) + 1;
-  }
-
-  private sharedRevision(revisionId: string): boolean {
-    return (
-      this.db.one(
-        `SELECT r.id FROM knowledge_revisions r JOIN knowledge_items k ON k.id=r.knowledge_id
-         WHERE r.id=? AND k.learner_id IS NULL`,
-        [revisionId],
-        idRow,
-      ) !== null
-    );
   }
 }
