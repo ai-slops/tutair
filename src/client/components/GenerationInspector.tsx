@@ -1,5 +1,5 @@
 import { AlertCircle, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   GenerationPipeline,
   GenerationRunDetail,
@@ -31,26 +31,38 @@ export function GenerationInspector(props: GenerationInspectorProps) {
     setLoadingRunId(null);
   }, [props.open]);
 
-  const inspect = async (runId: string): Promise<void> => {
+  const loadDetail = useCallback(
+    async (runId: string): Promise<void> => {
+      controllerRef.current?.abort();
+      const controller = new AbortController();
+      controllerRef.current = controller;
+      setLoadingRunId(runId);
+      setDetailError(null);
+      try {
+        setDetail(await props.loadRun(runId, controller.signal));
+      } catch (cause) {
+        if (controller.signal.aborted) return;
+        if (!(cause instanceof Error)) throw cause;
+        setDetailError(cause.message);
+      } finally {
+        if (!controller.signal.aborted) setLoadingRunId(null);
+      }
+    },
+    [props.loadRun],
+  );
+  const inspect = (runId: string): void => {
     if (detail?.runId === runId) {
       setDetail(null);
       return;
     }
-    controllerRef.current?.abort();
-    const controller = new AbortController();
-    controllerRef.current = controller;
-    setLoadingRunId(runId);
-    setDetailError(null);
-    try {
-      setDetail(await props.loadRun(runId, controller.signal));
-    } catch (cause) {
-      if (controller.signal.aborted) return;
-      if (!(cause instanceof Error)) throw cause;
-      setDetailError(cause.message);
-    } finally {
-      if (!controller.signal.aborted) setLoadingRunId(null);
-    }
+    void loadDetail(runId);
   };
+  useEffect(() => {
+    if (!props.open || detail?.status !== "running") return;
+    const recordedStage = props.pipeline?.stages.find((stage) => stage.runId === detail.runId);
+    if (recordedStage === undefined || recordedStage.status === "running") return;
+    void loadDetail(detail.runId);
+  }, [detail?.runId, detail?.status, loadDetail, props.open, props.pipeline?.stages]);
 
   if (!props.open) return null;
   const totals = knownTotals(props.pipeline?.stages ?? []);
@@ -110,10 +122,7 @@ export function GenerationInspector(props: GenerationInspectorProps) {
                   </span>
                 </div>
               )}
-              <GenerationTimeline
-                stages={props.pipeline.stages}
-                onStage={(runId) => void inspect(runId)}
-              />
+              <GenerationTimeline stages={props.pipeline.stages} onStage={inspect} />
               {loadingRunId === null ? null : <p className="muted">Loading recorded call…</p>}
               {detailError === null ? null : (
                 <p className="notice notice-error" role="alert">
@@ -160,6 +169,22 @@ function RunDetail({ detail }: { readonly detail: GenerationRunDetail }) {
           <dd>{detail.outputMode ?? "Unknown"}</dd>
         </div>
         <div>
+          <dt>Duration</dt>
+          <dd>{detail.durationMs === null ? "Unknown" : `${detail.durationMs} ms`}</dd>
+        </div>
+        <div>
+          <dt>Usage</dt>
+          <dd>{formatUsage(detail.usage)}</dd>
+        </div>
+        <div>
+          <dt>Error</dt>
+          <dd>{detail.errorCode ?? "None recorded"}</dd>
+        </div>
+        <div>
+          <dt>Fallback</dt>
+          <dd>{detail.fallbackStatus ?? "Unknown"}</dd>
+        </div>
+        <div>
           <dt>Stage / prompt / schema</dt>
           <dd>
             {detail.versions.stage} / {detail.versions.prompt} / {detail.versions.schema}
@@ -183,6 +208,11 @@ function RunDetail({ detail }: { readonly detail: GenerationRunDetail }) {
       <DiagnosticBlock title="Decision traces" value={detail.traces} />
     </section>
   );
+}
+
+function formatUsage(usage: GenerationRunDetail["usage"]): string {
+  if (usage === null) return "Unknown";
+  return `${usage.inputTokens} input / ${usage.outputTokens} output / ${usage.totalTokens} total`;
 }
 
 function DiagnosticBlock({ title, value }: { readonly title: string; readonly value: unknown }) {
