@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { z } from "zod";
 import { createApp } from "../../src/server/app.js";
 import { ChatGptAuth } from "../../src/server/chatgpt-auth.js";
 import { ProtectedTokenStore } from "../../src/server/chatgpt-token-store.js";
@@ -190,9 +191,10 @@ describe("remote manual ChatGPT callback relay", () => {
       method: "POST",
       headers: { cookie, origin: EXTERNAL_ORIGIN },
     });
-    expect(response.status).toBe(302);
-    const authorizationUrl = response.headers.get("location");
-    if (authorizationUrl === null) throw new Error("Manual initiation omitted authorization URL");
+    expect(response.status).toBe(200);
+    const { authorizationUrl } = z
+      .object({ authorizationUrl: z.url() })
+      .parse(await response.json());
     const authorized = await fetch(authorizationUrl, { redirect: "manual" });
     const callbackUrl = authorized.headers.get("location");
     if (callbackUrl === null) throw new Error("OAuth fixture omitted callback URL");

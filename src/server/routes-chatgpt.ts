@@ -19,7 +19,7 @@ export const chatGptRoutes = (services: Services): Hono => {
     const auth = requiredAuth(services);
     auth.assertManualOrigin(c.req.header("origin"));
     const started = await auth.begin(ownerFor(c, services));
-    return c.redirect(started.url, 302);
+    return c.json({ authorizationUrl: started.url });
   });
   app.post("/chatgpt/manual/callback", async (c) => {
     const auth = requiredAuth(services);
