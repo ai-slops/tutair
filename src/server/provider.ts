@@ -11,6 +11,7 @@ export const stages = [
   "extraction",
   "resolution",
   "planning",
+  "preparation",
   "draft",
   "lint",
   "final",

@@ -243,12 +243,14 @@ export class ModelRunner {
         return `${common} Resolve every original candidate key against supplied exact revision candidates. Copy supplied UUIDs and revisions exactly; never invent them. Reuse compatible canonical knowledge first. Uncertain matches stay provisional. Do not rewrite original candidates.`;
       case "planning":
         return `${common} Choose a current-goal-first scaffold, not a mastery gate.`;
+      case "preparation":
+        return `${common} Prepare reusable learner-facing explanation blocks for only the offered exact revisions. English source blocks come first. When responseLanguage is not en, localized blocks must map by sourceEnglishIndex to those exact English blocks. Keep each block standalone and factual; do not include personal transcript details or invented references. Return complete snapshots, at most 24 blocks and 20000 characters total.`;
       case "draft":
         return `${common} Answer the current question first with a concise explanation and concrete example. Scaffold important unknown prerequisites inline. Do not force a quiz or prerequisite course before answering.`;
       case "lint":
         return `${common} Inspect actual draft concepts against supplied knowledge and learner states. Reuse known IDs and aliases. Generate a new candidate only for an important concept truly absent from supplied knowledge; do not repeat the whole micrograph. Choose inline scaffolding over unnecessary diagnosis. Flag unsafe certainty or high-stakes overclaiming.`;
       case "final":
-        return `${common} Produce the final answer using the draft and lint. Each exposure must use an allowedKnowledgeId and a sourceQuote copied verbatim from your final text: one unique complete explanatory phrase or sentence. Set sourceSpan to null when using sourceQuote; the server computes offsets. Omit an exposure if uncertain. No learner mastery follows from this explanation.`;
+        return `${common} Select and order only supplied block IDs. Return no prose fields. Layout is structural only: heading, paragraph, or bullet. Every factual heading and transition must be a selected block.`;
       case "evaluation":
         return `${common} Identify evidence only for supplied knowledge/revision IDs. A request for explanation is not evidence; return an empty evidence array when nothing was demonstrated. Do not invent assessment/thread IDs: use null unless supplied. Self-report is weak. For evidence spanning the full learner answer use start=0 and end=messageUtf16Length. Tutor exposure is not learner evidence.`;
     }
