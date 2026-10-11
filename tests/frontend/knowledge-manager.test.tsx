@@ -52,6 +52,46 @@ const state = vi.hoisted(() => ({
             },
           ],
           reviewHistory: [],
+          documents: [
+            {
+              id: "document-en-1",
+              role: "english_base",
+              languageTag: "en",
+              version: 2,
+              sourceType: "canonical_import",
+              sourceRefs: ["reference-v2"],
+              createdAt: "2026-10-02T00:00:00.000Z",
+              stale: false,
+              blocks: [
+                {
+                  id: "block-en-1",
+                  type: "definition",
+                  content: "A model with finite states and transition rules.",
+                  contentHash: "1234567890abcdef",
+                  sourceBlockId: null,
+                },
+              ],
+            },
+            {
+              id: "document-ko-1",
+              role: "localization",
+              languageTag: "ko",
+              version: 1,
+              sourceType: "model_generated",
+              sourceRefs: [],
+              createdAt: "2026-10-02T00:01:00.000Z",
+              stale: true,
+              blocks: [
+                {
+                  id: "block-ko-1",
+                  type: "definition",
+                  content: "유한한 상태와 전이 규칙을 가진 모델입니다.",
+                  contentHash: "abcdef1234567890",
+                  sourceBlockId: "block-en-1",
+                },
+              ],
+            },
+          ],
         },
         {
           id: "knowledge-2",
@@ -142,7 +182,7 @@ describe("knowledge manager", () => {
 
     // Then
     expect(screen.getByRole("heading", { name: "Knowledge manager" })).toBeTruthy();
-    expect(screen.getByText("유한한 상태와 전이 규칙을 가진 모델입니다.")).toBeTruthy();
+    expect(screen.getAllByText("유한한 상태와 전이 규칙을 가진 모델입니다.")).toHaveLength(2);
     expect(screen.getByText("reference-v2")).toBeTruthy();
     expect(screen.getByText("Revision 1")).toBeTruthy();
     await user.type(screen.getByRole("searchbox", { name: "Search knowledge" }), "graph");
@@ -168,6 +208,20 @@ describe("knowledge manager", () => {
     expect(screen.getByRole("alert").textContent).toContain("could not be saved");
     expect(action.disabled).toBe(false);
     expect(screen.getByRole("heading", { name: "상태 기계" })).toBeTruthy();
+  });
+
+  it("inspects immutable English and localized document versions", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: "Manage knowledge" }));
+
+    expect(screen.getByRole("heading", { name: "Learner-facing documents" })).toBeTruthy();
+    expect(screen.getByText("2 immutable")).toBeTruthy();
+    expect(screen.getByText("English source")).toBeTruthy();
+    expect(screen.getByText("Localization")).toBeTruthy();
+    expect(screen.getByText(/localization is stale/i)).toBeTruthy();
+    expect(screen.getByText("A model with finite states and transition rules.")).toBeTruthy();
+    expect(screen.getByText("hash 1234567890ab")).toBeTruthy();
   });
 
   it("explains unreviewed eligibility and opens revise correction for the selected unit", async () => {

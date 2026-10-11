@@ -1,5 +1,6 @@
 import { Archive, Check, CircleX, History, PencilLine, RotateCcw } from "lucide-react";
 import type { KnowledgeItem, ReviewAction } from "../model";
+import { KnowledgeDocumentHistory } from "./KnowledgeDocumentHistory";
 
 type DetailProps = {
   readonly item: KnowledgeItem;
@@ -111,6 +112,7 @@ export function KnowledgeManagerDetail(props: DetailProps) {
           </ul>
         )}
       </section>
+      <KnowledgeDocumentHistory documents={item.documents ?? []} />
       <section className="manager-reader-section">
         <h3>
           <History className="icon" aria-hidden="true" /> Revision history
