@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { Database } from "./database.js";
+import { DebugSettingsStore } from "./debug-settings-store.js";
 import {
   MODEL_CONTEXT_VERSION,
   modelContextSnapshot,
@@ -56,6 +57,9 @@ export class ModelRunner {
     const schemaVersion = STAGE_SCHEMA_VERSIONS[stage];
     const traceId = typeof data["traceId"] === "string" ? data["traceId"] : null;
     const repairOfRunId = typeof data["repairOfRunId"] === "string" ? data["repairOfRunId"] : null;
+    const reasoningSummaryEnabled = new DebugSettingsStore(this.db).get(
+      owner,
+    ).saveProviderReasoningSummaries;
     this.db.run("INSERT INTO model_runs VALUES(?,?,?,?,?,?,?,?,?,?,?)", [
       runId,
       owner,
@@ -81,14 +85,18 @@ export class ModelRunner {
       null,
       null,
     ]);
-    this.db.run("INSERT INTO model_run_inspection VALUES(?,?,?,?,?,?)", [
-      runId,
-      traceId,
-      repairOfRunId,
-      repairOfRunId === null ? 1 : 2,
-      this.provider.state.outputMode ?? null,
-      null,
-    ]);
+    this.db.run(
+      "INSERT INTO model_run_inspection(run_id,trace_id,repair_of_run_id,attempt,output_mode,finished_at,reasoning_summary_enabled) VALUES(?,?,?,?,?,?,?)",
+      [
+        runId,
+        traceId,
+        repairOfRunId,
+        repairOfRunId === null ? 1 : 2,
+        this.provider.state.outputMode ?? null,
+        null,
+        reasoningSummaryEnabled ? 1 : 0,
+      ],
+    );
     try {
       const jsonSchema = z
         .record(z.string(), z.unknown())
@@ -99,6 +107,7 @@ export class ModelRunner {
         system: this.instruction(stage),
         data: boundedData,
         jsonSchema,
+        reasoningSummaryEnabled,
       } satisfies Parameters<TutorProvider["call"]>[0];
       const snapshot = modelContextSnapshot(call);
       this.db.run("INSERT INTO model_run_contexts VALUES(?,?,?,?,?,?)", [
@@ -121,9 +130,22 @@ export class ModelRunner {
             })
             .nullable(),
           resolvedModel: z.string().optional(),
+          reasoningSummary: z
+            .discriminatedUnion("state", [
+              z.object({ state: z.literal("disabled") }),
+              z.object({ state: z.literal("unavailable") }),
+              z.object({ state: z.literal("available"), text: z.string().min(1).max(10_000) }),
+            ])
+            .optional(),
         })
         .safeParse(raw);
       const output = result.success ? result.data.value : raw;
+      const reasoningSummary = result.success ? result.data.reasoningSummary : undefined;
+      if (reasoningSummaryEnabled && reasoningSummary?.state === "available")
+        this.db.run(
+          "INSERT INTO model_run_reasoning_summaries(run_id,summary_text,created_at) VALUES(?,?,?)",
+          [runId, reasoningSummary.text, isoNow()],
+        );
       const parsed = schema.safeParse(output);
       if (!parsed.success) {
         this.db.run(

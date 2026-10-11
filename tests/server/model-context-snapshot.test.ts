@@ -76,6 +76,7 @@ it.each(["success", "failure"] as const)(
           system: z.string(),
           data: z.record(z.string(), z.unknown()),
           jsonSchema: z.record(z.string(), z.unknown()),
+          reasoningSummaryEnabled: z.boolean(),
         })
         .parse(JSON.parse(row?.context_json ?? "null"));
       expect(snapshot).toEqual(dispatched);
