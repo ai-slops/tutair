@@ -175,6 +175,24 @@ redacted for credentials and tokens; hidden chain-of-thought is never requested
 or exposed. See the [backend API](docs/backend-api.md#generation-pipeline-inspection)
 for the normative contract.
 
+Every tutor reply also keeps a visible **Sources & knowledge** disclosure. It
+loads lazily and separates immutable revisions actually provided to model calls,
+revisions created during the answer, and revisions named by verified answer
+exposures. Exposure annotations are explicitly non-exhaustive. Links select the
+exact historical revision in Knowledge manager, even after a newer revision
+becomes current. Older answers without exact run snapshots say provenance is
+unavailable rather than inferring it from current knowledge or search results.
+
+In **Settings → Session & model → Private debugging**, each learner can opt in to
+**Save provider reasoning summaries for debugging**. It is off by default and
+applies only to new Responses API model runs. When enabled, Tutair requests the
+official `reasoning.summary: "auto"` output and privately stores only a public
+provider summary returned with the completed response. Raw reasoning tokens,
+encrypted reasoning content, and hidden chain-of-thought are never requested or
+stored. Chat Completions modes receive no unsupported parameter. An enabled model
+that returns no summary is shown as unavailable without an automatic retry;
+previously retained summaries remain private until learning data is erased.
+
 ### Knowledge review lifecycle
 
 Open **Knowledge** in the workspace header to browse definitions, provenance,

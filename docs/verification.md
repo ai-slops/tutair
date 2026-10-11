@@ -378,3 +378,30 @@ database path, ChatGPT credential store location, callback settings, and exact
 manual-origin allowlist. Baseline PID 8 remained running. Local and public health
 both returned `{ "status": "ok" }` at
 `https://tutair--3.remote-main-3.mj-y.com/api/health`.
+
+## Answer provenance and private reasoning summaries: October 11, 2026
+
+Added a lazy per-answer disclosure that separates immutable revisions provided to
+recorded model calls, revisions created during the turn, and non-exhaustive
+verified answer exposures. Historical links open the exact revision rather than
+the current definition. Old turns without exact call snapshots explicitly report
+that provenance is unavailable.
+
+The owner-scoped private-debug setting is off by default. A model run snapshots
+the setting before dispatch; enabled Responses calls request the official public
+`reasoning.summary` output. Only typed summary text from a completed response is
+stored. Chat Completions modes receive no unsupported parameter, and raw or
+encrypted reasoning content is never requested, parsed, logged, or exposed.
+
+Final verification passed with **308 tests passed, one opt-in local-embedding test
+skipped, and 73 test files passed**. Strict type checking, Biome, server
+compilation, and the production Vite build passed. The full production-browser
+suite passed **14/14 scenarios**, including the new opt-in setting, public summary
+display, exact revision navigation, and fresh provenance captures at 375, 768,
+and 1280 pixels. No external model call was made.
+
+The isolated port-1455 process was rebuilt and restarted without changing its
+database path, callback settings, credential-store environment, or origin
+allowlist. Local and public health returned `{ "status": "ok" }`. A temporary
+live-browser learner enabled and disabled the debug setting through the deployed
+UI, observed both persisted API states, and was erased with a 204 response.

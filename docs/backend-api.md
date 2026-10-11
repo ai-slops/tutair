@@ -10,6 +10,8 @@ Clients never send learner IDs. Error bodies are
 - `POST /api/auth/local-signup` `{ displayName?: string }` -> `201 { learner, synthetic: false }`
 - `GET /api/session` -> `{ learner }`
 - `GET /api/capabilities` -> `{ provider, model, generation, embedding, search, synthetic, chatgpt }`
+- `GET /api/settings/debug` -> `{ saveProviderReasoningSummaries: boolean }`
+- `PUT /api/settings/debug` `{ saveProviderReasoningSummaries: boolean }` -> the saved owner-scoped setting
 
 OpenAI providers also report `outputMode: "strict" | "compatibility" | "responses"`. The mode
 is explicitly configured on the server, never silently selected after a failure.
@@ -31,6 +33,11 @@ The manual endpoints are an optional Tutair relay, not an alternate redirect URI
 They require the same learner session and same-origin POST boundary. A second
 learner receives the same invalid-state response and cannot consume or invalidate
 the initiating learner's attempt.
+
+Debug settings are authenticated, learner-scoped database records and are never
+stored in browser storage. `saveProviderReasoningSummaries` defaults to false.
+Each model run snapshots its value at the start, so changing it affects only new
+runs. Privacy erasure removes the setting and any retained summaries.
 
 ## Conversations and messages
 
@@ -73,7 +80,12 @@ blindly resubmitted.
   redacted request error/flags, and one ordered row per persisted model run.
 - `GET /api/conversations/:id/tutor-turns/:requestId/pipeline/:runId` lazily
   returns one owned run plus its bounded recorded `StructuredCall`, structured
-  response, versions, repair parent, and redacted traces.
+  response, versions, repair parent, redacted traces, and official provider
+  reasoning-summary state.
+- `GET /api/conversations/:id/tutor-turns/:requestId/provenance` lazily returns
+  revision records separated into `providedToModel`, `created`, and
+  `exposedInAnswer`, plus per-run reasoning-summary states. This endpoint is not
+  part of the cheap pipeline poll or conversation snapshot.
 
 The implemented request states are `running`, `needs_selection`, `completed`, and
 `failed`; stage states are `running`, `completed`, and `failed`. GETs are
@@ -102,6 +114,25 @@ provider credentials or requested hidden chain-of-thought. Historical runs made
 before snapshot or inspection metadata existed remain inspectable only to the
 extent of their persisted fields; exact inputs, model identity, usage, or timing
 are not reconstructed from current state.
+
+`providedToModel` is derived only from each run's immutable bounded
+`StructuredCall.data.knowledge` array. Search hits or current knowledge are not
+substituted. Every entry carries the exact knowledge ID, revision ID, revision
+number, scope, and a manager link selecting that historical revision. `created`
+contains immutable revisions whose model run belongs to the turn.
+`exposedInAnswer` contains verified exposure annotations pinned to the tutor
+message; `exposureCoverage: "non_exhaustive"` warns that annotations can be
+omitted and are never reverse-engineered from prose. Old records without call
+snapshots explicitly report `availability: "unavailable"`.
+
+Reasoning summary states are `disabled`, `pending`, `available`, or `unavailable`.
+Only Responses requests whose run-start setting was enabled send
+`reasoning: { summary: "auto" }`. Tutair stores text only from typed public
+`reasoning.summary` items in the completed provider response. It never prompts
+for, extracts, stores, logs, or returns raw reasoning tokens, encrypted reasoning
+content, or hidden chain-of-thought. Chat Completions requests receive no
+reasoning-summary field. An enabled run that completes without a public summary
+is `unavailable`; Tutair does not duplicate the billed call to retry for one.
 
 Turn `run.evaluationSkipped` distinguishes a successful empty evaluation from a
 failed or persistently invalid evaluation. `run.followupTrackingSkipped` identifies
