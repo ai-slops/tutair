@@ -405,3 +405,42 @@ database path, callback settings, credential-store environment, or origin
 allowlist. Local and public health returned `{ "status": "ok" }`. A temporary
 live-browser learner enabled and disabled the debug setting through the deployed
 UI, observed both persisted API states, and was erased with a 204 response.
+
+## Restart recovery and document admission boundaries: October 11, 2026
+
+Resumed from the committed multilingual document pipeline after the sandbox
+restart. Added owner-scoped document reads, current-head search aggregation,
+bounded candidate-specific retrieval, explicit concept-admission review,
+demand-driven material preparation, and single-definition source-document rules.
+Legacy records and existing duplicate units were not destructively merged.
+
+Final `npm run verify` passed with **339 tests passed, one skipped, and 79 test
+files passed**, plus type checking, Biome, and production builds. The restored
+Chromium suite passed **14/14**. The lead separately exercised the provenance and
+knowledge-management scenarios against the latest build: **2/2 passed**.
+Header control bounds were checked at 375, 768, and 1280 pixels. Pending turns
+still refresh automatically after reload and completion; the recovery test does
+not require a manual retry to pass. Failure injection now targets the actual
+`final` stage rather than the removed free-prose `draft` path.
+
+The restarted image lacked browser libraries and had a broken sudo installation.
+Chromium and its libraries were installed under the user's cache and
+`/tmp/opencode/browser-libs/root`, without changing system privilege settings.
+Browser checks used the isolated in-memory synthetic fixture, not the learner DB.
+
+Three bounded real ChatGPT turn attempts uncovered missing English definitions,
+a non-BCP-47 language value, and duplicate candidate keys across extraction
+categories. Each received regression coverage. Definition validation now uses the
+existing repair boundary without copying unknown-language legacy statements into
+English documents; language tags and global key uniqueness are checked before
+downstream persistence. **No successful real-provider full turn was observed for
+this new pipeline before the call budget was exhausted.** The final key-validation
+fix is deployed and fixture-tested, but real-provider end-to-end confirmation
+remains outstanding. Earlier successful tutor turns predate this pipeline change.
+
+A temporary demo deployment was detected during handoff and replaced before
+delivery. The final public service uses the existing personal ChatGPT provider,
+`chatgpt-preview.sqlite`, callback/origin configuration, and protected credential
+store. In-flight counts were zero before restart; baseline PID 8 was untouched.
+Local and external health checks pass. A healthy endpoint is not evidence of a
+successful real-model answer or of educational/translation accuracy.
