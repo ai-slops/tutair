@@ -31,7 +31,7 @@ const preparedDocumentRow = z.object({
   id: z.string(),
   knowledge_id: z.string(),
   knowledge_revision_id: z.string(),
-  role: z.enum(["english_base", "localization", "legacy"]),
+  role: z.enum(["english_base", "localization"]),
   language_tag: z.string(),
 });
 
@@ -105,7 +105,8 @@ export class AnswerProvenanceStore {
        JOIN knowledge_revisions r ON r.id=d.knowledge_revision_id
        JOIN model_runs mr ON mr.id=d.model_run_id
        WHERE d.owner_learner_id=? AND mr.learner_id=? AND mr.conversation_id=?
-         AND mr.input_message_id=? ORDER BY d.created_at,d.id`,
+         AND mr.input_message_id=? AND d.role IN ('english_base','localization')
+       ORDER BY d.created_at,d.id`,
       [key.owner, key.owner, key.conversationId, request.user_message_id],
       preparedDocumentRow,
     );

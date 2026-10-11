@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
+import { KnowledgeDocumentRepository } from "../../src/server/knowledge-document-repository.js";
 import type { StructuredCall } from "../../src/server/provider.js";
 import { createBackendHarness, makeClient, post, scripted } from "./backend-harness.js";
 
@@ -26,7 +27,7 @@ const provenanceSchema = z.object({
       documentId: z.string().uuid(),
       knowledgeId: z.string().uuid(),
       knowledgeRevisionId: z.string().uuid(),
-      role: z.enum(["english_base", "localization", "legacy"]),
+      role: z.enum(["english_base", "localization"]),
       languageTag: z.string(),
     }),
   ),
@@ -72,7 +73,7 @@ describe("answer debug provenance", () => {
 
   it("lists exact revisions provided, created, and exposed for one answer", async () => {
     // Given
-    const { client } = harness.setup();
+    const { client, database } = harness.setup();
     await client.call("/api/auth/local-signup", post({}));
     const { conversation } = conversationSchema.parse(
       await client.json("/api/conversations", post({})),
@@ -83,6 +84,7 @@ describe("answer debug provenance", () => {
         post({ content: "Explain this claim" }),
       ),
     );
+    new KnowledgeDocumentRepository(database).migrateLegacy();
 
     // When
     const provenance = provenanceSchema.parse(
@@ -94,6 +96,7 @@ describe("answer debug provenance", () => {
     // Then
     expect(provenance.availability).toBe("available");
     expect(provenance.created).toHaveLength(1);
+    expect(provenance.createdDocuments.length).toBeGreaterThan(0);
     expect(provenance.providedToModel).toContainEqual(
       expect.objectContaining({
         knowledgeId: provenance.created[0]?.knowledgeId,
