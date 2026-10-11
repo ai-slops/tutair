@@ -1,6 +1,11 @@
 import { useCallback, useMemo, useState } from "react";
 import { api } from "./api";
-import { clearMatchingRecoveredDraft, resolveKnowledgeSelection, sendDraft } from "./app-state";
+import {
+  clearMatchingRecoveredDraft,
+  learningThreadInput,
+  resolveKnowledgeSelection,
+  sendDraft,
+} from "./app-state";
 import { Conversation } from "./components/Conversation";
 import { Dialog } from "./components/Dialogs";
 import { KnowledgePanel } from "./components/KnowledgePanel";
@@ -40,10 +45,6 @@ export function App() {
   );
 
   if (!workspace.initialized) return <WorkspaceLoading />;
-
-  async function submit(): Promise<void> {
-    await sendDraft(draft, workspace.send, () => setDraft(""));
-  }
 
   function openSearchResult(result: SearchResult): void {
     switch (result.entityType) {
@@ -88,6 +89,7 @@ export function App() {
   }
 
   const recoveryCandidateThreadIds = new Set(workspace.snapshot.recovery?.candidateThreadIds ?? []);
+  const turnRunning = workspace.turnPending || workspace.snapshot.recovery?.kind === "running";
 
   return (
     <div className="app-shell">
@@ -145,11 +147,12 @@ export function App() {
           messages={workspace.snapshot.messages}
           provider={workspace.snapshot.provider}
           draft={draft}
-          submitting={workspace.loading}
-          error={workspace.error}
+          submitting={turnRunning}
+          showProgress={workspace.turnPending && workspace.snapshot.recovery === null}
+          error={workspace.snapshot.recovery?.kind === "running" ? null : workspace.error}
           onDraft={setDraft}
           onSubmit={() => {
-            void submit();
+            void sendDraft(draft, workspace.send, setDraft);
           }}
           onRetry={() => {
             void workspace.refresh();
@@ -238,16 +241,7 @@ export function App() {
       {threadDialog === null ? null : (
         <ThreadDialog
           mode={threadDialog}
-          initial={
-            workspace.snapshot.activeLearningThread === null
-              ? { title: "", desiredOutcome: "", origin: "question", whyNow: "" }
-              : {
-                  title: workspace.snapshot.activeLearningThread.title,
-                  desiredOutcome: workspace.snapshot.activeLearningThread.desiredOutcome,
-                  origin: workspace.snapshot.activeLearningThread.origin,
-                  whyNow: workspace.snapshot.activeLearningThread.whyNow ?? "",
-                }
-          }
+          initial={learningThreadInput(workspace.snapshot.activeLearningThread)}
           error={workspace.error}
           onClose={() => setThreadDialog(null)}
           onSave={(input) =>

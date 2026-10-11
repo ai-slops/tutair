@@ -1,6 +1,6 @@
 import { ArrowRight, BookMarked, RefreshCcw, Send, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Message, ProviderStatus } from "../model";
 import { useMediaMatch } from "../useMediaMatch";
 import { TrackingNotice } from "./TrackingNotice";
@@ -16,6 +16,7 @@ type ConversationProps = {
   readonly provider: ProviderStatus;
   readonly draft: string;
   readonly submitting: boolean;
+  readonly showProgress: boolean;
   readonly error: string | null;
   readonly onDraft: (value: string) => void;
   readonly onSubmit: () => void;
@@ -33,7 +34,7 @@ export function Conversation(props: ConversationProps) {
 
   return (
     <>
-      <div className="conversation-scroll" aria-live="polite">
+      <div className="conversation-scroll">
         <div className="conversation">
           {props.recovery}
           {props.provider.mode === "synthetic" ? (
@@ -63,6 +64,7 @@ export function Conversation(props: ConversationProps) {
           ) : (
             <MessageList messages={props.messages} />
           )}
+          {props.showProgress ? <TutorProgress /> : null}
           <div ref={endRef} />
         </div>
       </div>
@@ -75,10 +77,14 @@ export function Conversation(props: ConversationProps) {
                 value={props.draft}
                 onChange={(event) => props.onDraft(event.currentTarget.value)}
                 onKeyDown={(event) => {
-                  if ((event.metaKey || event.ctrlKey) && event.key === "Enter") props.onSubmit();
+                  if (
+                    !props.submitting &&
+                    (event.metaKey || event.ctrlKey) &&
+                    event.key === "Enter"
+                  )
+                    props.onSubmit();
                 }}
                 placeholder="Ask a question, test an idea, or describe where you are stuck…"
-                disabled={props.submitting}
               />
             </label>
             <button
@@ -86,7 +92,7 @@ export function Conversation(props: ConversationProps) {
               type="button"
               onClick={props.onSubmit}
               disabled={props.submitting || props.draft.trim().length === 0}
-              aria-label="Send message"
+              aria-label={props.submitting ? "Sending message" : "Send message"}
             >
               {props.submitting ? <span className="spinner" /> : <Send className="icon" />}
             </button>
@@ -138,7 +144,7 @@ function EmptyState({ onPrompt }: { readonly onPrompt: (prompt: string) => void 
 
 function MessageList({ messages }: { readonly messages: readonly Message[] }) {
   return (
-    <div className="message-list">
+    <div className="message-list" aria-live="polite">
       {messages.map((message) => (
         <div className="message-with-tracking" key={message.id}>
           <article
@@ -157,5 +163,33 @@ function MessageList({ messages }: { readonly messages: readonly Message[] }) {
         </div>
       ))}
     </div>
+  );
+}
+
+function TutorProgress() {
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    const startedAt = Date.now();
+    const timer = window.setInterval(
+      () => setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000)),
+      1000,
+    );
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const minutes = Math.floor(elapsedSeconds / 60);
+  const seconds = String(elapsedSeconds % 60).padStart(2, "0");
+  return (
+    <section className="tutor-progress">
+      <span className="spinner tutor-progress-spinner" aria-hidden="true" />
+      <div className="tutor-progress-copy" role="status" aria-atomic="true">
+        <strong>Preparing your answer</strong>
+        <span>Tutair reviews several learning signals, so this can take a few minutes.</span>
+      </div>
+      <span className="tutor-progress-elapsed" aria-hidden="true">
+        Elapsed {minutes}:{seconds}
+      </span>
+    </section>
   );
 }

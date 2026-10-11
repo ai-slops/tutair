@@ -291,6 +291,35 @@
   color: var(--color-ink-muted);
   font-size: var(--type-small);
 }
+.tutor-progress {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  max-inline-size: 68ch;
+  margin-block-start: var(--space-8);
+  padding: var(--space-4) var(--space-5);
+  color: var(--color-ink);
+  background: var(--color-forest-wash);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+}
+.tutor-progress-copy {
+  display: grid;
+  gap: var(--space-1);
+}
+.tutor-progress-copy span,
+.tutor-progress-elapsed {
+  color: var(--color-ink-muted);
+  font-size: var(--type-small);
+}
+.tutor-progress-elapsed {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.tutor-progress-spinner {
+  color: var(--color-forest);
+}
 .composer-box {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -504,6 +533,15 @@
 }
 
 @media (max-width: 45rem) {
+  .main-header .overview-trigger {
+    display: none;
+  }
+  .tutor-progress {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .tutor-progress-elapsed {
+    grid-column: 2;
+  }
   .dialog {
     padding: var(--space-4);
   }
@@ -514,7 +552,7 @@
     gap: var(--space-1);
   }
   .thread-pane .icon-button.mobile-only,
-  .main-header .icon-button.mobile-only {
+  .main-header .icon-button.mobile-only:not(.overview-trigger) {
     display: inline-flex;
   }
 }
