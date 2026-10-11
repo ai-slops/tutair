@@ -195,6 +195,12 @@ unbroken tokens rather than a zero-width text column.
 - States: stable loading shell, empty knowledge base, no filter matches, selected detail, per-action pending, inline request error, and restored success through refreshed server state. Status is always text, never color alone.
 - Layout: manager header stays fixed; wide filter/list/detail regions own their own scroll. At 768px filters become a wrapping toolbar and list/detail remain readable; at 375px all regions stack without horizontal overflow, CJK clipping, or hidden actions.
 
+### KnowledgeDocumentHistory
+- Lives inside KnowledgeManager detail after provenance. It presents immutable learner-facing expressions separately from semantic revision history so translation never reads as a new fact revision.
+- Each document summary names language, role, version, source, and stale/current state in text. English source, localization, and migrated legacy material remain visibly distinct; stale localizations carry an amber notice and are never implied current.
+- Opening a document reveals ordered typed blocks, their exact text, and abbreviated content hash. Blocks use the paper-muted inset already established for immutable history; hashes use the UI stack and wrap safely rather than introducing a new monospace family.
+- States: no documents, one legacy document, current English with localizations, stale localization, multiple immutable versions, keyboard-open details. At 375px metadata wraps above block text with no horizontal scroll.
+
 ### DeferredKnowledge / OpenQuestions
 - Deferred knowledge is a thread-target holding area, not a knowledge-state transition. It explicitly says “Deferred here; this does not change knowledge state,” and each unit offers “Move to learning targets.” No action claims understanding, acceptance, or mastery.
 - Learning questions show their current open, parked, or resolved lifecycle state. Open questions expose Resolve and Park; parked and resolved questions expose Reopen. Actions use contract-specific verbs rather than ambiguous icon-only controls.
