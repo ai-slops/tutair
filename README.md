@@ -158,6 +158,25 @@ annotations are omitted and audited with `exposureTrackingSkipped`, rather than
 fabricating evidence or discarding an otherwise usable answer. Verified
 annotations and learner-evidence validation remain strict.
 
+### Knowledge review lifecycle
+
+Open **Knowledge** in the workspace header to browse definitions, provenance,
+immutable revisions, and learner-specific review history. Review status describes
+definition accuracy, not learner mastery or canonical authority.
+
+- **Reviewed** records that the current revision was checked. A new revision starts
+  unreviewed.
+- **Incorrect** requires a reason and excludes that exact revision from future
+  search and tutor-generation context for the current learner.
+- **Retired** requires a reason and excludes the whole unit across revisions until
+  it is explicitly restored.
+- **Restore** requires explicit confirmation and removes retirement. A current
+  revision still marked incorrect remains excluded until reviewed or corrected.
+
+Review events are append-only and learner-scoped, including reviews of shared
+canonical definitions. Retirement never physically deletes knowledge, evidence,
+exposures, conversations, or revision history.
+
 ### Semantic retrieval
 
 Local semantic search uses a pinned, quantized `Xenova/all-MiniLM-L6-v2` model
@@ -213,6 +232,7 @@ a production service.
 - [Learner model and resolution policy](docs/learner-model.md)
 - [Verification record and environment limitations](docs/verification.md)
 - [Real-provider quality evaluation and remaining validation](docs/quality-evaluation.md)
+- [Pipeline experiment readiness, improvements, and test plan](docs/pipeline-experiments.md)
 - [Design system](DESIGN.md)
 
 Phase 2 clustering, automatic canonicalization, editorial workflows, public
