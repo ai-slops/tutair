@@ -54,6 +54,8 @@ export class ModelRunner {
         ? PROMPT_SCHEMA_VERSIONS.compatibilityPrompt
         : PROMPT_SCHEMA_VERSIONS.prompt;
     const schemaVersion = STAGE_SCHEMA_VERSIONS[stage];
+    const traceId = typeof data["traceId"] === "string" ? data["traceId"] : null;
+    const repairOfRunId = typeof data["repairOfRunId"] === "string" ? data["repairOfRunId"] : null;
     this.db.run("INSERT INTO model_runs VALUES(?,?,?,?,?,?,?,?,?,?,?)", [
       runId,
       owner,
@@ -77,6 +79,14 @@ export class ModelRunner {
       null,
       null,
       null,
+      null,
+    ]);
+    this.db.run("INSERT INTO model_run_inspection VALUES(?,?,?,?,?,?)", [
+      runId,
+      traceId,
+      repairOfRunId,
+      repairOfRunId === null ? 1 : 2,
+      this.provider.state.outputMode ?? null,
       null,
     ]);
     try {
@@ -110,15 +120,24 @@ export class ModelRunner {
               totalTokens: z.number().int().nonnegative(),
             })
             .nullable(),
+          resolvedModel: z.string().optional(),
         })
         .safeParse(raw);
       const output = result.success ? result.data.value : raw;
       const parsed = schema.safeParse(output);
       if (!parsed.success) {
-        this.db.run("UPDATE model_run_details SET output_json=? WHERE run_id=?", [
-          JSON.stringify(output),
-          runId,
-        ]);
+        this.db.run(
+          `UPDATE model_run_details SET output_json=?,usage_json=?,model=COALESCE(?,model)
+           WHERE run_id=?`,
+          [
+            JSON.stringify(output),
+            !result.success || result.data.usage === null
+              ? null
+              : JSON.stringify(result.data.usage),
+            result.success ? (result.data.resolvedModel ?? null) : null,
+            runId,
+          ],
+        );
         throw new StructuredOutputError(runId, output, parsed.error.issues);
       }
       const value = parsed.data;
@@ -127,15 +146,21 @@ export class ModelRunner {
         owner,
       ]);
       this.db.run(
-        "UPDATE model_run_details SET output_json=?,usage_json=?,latency_ms=?,fallback_status=? WHERE run_id=?",
+        `UPDATE model_run_details SET output_json=?,usage_json=?,latency_ms=?,fallback_status=?,
+         model=COALESCE(?,model) WHERE run_id=?`,
         [
           JSON.stringify(value),
           !result.success || result.data.usage === null ? null : JSON.stringify(result.data.usage),
           Date.now() - started,
           "none",
+          result.success ? (result.data.resolvedModel ?? null) : null,
           runId,
         ],
       );
+      this.db.run("UPDATE model_run_inspection SET finished_at=? WHERE run_id=?", [
+        isoNow(),
+        runId,
+      ]);
       this.trace(owner, runId, "stage_completed", {
         stage,
         traceId: data["traceId"] ?? null,
@@ -160,6 +185,10 @@ export class ModelRunner {
       this.db.run("UPDATE model_run_details SET latency_ms=?,fallback_status=? WHERE run_id=?", [
         Date.now() - started,
         "failed",
+        runId,
+      ]);
+      this.db.run("UPDATE model_run_inspection SET finished_at=? WHERE run_id=?", [
+        isoNow(),
         runId,
       ]);
       this.trace(owner, runId, "stage_failed", {
