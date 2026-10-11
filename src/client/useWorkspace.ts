@@ -5,7 +5,7 @@ import type {
   QuestionStatus,
   RecoveryChoice,
 } from "./learning-model";
-import type { CorrectionKind, KnowledgeItem, SearchResult } from "./model";
+import type { CorrectionKind, KnowledgeItem, ReviewAction, SearchResult } from "./model";
 import {
   EMPTY_SNAPSHOT,
   type SearchResponse,
@@ -85,6 +85,12 @@ type WorkspaceState = {
     item: KnowledgeItem,
     correction: string,
     kind: CorrectionKind,
+  ) => Promise<boolean>;
+  readonly review: (
+    itemId: string,
+    action: ReviewAction,
+    reason: string,
+    confirmed: boolean,
   ) => Promise<boolean>;
   readonly deleteAll: () => Promise<boolean>;
   readonly selectChatGptModel: (slug: string) => Promise<boolean>;
@@ -182,6 +188,12 @@ export function useWorkspace(api: WorkspaceApi): WorkspaceState {
     promoteKnowledge: (id, knowledgeId) => run(() => api.promoteKnowledge(id, knowledgeId)),
     createSession: () => run(() => api.createSession()),
     correct: (item, correction, kind) => run(() => api.correctKnowledge(item.id, correction, kind)),
+    review: (itemId, action, reason, confirmed) => {
+      const item = snapshot.knowledge.find((candidate) => candidate.id === itemId);
+      return item === undefined
+        ? Promise.resolve(false)
+        : run(() => api.reviewKnowledge(itemId, item.revision, action, reason, confirmed));
+    },
     deleteAll: () => run(() => api.deleteAll()),
     selectChatGptModel: (slug) => run(() => api.selectChatGptModel(slug)),
     beginChatGptManual: async () => {

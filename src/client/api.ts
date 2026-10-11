@@ -69,6 +69,25 @@ export function createWorkspaceApi(client: KyInstance): WorkspaceApi {
       );
       return workspace.snapshot(conversationId, generation);
     },
+    async reviewKnowledge(itemId, revision, action, reason, confirmed) {
+      const generation = workspace.begin();
+      const conversationId = workspace.activeConversationId;
+      await request(
+        () =>
+          client
+            .post(`knowledge/${itemId}/reviews`, {
+              json: {
+                revision,
+                action,
+                ...(reason.trim() === "" ? {} : { reason }),
+                confirmed,
+              },
+            })
+            .json(),
+        z.object({ event: z.object({ id: IdSchema }).catchall(z.unknown()) }).catchall(z.unknown()),
+      );
+      return workspace.snapshot(conversationId, generation);
+    },
     async deleteAll() {
       const generation = workspace.begin();
       await client.delete("privacy");

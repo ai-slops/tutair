@@ -14,6 +14,7 @@ import type {
   KnowledgeItem,
   Message,
   ProviderStatus,
+  ReviewAction,
   SearchResult,
 } from "./model";
 
@@ -52,6 +53,13 @@ export interface WorkspaceApi {
     itemId: string,
     correction: string,
     kind: CorrectionKind,
+  ): Promise<WorkspaceSnapshot>;
+  reviewKnowledge(
+    itemId: string,
+    revision: number,
+    action: ReviewAction,
+    reason: string,
+    confirmed: boolean,
   ): Promise<WorkspaceSnapshot>;
   deleteAll(): Promise<WorkspaceSnapshot>;
   selectChatGptModel(slug: string): Promise<WorkspaceSnapshot>;
