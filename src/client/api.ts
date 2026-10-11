@@ -11,6 +11,7 @@ import {
 import { learningActions } from "./api-learning";
 import { turnActions } from "./api-turns";
 import { WorkspaceClient } from "./api-workspace";
+import { GenerationPipelineSchema, GenerationRunDetailSchema } from "./generation-contract";
 import type { WorkspaceApi } from "./workspace";
 
 export function createWorkspaceApi(client: KyInstance): WorkspaceApi {
@@ -122,6 +123,28 @@ export function createWorkspaceApi(client: KyInstance): WorkspaceApi {
       request(
         () => client.get("search", { searchParams: { q: query, limit: 20 } }).json(),
         SearchResponseSchema,
+      ),
+    generationPipeline: (target, signal) =>
+      request(
+        () =>
+          client
+            .get(
+              `conversations/${target.conversationId}/tutor-turns/${target.requestId}/pipeline`,
+              { signal },
+            )
+            .json(),
+        GenerationPipelineSchema,
+      ),
+    generationRun: (target, runId, signal) =>
+      request(
+        () =>
+          client
+            .get(
+              `conversations/${target.conversationId}/tutor-turns/${target.requestId}/pipeline/${runId}`,
+              { signal },
+            )
+            .json(),
+        GenerationRunDetailSchema,
       ),
     exportUrl: () => "/api/export",
   };

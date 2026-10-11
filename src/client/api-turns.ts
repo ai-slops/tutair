@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ApiError, ConversationSchema, request, TutorTurnSchema } from "./api-contract";
 import type { WorkspaceClient } from "./api-workspace";
+import type { GenerationTarget } from "./generation-contract";
 import { candidateIds, LearningThreadDetailSchema } from "./learning-contract";
 import type { RecoveryChoice, TurnRecovery } from "./learning-model";
 
@@ -9,9 +10,11 @@ export function turnActions(workspace: WorkspaceClient) {
     attempt: TurnRecovery,
     choice: RecoveryChoice | undefined,
     generation: number,
+    onStarted?: (target: GenerationTarget) => void,
   ) {
     workspace.select(generation, attempt.conversationId);
     workspace.recoveries.set(attempt.conversationId, { ...attempt, kind: "running" });
+    onStarted?.({ conversationId: attempt.conversationId, requestId: attempt.requestId });
     try {
       await request(
         () =>
@@ -65,7 +68,11 @@ export function turnActions(workspace: WorkspaceClient) {
   }
 
   return {
-    async sendMessage(conversationId: string | null, content: string) {
+    async sendMessage(
+      conversationId: string | null,
+      content: string,
+      onStarted?: (target: GenerationTarget) => void,
+    ) {
       const generation = workspace.begin();
       const selectedThreadId =
         conversationId === workspace.activeConversationId ? workspace.activeLearningThreadId : null;
@@ -101,9 +108,10 @@ export function turnActions(workspace: WorkspaceClient) {
         attempt,
         selectedThreadId === null ? undefined : { threadId: selectedThreadId },
         generation,
+        onStarted,
       );
     },
-    async resolveTurn(choice: RecoveryChoice) {
+    async resolveTurn(choice: RecoveryChoice, onStarted?: (target: GenerationTarget) => void) {
       const attempt = pending();
       const generation = workspace.begin();
       if ("threadId" in choice) {
@@ -123,16 +131,16 @@ export function turnActions(workspace: WorkspaceClient) {
           );
         }
       }
-      return submit(attempt, choice, generation);
+      return submit(attempt, choice, generation, onStarted);
     },
-    retryTurn() {
+    retryTurn(onStarted?: (target: GenerationTarget) => void) {
       const attempt = pending();
       if (attempt.kind === "failed" || attempt.kind === "selection")
         throw new ApiError(
           "turn_not_retryable",
           "Choose a learning thread or ask a new question; the saved request will not be repeated.",
         );
-      return submit(attempt, undefined, workspace.begin());
+      return submit(attempt, undefined, workspace.begin(), onStarted);
     },
   };
 }
