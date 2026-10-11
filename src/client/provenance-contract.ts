@@ -14,6 +14,15 @@ export const AnswerProvenanceSchema = z.object({
   reason: z.string().nullable().default(null),
   providedToModel: z.array(DocumentRevisionSchema),
   created: z.array(DocumentRevisionSchema),
+  createdDocuments: z.array(
+    z.object({
+      documentId: z.string(),
+      knowledgeId: z.string(),
+      knowledgeRevisionId: z.string(),
+      role: z.enum(["english_base", "localization", "legacy"]),
+      languageTag: z.string(),
+    }),
+  ),
   exposedInAnswer: z.array(DocumentRevisionSchema),
   exposureCoverage: z.literal("non_exhaustive"),
   reasoningSummaries: z.array(

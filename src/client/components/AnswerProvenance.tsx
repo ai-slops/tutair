@@ -72,12 +72,40 @@ function ProvenanceRecord({ record }: { readonly record: AnswerProvenanceRecord 
       ) : null}
       <DocumentGroup title="Provided to model" documents={record.providedToModel} />
       <DocumentGroup title="Created during this answer" documents={record.created} created />
+      <PreparedDocuments documents={record.createdDocuments} />
       <DocumentGroup title="Exposed in answer" documents={record.exposedInAnswer} />
       <p className="provenance-caveat">
         Exposed items come from verified answer annotations; annotations are not exhaustive.
       </p>
       <ReasoningSummaries summaries={record.reasoningSummaries} />
     </>
+  );
+}
+
+function PreparedDocuments({
+  documents,
+}: {
+  readonly documents: AnswerProvenanceRecord["createdDocuments"];
+}) {
+  return (
+    <section className="provenance-group" aria-label="Prepared explanation documents">
+      <h4>
+        <FilePlus2 className="icon" aria-hidden="true" />
+        Prepared explanation documents
+      </h4>
+      {documents.length === 0 ? (
+        <p className="muted">None recorded.</p>
+      ) : (
+        <ul>
+          {documents.map((document) => (
+            <li key={document.documentId}>
+              <span>{document.role.replaceAll("_", " ")}</span>
+              <span className="provenance-meta">{document.languageTag}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

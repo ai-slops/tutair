@@ -30,6 +30,15 @@ const record: AnswerProvenanceRecord = {
       stages: [],
     },
   ],
+  createdDocuments: [
+    {
+      documentId: "document-1",
+      knowledgeId: "knowledge-2",
+      knowledgeRevisionId: "revision-2",
+      role: "localization",
+      languageTag: "ko",
+    },
+  ],
   exposedInAnswer: [],
   exposureCoverage: "non_exhaustive",
   reasoningSummaries: [
