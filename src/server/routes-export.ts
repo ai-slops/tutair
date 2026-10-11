@@ -43,6 +43,31 @@ export const exportRoutes = (services: Services): Hono => {
       learnerState: owned("learner_state"),
       corrections: owned("corrections"),
       knowledgeReviewEvents: owned("knowledge_review_events"),
+      knowledgeDocuments: services.db.all(
+        `SELECT d.* FROM knowledge_documents d JOIN knowledge_revisions r ON r.id=d.knowledge_revision_id
+         JOIN knowledge_items k ON k.id=r.knowledge_id
+         WHERE d.owner_learner_id=? OR (d.owner_learner_id IS NULL AND k.learner_id IS NULL)
+         ORDER BY d.created_at,d.id`,
+        [owner],
+        genericRecord,
+      ),
+      knowledgeDocumentBlocks: services.db.all(
+        `SELECT b.* FROM knowledge_document_blocks b JOIN knowledge_documents d ON d.id=b.document_id
+         JOIN knowledge_revisions r ON r.id=d.knowledge_revision_id JOIN knowledge_items k ON k.id=r.knowledge_id
+         WHERE d.owner_learner_id=? OR (d.owner_learner_id IS NULL AND k.learner_id IS NULL)
+         ORDER BY b.document_id,b.position`,
+        [owner],
+        genericRecord,
+      ),
+      knowledgeDocumentBlockTopics: services.db.all(
+        `SELECT t.* FROM knowledge_document_block_topics t JOIN knowledge_document_blocks b ON b.id=t.block_id
+         JOIN knowledge_documents d ON d.id=b.document_id JOIN knowledge_revisions r ON r.id=d.knowledge_revision_id
+         JOIN knowledge_items k ON k.id=r.knowledge_id
+         WHERE d.owner_learner_id=? OR (d.owner_learner_id IS NULL AND k.learner_id IS NULL)
+         ORDER BY t.block_id,t.knowledge_revision_id`,
+        [owner],
+        genericRecord,
+      ),
       qualityObservations: owned("quality_observations"),
       modelRuns: owned("model_runs"),
       modelRunDetails: services.db.all(
