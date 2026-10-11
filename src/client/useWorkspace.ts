@@ -87,6 +87,7 @@ type WorkspaceState = {
   ) => Promise<boolean>;
   readonly deleteAll: () => Promise<boolean>;
   readonly selectChatGptModel: (slug: string) => Promise<boolean>;
+  readonly beginChatGptManual: () => Promise<string | null>;
   readonly completeChatGptManual: (callbackUrl: string) => Promise<boolean>;
   readonly disconnectChatGpt: () => Promise<boolean>;
   readonly search: SearchState & { readonly run: (query: string) => Promise<void> };
@@ -177,6 +178,19 @@ export function useWorkspace(api: WorkspaceApi): WorkspaceState {
     correct: (item, correction, kind) => run(() => api.correctKnowledge(item.id, correction, kind)),
     deleteAll: () => run(() => api.deleteAll()),
     selectChatGptModel: (slug) => run(() => api.selectChatGptModel(slug)),
+    beginChatGptManual: async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        return await api.beginChatGptManual();
+      } catch (cause) {
+        if (!(cause instanceof Error)) throw cause;
+        setError(cause.message);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
     completeChatGptManual: (callbackUrl) => run(() => api.completeChatGptManual(callbackUrl)),
     disconnectChatGpt: () => run(() => api.disconnectChatGpt()),
     search: {

@@ -55,6 +55,7 @@ export interface WorkspaceApi {
   ): Promise<WorkspaceSnapshot>;
   deleteAll(): Promise<WorkspaceSnapshot>;
   selectChatGptModel(slug: string): Promise<WorkspaceSnapshot>;
+  beginChatGptManual(): Promise<string>;
   completeChatGptManual(callbackUrl: string): Promise<WorkspaceSnapshot>;
   disconnectChatGpt(): Promise<WorkspaceSnapshot>;
   search(query: string): Promise<SearchResponse>;
