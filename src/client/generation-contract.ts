@@ -52,6 +52,12 @@ export const GenerationRunDetailSchema = GenerationStageSchema.extend({
   recordedCall: RecordedCallSchema,
   response: z.object({ available: z.boolean(), validated: z.boolean(), value: z.unknown() }),
   traces: z.array(z.object({ event: z.string(), at: z.string(), data: z.unknown() })),
+  reasoningSummary: z.discriminatedUnion("state", [
+    z.object({ state: z.literal("disabled") }),
+    z.object({ state: z.literal("pending") }),
+    z.object({ state: z.literal("unavailable") }),
+    z.object({ state: z.literal("available"), text: z.string() }),
+  ]),
 });
 
 export type GenerationPipeline = z.infer<typeof GenerationPipelineSchema>;

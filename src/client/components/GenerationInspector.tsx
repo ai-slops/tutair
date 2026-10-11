@@ -206,6 +206,18 @@ function RunDetail({ detail }: { readonly detail: GenerationRunDetail }) {
         value={detail.response.value}
       />
       <DiagnosticBlock title="Decision traces" value={detail.traces} />
+      <DiagnosticBlock
+        title="Provider reasoning summary"
+        value={
+          detail.reasoningSummary.state === "available"
+            ? detail.reasoningSummary.text
+            : detail.reasoningSummary.state === "disabled"
+              ? "Not saved because the private setting was off."
+              : detail.reasoningSummary.state === "pending"
+                ? "Waiting for the provider response."
+                : "Not available from this model or run."
+        }
+      />
     </section>
   );
 }

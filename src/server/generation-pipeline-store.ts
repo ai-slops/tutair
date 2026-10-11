@@ -36,6 +36,8 @@ const stageRow = z.object({
   finished_at: z.string().nullable(),
   context_version: z.string().nullable(),
   context_hash: z.string().nullable(),
+  reasoning_summary_enabled: z.number().int().nullable(),
+  summary_text: z.string().nullable(),
 });
 const detailRow = stageRow.extend({
   output_json: z.string().nullable(),
@@ -118,6 +120,14 @@ export class GenerationPipelineStore {
         at: trace.created_at,
         data: redactDiagnostic(parseStoredJson(trace.data_json)),
       })),
+      reasoningSummary:
+        row.reasoning_summary_enabled !== 1
+          ? { state: "disabled" }
+          : row.summary_text !== null
+            ? { state: "available", text: row.summary_text }
+            : row.status === "running"
+              ? { state: "pending" }
+              : { state: "unavailable" },
     };
   }
 
@@ -137,10 +147,12 @@ export class GenerationPipelineStore {
 function stageSelect(extra = ""): string {
   return `SELECT r.id,r.stage,r.version,r.provider,r.status,r.error_code,r.created_at,
    d.model,d.prompt_version,d.schema_version,d.usage_json,d.latency_ms,d.fallback_status,
-   i.trace_id,i.repair_of_run_id,i.attempt,i.output_mode,i.finished_at,
-   c.context_version,c.context_hash${extra} FROM model_runs r
+    i.trace_id,i.repair_of_run_id,i.attempt,i.output_mode,i.finished_at,i.reasoning_summary_enabled,
+    s.summary_text,
+    c.context_version,c.context_hash${extra} FROM model_runs r
    JOIN model_run_details d ON d.run_id=r.id
-   LEFT JOIN model_run_inspection i ON i.run_id=r.id
+    LEFT JOIN model_run_inspection i ON i.run_id=r.id
+    LEFT JOIN model_run_reasoning_summaries s ON s.run_id=r.id
    LEFT JOIN model_run_contexts c ON c.run_id=r.id`;
 }
 

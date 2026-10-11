@@ -45,6 +45,7 @@ const detail = (status: GenerationStage["status"]): GenerationRunDetail => ({
   recordedCall: { available: false, reason: "Unavailable" },
   response: { available: false, validated: false, value: null },
   traces: [],
+  reasoningSummary: { state: "unavailable" },
 });
 
 afterEach(cleanup);
