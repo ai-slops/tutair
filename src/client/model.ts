@@ -46,14 +46,51 @@ export type LearnerDimensionState = {
   readonly evidenceIds: readonly string[];
 };
 
+export const REVIEW_STATUSES = ["unreviewed", "reviewed", "incorrect", "retired"] as const;
+export type ReviewStatusName = (typeof REVIEW_STATUSES)[number];
+export const REVIEW_ACTIONS = ["reviewed", "mark_incorrect", "retire", "restore"] as const;
+export type ReviewAction = (typeof REVIEW_ACTIONS)[number];
+
+export type KnowledgeReviewStatus = {
+  readonly status: ReviewStatusName;
+  readonly revision: number;
+  readonly revisionId: string;
+  readonly reason: string | null;
+  readonly updatedAt: string | null;
+};
+
+export type KnowledgeRevision = {
+  readonly id: string;
+  readonly revision: number;
+  readonly statement: string;
+  readonly semanticScope: string;
+  readonly sourceType: string;
+  readonly sourceRef: string | null;
+  readonly createdAt: string;
+};
+
+export type KnowledgeReviewEvent = {
+  readonly id: string;
+  readonly revision: number;
+  readonly action: ReviewAction;
+  readonly reason: string | null;
+  readonly createdAt: string;
+};
+
 export type KnowledgeItem = {
   readonly id: string;
   readonly name: string;
   readonly definition: string;
   readonly revision: number;
+  readonly scope: "canonical" | "provisional";
+  readonly kind: string;
+  readonly semanticScope: string;
   readonly sources: readonly string[];
   readonly evidence: readonly Evidence[];
   readonly learnerState: readonly LearnerDimensionState[];
+  readonly reviewStatus: KnowledgeReviewStatus;
+  readonly revisions: readonly KnowledgeRevision[];
+  readonly reviewHistory: readonly KnowledgeReviewEvent[];
 };
 
 export type ProviderStatus = {

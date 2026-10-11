@@ -118,9 +118,21 @@ describe("workspace correctness", () => {
       name: "Old title",
       definition: "Old definition",
       revision: 1,
+      scope: "provisional",
+      kind: "concept",
+      semanticScope: "",
       sources: [],
       evidence: [],
       learnerState: [],
+      reviewStatus: {
+        status: "unreviewed",
+        revision: 1,
+        revisionId: "revision-1",
+        reason: null,
+        updatedAt: null,
+      },
+      revisions: [],
+      reviewHistory: [],
     };
     const refreshed: KnowledgeItem = { ...stale, definition: "Current definition", revision: 2 };
 

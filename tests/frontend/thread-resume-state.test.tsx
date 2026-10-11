@@ -125,6 +125,9 @@ describe("thread resume and learner state", () => {
       name: "Bayes theorem",
       definition: "A rule for updating conditional probability.",
       revision: 2,
+      scope: "provisional",
+      kind: "concept",
+      semanticScope: "",
       sources: [],
       evidence: [],
       learnerState: dimensions.map((dimension, index) => ({
@@ -137,6 +140,15 @@ describe("thread resume and learner state", () => {
         knowledgeRevisionId: "revision-2",
         evidenceIds: [`evidence-${index}`],
       })),
+      reviewStatus: {
+        status: "unreviewed",
+        revision: 2,
+        revisionId: "revision-2",
+        reason: null,
+        updatedAt: null,
+      },
+      revisions: [],
+      reviewHistory: [],
     } satisfies KnowledgeItem;
 
     const markup = renderToStaticMarkup(

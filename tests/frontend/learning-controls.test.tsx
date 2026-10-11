@@ -309,9 +309,21 @@ describe("learning controls", () => {
             name: "Reducer composition",
             definition: "Reducers compose state transitions.",
             revision: 1,
+            scope: "provisional",
+            kind: "concept",
+            semanticScope: "",
             sources: [],
             evidence: [],
             learnerState: [],
+            reviewStatus: {
+              status: "unreviewed",
+              revision: 1,
+              revisionId: "revision-1",
+              reason: null,
+              updatedAt: null,
+            },
+            revisions: [],
+            reviewHistory: [],
           },
         ]}
         questions={[

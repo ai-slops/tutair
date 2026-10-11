@@ -27,6 +27,9 @@ describe("client runtime contracts", () => {
       name: "Bayes theorem",
       definition: "A rule for updating conditional probability.",
       revision: 1,
+      scope: "provisional",
+      kind: "concept",
+      semanticScope: "",
       sources: [],
       evidence: [
         {
@@ -38,6 +41,15 @@ describe("client runtime contracts", () => {
         },
       ],
       learnerState: [],
+      reviewStatus: {
+        status: "unreviewed",
+        revision: 1,
+        revisionId: "revision-1",
+        reason: null,
+        updatedAt: null,
+      },
+      revisions: [],
+      reviewHistory: [],
     };
 
     const markup = renderToStaticMarkup(
