@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { GenerationTarget } from "./generation-contract";
 import type {
   LearningThreadInput,
   LearningThreadStatus,
@@ -62,6 +63,7 @@ type WorkspaceState = {
   readonly initialized: boolean;
   readonly loading: boolean;
   readonly turnPending: boolean;
+  readonly activeGeneration: GenerationTarget | null;
   readonly error: string | null;
   readonly refresh: () => Promise<boolean>;
   readonly createConversation: () => Promise<boolean>;
@@ -105,6 +107,7 @@ export function useWorkspace(api: WorkspaceApi): WorkspaceState {
   const [initialized, setInitialized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [turnPending, setTurnPending] = useState(false);
+  const [activeGeneration, setActiveGeneration] = useState<GenerationTarget | null>(null);
   const turnPendingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState<SearchState>({
@@ -156,6 +159,7 @@ export function useWorkspace(api: WorkspaceApi): WorkspaceState {
       } finally {
         turnPendingRef.current = false;
         setTurnPending(false);
+        setActiveGeneration(null);
       }
     },
     [api, run],
@@ -171,15 +175,17 @@ export function useWorkspace(api: WorkspaceApi): WorkspaceState {
     initialized,
     loading,
     turnPending,
+    activeGeneration,
     error,
     refresh,
     createConversation: () => run(() => api.createConversation()),
     createLearningThread: (input) => run(() => api.createLearningThread(input)),
     openConversation: (id) => run(() => api.openConversation(id)),
     openSearchThread: (id) => run(() => api.openSearchThread(id)),
-    send: (content) => runTurn(() => api.sendMessage(snapshot.activeConversationId, content)),
-    resolveTurn: (choice) => runTurn(() => api.resolveTurn(choice)),
-    retryTurn: () => runTurn(() => api.retryTurn()),
+    send: (content) =>
+      runTurn(() => api.sendMessage(snapshot.activeConversationId, content, setActiveGeneration)),
+    resolveTurn: (choice) => runTurn(() => api.resolveTurn(choice, setActiveGeneration)),
+    retryTurn: () => runTurn(() => api.retryTurn(setActiveGeneration)),
     updateLearningThread: (id, input) => run(() => api.updateLearningThread(id, input)),
     setThreadStatus: (id, status) => run(() => api.setThreadStatus(id, status)),
     addQuestion: (id, text) => run(() => api.addQuestion(id, text)),
