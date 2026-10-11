@@ -165,6 +165,7 @@ unbroken tokens rather than a zero-width text column.
 ### AnswerProvenance
 - Every tutor answer ends with a visible “Sources & knowledge” disclosure, independent of debug settings. Its body loads lazily only when opened so conversation refresh and generation polling never carry full call snapshots.
 - The disclosure separates exact immutable revisions actually provided to a model, revisions created during that answer, and verified answer exposures. Exposure is explicitly labeled non-exhaustive because omitted annotations are not reconstructed.
+- Prepared explanation documents are a separate provenance group with their typed document ID, role, and language. They never appear as newly created semantic concepts, and their presence does not claim source accuracy or translation fidelity.
 - Revision links open Knowledge manager with the referenced historical revision expanded. A historical revision is never labeled current when a newer revision exists.
 - Provider reasoning summaries appear only when the official Responses API returned a public summary for a run whose private setting was enabled at run start. Disabled, pending, and unsupported/unavailable states remain distinct; hidden chain-of-thought is never requested or displayed.
 - States: collapsed, loading, loaded with empty groups, partial historical availability, request error, and unavailable legacy answer. At 375px, labels and links wrap without horizontal overflow.

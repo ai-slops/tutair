@@ -13,6 +13,10 @@ Current checkpoint: October 11, 2026. Normative target:
   conversation/thread is included before bounded context selection.
 - Exact compatible generated definitions are reused rather than blindly inserted.
   Different scopes/owners and incorrect or retired items are not merged.
+- Candidate-specific retrieval is bounded to four 500-character probes, and only
+  eligible exact current revisions returned by those probes are offered for review.
+- Concept admission is fail-closed: only explicit independently validated creation
+  persists a new unit; material requests attach to offered named revisions or skip.
 - Correction appends a semantic revision and leaves historical evidence intact.
 - Existing duplicate nodes are not destructively merged. Paraphrase equivalence
   is not guaranteed by exact-text reuse and still requires conservative resolution.
@@ -39,6 +43,9 @@ The implementation stores immutable document, block, and exact block-topic rows;
 migrates existing statements byte-for-byte as `legacy` / `und`; creates English
 documents for canonical imports and model-prepared provisional knowledge; and
 shows language, role, version, staleness, and ordered blocks in Knowledge manager.
+Active search emits one aggregated row per current knowledge revision, so additional
+blocks and localizations do not duplicate IDs or boost rank. This identity guarantee
+does not claim perfect multilingual semantic matching or translation fidelity.
 
 ## 3. Preparation and final composition: implemented
 
@@ -60,6 +67,11 @@ The recorded `preparation` stage may run once plus one bounded material retry.
 The `final` stage accepts only ordered block IDs and layout enums. Server rendering,
 segment offsets, hashes, answer composition, tutor message, and exposures are saved
 in one transaction; reconstruction verifies the persisted answer hash.
+Planning now names exact revision/block-type needs. Preparation touches only those
+needs, requires exactly one English definition per document version, preserves the
+definition when adding supporting blocks, and validates localization source IDs,
+types, and topics. Created English/localized document IDs are included in ordinary
+answer provenance independently of private debug settings.
 
 ## 4. Quality and operational evaluation
 
@@ -72,3 +84,7 @@ Measure preparation reuse, total/stage latency, repair/material-cycle rates, and
 known usage with the [experiment guidance](pipeline-experiments.md). Run isolated
 fixtures first; real model calls require an explicit bounded budget. A source link
 or successful runtime test is not proof of factual or educational correctness.
+The implementation guarantees ownership, identity, versioning, and grounding
+semantics. Source accuracy, English-source quality, cross-language equivalence, and
+translation fidelity remain review and evaluation questions rather than automatic
+guarantees.

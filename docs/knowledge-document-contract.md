@@ -17,6 +17,14 @@ See [implementation milestones](knowledge-document-roadmap.md).
   remain excluded under the existing learner-specific review policy.
 - Matching titles alone never establish identical meaning. Reuse must preserve
   kind, scope, ownership, exact revision identity, and uncertainty boundaries.
+- Extraction classifies durable named concepts separately from requests for
+  scopes, examples, contrasts, or other answer material. Only an explicit,
+  independently validated `create` review may persist a new concept. Omitted,
+  conflicting, unverified, or ignored decisions create nothing. Material requests
+  attach only to an offered exact revision or are skipped.
+- Candidate resolution may use a bounded set of lexical/vector probes built from
+  extracted labels, definitions, and semantic scopes. Retrieval proposes candidates;
+  vector or title similarity alone never authorizes a merge.
 
 ## Immutable documents and localized expressions
 
@@ -44,6 +52,10 @@ claim, example, contrast, prerequisite, caveat, or procedure step. Blocks have
 stable IDs within immutable document versions, ordering, topic/revision links,
 and provenance. Localized blocks reference exact source block IDs and retain the
 same topic identity; target-only factual additions require source material first.
+Every English document version has exactly one definition block. Adding an example,
+contrast, or procedure creates a new immutable document version carrying that same
+definition; an automatic definition change is rejected and requires an explicit
+semantic correction revision.
 
 Richness is task-driven, not a minimum word count. A useful concept document may
 include a concise definition, applicability, distinguishing principles, an example,
@@ -57,10 +69,10 @@ The target pipeline is:
 
 1. Evaluate the learner's message using existing evidence rules.
 2. Identify required topics, requested explanation material, and response language.
-3. Resolve topics against eligible exact knowledge revisions.
-4. Prepare missing reusable English blocks and localized expressions; validate and
+3. Resolve topics against eligible exact current knowledge revisions.
+4. Plan exact material needs by revision and block type.
+5. Prepare only missing reusable English blocks and localized expressions; validate and
    persist them before they can be offered to final composition.
-5. Plan an answer from the available persisted block IDs.
 6. Select and order blocks with the final model; render them deterministically.
 7. Validate/lint the rendered result and atomically persist its message, composition
    provenance, and exposures.
@@ -114,3 +126,9 @@ must never suppress ordinary document provenance.
 The UI must expose English and localized content, exact version links, provenance,
 review status, and stale translation state without implying that a reviewed
 semantic revision is also a reviewed translation.
+
+Search projects one active record per eligible knowledge identity. That record uses
+the current semantic revision, its active English document head, aliases, and
+non-stale localizations. Historical revisions and superseded or stale document
+blocks remain inspectable but are not active retrieval records and cannot gain rank
+through duplicate block rows.
