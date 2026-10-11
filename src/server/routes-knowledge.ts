@@ -7,6 +7,7 @@ import {
   canonicalKnowledgeYamlSchema,
   knowledgeCreateBoundarySchema,
 } from "./knowledge-contracts.js";
+import { documentCreateBodySchema } from "./knowledge-document-contracts.js";
 import { genericRecord } from "./records.js";
 import { registerEvidenceRoutes } from "./routes-evidence.js";
 import { importSchema, knowledgeReviewSchema } from "./schemas.js";
@@ -44,7 +45,34 @@ export const knowledgeRoutes = (services: Services): Hono => {
       learnerState: services.knowledge.learnerState(owner, id, item.current_revision),
       reviewStatus: services.knowledge.reviewStatus(owner, id, item.current_revision),
       reviewHistory: services.knowledge.reviewHistory(owner, id),
+      documents: services.documents.forRevision(
+        z
+          .object({ id: z.string() })
+          .parse(services.knowledge.revision(owner, id, item.current_revision)).id,
+      ),
     });
+  });
+  app.get("/knowledge/:id/revisions/:revision/documents", (c) => {
+    const owner = ownerFor(c, services);
+    const id = c.req.param("id");
+    const revision = z.coerce.number().int().positive().parse(c.req.param("revision"));
+    const record = z
+      .object({ id: z.string() })
+      .parse(services.knowledge.revision(owner, id, revision));
+    return c.json({ documents: services.documents.forRevision(record.id) });
+  });
+  app.post("/knowledge/:id/revisions/:revision/documents", async (c) => {
+    const owner = ownerFor(c, services);
+    const id = c.req.param("id");
+    const revision = z.coerce.number().int().positive().parse(c.req.param("revision"));
+    const record = z
+      .object({ id: z.string() })
+      .parse(services.knowledge.revision(owner, id, revision));
+    const body = documentCreateBodySchema.parse(await jsonBody(c));
+    return c.json(
+      services.documents.create({ ...body, owner, knowledgeRevisionId: record.id }),
+      201,
+    );
   });
   app.post("/knowledge/:id/reviews", async (c) => {
     const owner = ownerFor(c, services);
@@ -119,6 +147,29 @@ export const knowledgeRoutes = (services: Services): Hono => {
           distinguishingFeatures: item.distinguishingFeatures,
           claims: item.claims,
           sourceRefs: [data.source],
+        });
+        const revision = z.object({ id: z.string() }).parse(result.revision);
+        services.documents.create({
+          owner: null,
+          knowledgeRevisionId: revision.id,
+          role: "english_base",
+          languageTag: "en",
+          sourceType: "canonical_import",
+          sourceRefs: [data.source],
+          blocks: [
+            { type: "definition", content: item.statement },
+            ...(item.semanticScope === ""
+              ? []
+              : [{ type: "scope" as const, content: item.semanticScope }]),
+            ...item.distinguishingFeatures.map((content) => ({
+              type: "feature" as const,
+              content,
+            })),
+            ...item.claims.map((claim) => ({
+              type: "claim" as const,
+              content: typeof claim === "string" ? claim : claim.text,
+            })),
+          ],
         });
         return { key: item.key, result };
       });
