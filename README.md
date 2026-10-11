@@ -268,6 +268,8 @@ a production service.
 - [Verification record and environment limitations](docs/verification.md)
 - [Real-provider quality evaluation and remaining validation](docs/quality-evaluation.md)
 - [Pipeline experiment readiness, improvements, and test plan](docs/pipeline-experiments.md)
+- [English source documents, localized expressions, and grounded composition contract](docs/knowledge-document-contract.md)
+- [Knowledge document implementation milestones](docs/knowledge-document-roadmap.md)
 - [Design system](DESIGN.md)
 
 Phase 2 clustering, automatic canonicalization, editorial workflows, public
