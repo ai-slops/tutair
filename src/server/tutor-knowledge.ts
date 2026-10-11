@@ -185,7 +185,7 @@ export function persistResolution(input: {
       }
     }
     const candidate = applyKnowledgeRisk(raw);
-    const created = input.repository.create(input.owner, {
+    const created = input.repository.createOrReuseGenerated(input.owner, {
       title: candidate.label.slice(0, 200),
       statement: candidate.definition,
       riskScope: candidate.riskScope,
@@ -208,14 +208,15 @@ export function persistResolution(input: {
       .object({
         item: z.object({ id: z.string().uuid() }),
         revision: z.object({ id: z.string().uuid() }),
+        created: z.boolean(),
       })
       .parse(created);
     ids.add(parsed.item.id);
     resolvedByKey.set(raw.key, { knowledgeId: parsed.item.id, revisionId: parsed.revision.id });
-    changes.push(created);
+    if (parsed.created) changes.push(created);
     decisions.push({
       key: raw.key,
-      resolution: "new",
+      resolution: parsed.created ? "new" : "exact_fingerprint_reuse",
       knowledgeId: parsed.item.id,
       revisionId: parsed.revision.id,
       reasonCodes: decision.reasonCodes,

@@ -64,7 +64,7 @@ export function loadTutorContext(
     const parsed = retrievalDocument.safeParse(raw);
     return parsed.success ? [parsed.data] : [];
   });
-  const selected = new Set(
+  const retrievedKnowledge = new Set(
     documents
       .filter((document) => document.entity_type === "knowledge")
       .map((document) => document.id),
@@ -75,8 +75,9 @@ export function loadTutorContext(
   const messageDocumentIds = documents
     .filter((document) => document.entity_type === "message")
     .map((document) => document.id);
+  const directKnowledge = new Set<string>();
   const addKnowledgeIds = (rows: readonly { readonly knowledge_id: string }[]): void => {
-    for (const row of rows) selected.add(row.knowledge_id);
+    for (const row of rows) directKnowledge.add(row.knowledge_id);
   };
   if (evidenceDocumentIds.length > 0)
     addKnowledgeIds(
@@ -105,12 +106,32 @@ export function loadTutorContext(
       knowledgeIdRecord,
     ),
   );
+  addKnowledgeIds(
+    thread === null
+      ? db.all(
+          `SELECT DISTINCT r.knowledge_id FROM knowledge_revisions r
+           JOIN knowledge_items k ON k.id=r.knowledge_id
+           WHERE k.learner_id=? AND r.conversation_id=?
+           ORDER BY r.created_at DESC LIMIT 16`,
+          [input.owner, input.conversationId],
+          knowledgeIdRecord,
+        )
+      : db.all(
+          `SELECT DISTINCT r.knowledge_id FROM knowledge_revisions r
+           JOIN knowledge_items k ON k.id=r.knowledge_id
+           JOIN thread_conversations tc ON tc.conversation_id=r.conversation_id
+           WHERE k.learner_id=? AND tc.learner_id=? AND tc.thread_id=?
+           ORDER BY r.created_at DESC LIMIT 16`,
+          [input.owner, input.owner, thread.id],
+          knowledgeIdRecord,
+        ),
+  );
   if (thread !== null) {
     for (const id of [
       ...z.array(z.string()).parse(JSON.parse(thread.target_knowledge_unit_ids_json)),
       ...z.array(z.string()).parse(JSON.parse(thread.deferred_knowledge_unit_ids_json)),
     ])
-      selected.add(id);
+      directKnowledge.add(id);
     const plans = db.all(
       "SELECT data_json FROM turn_plans WHERE learner_id=? AND thread_id=? ORDER BY created_at DESC LIMIT 4",
       [input.owner, thread.id],
@@ -126,9 +147,10 @@ export function loadTutorContext(
           ...parsed.data.introducedUnits,
           ...parsed.data.deferredUnits,
         ])
-          selected.add(id);
+          directKnowledge.add(id);
     }
   }
+  const selected = [...directKnowledge, ...retrievedKnowledge];
   const seedIds = eligibleKnowledgeIds(db, input.owner, [...selected]).slice(0, 16);
   const relationCandidates =
     seedIds.length === 0

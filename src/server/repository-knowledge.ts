@@ -15,6 +15,7 @@ import {
   reviewStatus,
 } from "./knowledge-review.js";
 import { insertKnowledgeRevision } from "./knowledge-revision-store.js";
+import { exactGeneratedKnowledge } from "./knowledge-semantic-reuse.js";
 import { knowledgeRecord, learnerStateRecord, revisionRecord } from "./records.js";
 import { insertEvidence, listEvidence, rebuildEvidenceProjections } from "./repository-evidence.js";
 import type { LearnerId } from "./types.js";
@@ -122,10 +123,14 @@ export class KnowledgeRepository {
         };
       }
     }
-    const id = newId();
-    const now = isoNow();
-    const scope = owner === null ? "canonical" : "provisional";
-    const revision = this.db.transaction(() => {
+    return this.db.transaction(() => {
+      if (owner !== null && input.sourceType === "model_generated") {
+        const existing = exactGeneratedKnowledge(this.db, owner, input);
+        if (existing !== null) return existing;
+      }
+      const id = newId();
+      const now = isoNow();
+      const scope = owner === null ? "canonical" : "provisional";
       this.db.run("INSERT INTO knowledge_items VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", [
         id,
         owner,
@@ -140,7 +145,7 @@ export class KnowledgeRepository {
         input.confidence,
         now,
       ]);
-      const inserted = insertKnowledgeRevision(this.db, {
+      const revision = insertKnowledgeRevision(this.db, {
         knowledgeId: id,
         revision: 1,
         statement: input.statement,
@@ -150,12 +155,21 @@ export class KnowledgeRepository {
         details: input,
       });
       this.db.run("INSERT INTO knowledge_fts VALUES(?,?,?)", [id, input.title, input.statement]);
-      return inserted;
+      return {
+        item: this.item(owner ?? "00000000-0000-0000-0000-000000000000", id),
+        revision,
+      };
     });
-    return {
-      item: this.item(owner ?? "00000000-0000-0000-0000-000000000000", id),
-      revision,
-    };
+  }
+  createOrReuseGenerated(
+    owner: LearnerId,
+    input: NewKnowledge,
+  ): { readonly item: unknown; readonly revision: unknown; readonly created: boolean } {
+    return this.db.transaction(() => {
+      const existing = exactGeneratedKnowledge(this.db, owner, input);
+      if (existing !== null) return { ...existing, created: false };
+      return { ...this.create(owner, input), created: true };
+    });
   }
   addRevision(owner: LearnerId, input: NewRevision): unknown {
     const item = this.item(owner, input.knowledgeId);
