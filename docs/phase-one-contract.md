@@ -148,6 +148,12 @@ notifications, and sophisticated spaced repetition are out of scope.
 
 ## Required acceptance scenarios
 
+The user-approved document-language and preparation/composition extension is
+specified in [Knowledge document contract](knowledge-document-contract.md).
+It applies to both canonical and provisional material. Its target invariants and
+the [implementation milestones](knowledge-document-roadmap.md) are intentionally
+separate: current provenance UI does not yet imply complete document-derived answers.
+
 | Scenario | Observable result |
 | --- | --- |
 | Empty canonical database | A new question creates provisional micrograph, plan, reply, and exposures. |
