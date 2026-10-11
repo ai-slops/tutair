@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { deleteCookie, setCookie } from "hono/cookie";
 import { jsonBody, ownerFor, type Services } from "./context.js";
 import { registerConversationRoutes } from "./routes-conversations.js";
+import { registerDebugSettingsRoutes } from "./routes-debug-settings.js";
 import { registerThreadRoutes } from "./routes-threads.js";
 import { signupSchema } from "./schemas.js";
 
@@ -38,6 +39,7 @@ export const coreRoutes = (services: Services): Hono => {
     });
   });
   registerConversationRoutes(app, services);
+  registerDebugSettingsRoutes(app, services);
   registerThreadRoutes(app, services);
   app.delete("/privacy", async (c) => {
     const owner = ownerFor(c, services);
