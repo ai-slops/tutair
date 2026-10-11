@@ -79,9 +79,7 @@ test("shows recorded stages during a pending turn and recovers them after reload
   await expect(page.getByText("Saved request in progress", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "View generation details" }).click();
   await expect(page.getByText("Extracting relevant concepts", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Close generation details" }).click();
   await request.post("/__test__/generation/release");
-  await page.getByRole("button", { name: "Continue saved request" }).click();
   await expect(page.locator(".message-tutor")).toHaveCount(1);
   await expect(page.getByText("Saved request in progress", { exact: true })).toBeHidden();
 });
