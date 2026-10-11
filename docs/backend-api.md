@@ -18,6 +18,8 @@ When personal mode is enabled, all ChatGPT routes require the learner cookie:
 
 - `GET /api/chatgpt/status` -> learner-scoped connection metadata without tokens
 - `GET /api/chatgpt/connect` -> `302` to official authorization; loopback only
+- `POST /api/chatgpt/manual/authorize` -> `302` to official authorization; enabled and exact-origin allowlisted only
+- `POST /api/chatgpt/manual/callback` `{ callbackUrl }` -> learner-scoped connection metadata after exact loopback callback, state, PKCE, identity, and scope validation
 - `GET /auth/callback` -> validates and stores the official callback grant
 - `GET /api/chatgpt/models` -> `{ models: [{ slug, displayName }] }`, list-visible only
 - `PUT /api/chatgpt/model` `{ slug }` -> `204` after account-catalog validation
@@ -25,6 +27,10 @@ When personal mode is enabled, all ChatGPT routes require the learner cookie:
 
 The callback is outside `/api` because it is the OAuth redirect URI. Its random
 state binds it to the initiating learner; callback output contains no credentials.
+The manual endpoints are an optional Tutair relay, not an alternate redirect URI.
+They require the same learner session and same-origin POST boundary. A second
+learner receives the same invalid-state response and cannot consume or invalidate
+the initiating learner's attempt.
 
 ## Conversations and messages
 

@@ -62,6 +62,22 @@ the forwarded `http://127.0.0.1:<callback-port>` URL before connecting. Do not u
 credential transfer to a VM, follow OpenAI's self-hosted VM guidance and use a
 secure channel; the VM retains its own host ID and performs later refreshes.
 
+An operator may enable Tutair's app-specific callback relay with both
+`TUTOR_CHATGPT_MANUAL_CALLBACK=true` and an exact comma-separated allowlist in
+`TUTOR_CHATGPT_MANUAL_ORIGINS`. This is off by default. Each listed value must be
+an origin only, such as `https://tutair.example`, with no path. The initiating and
+completing requests are authenticated same-origin POSTs, and the pending state is
+bound to that learner before it can be consumed or invalidated. Submitted callback
+URLs must exactly match the configured loopback scheme, host, port, and path;
+denials consume only their owner's attempt, expired/replayed attempts fail, and
+codes or callback URLs are never logged or persisted.
+
+The relay transports the authorizing user's newly issued OAuth response; it does
+not import browser sessions, credentials from another client, or private Codex
+endpoints. It does not change OpenAI's registration policy. If the upstream page
+reports dynamic registration or the issued client is unsupported, stop and use
+OpenAI's documented local-authorization plus protected credential-transfer path.
+
 ## DIM integration
 
 `.dim` remains the original development-environment lifecycle. The application's
