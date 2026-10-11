@@ -158,6 +158,23 @@ annotations are omitted and audited with `exposureTrackingSkipped`, rather than
 fabricating evidence or discarding an otherwise usable answer. Verified
 annotations and learner-evidence validation remain strict.
 
+### Generation pipeline records
+
+While a tutor turn runs, the workspace shows only stages actually persisted by
+the server. **View generation details** opens the same request-scoped record for
+live, recovered, and historical replies. The summary is polled while work is
+active; the bounded structured call, validated or failed output, versions,
+repair provenance, and decision traces load only when a recorded run is selected.
+
+Records are correlated through the tutor request's saved learner message, not by
+nearby timestamps or another turn in the conversation. Failed attempts and their
+repair attempts remain separate. Missing historical model, usage, timing, or
+input snapshots are shown as unknown/unavailable—not zero and not reconstructed.
+All reads are authenticated and learner-scoped, and diagnostic payloads are
+redacted for credentials and tokens; hidden chain-of-thought is never requested
+or exposed. See the [backend API](docs/backend-api.md#generation-pipeline-inspection)
+for the normative contract.
+
 ### Knowledge review lifecycle
 
 Open **Knowledge** in the workspace header to browse definitions, provenance,

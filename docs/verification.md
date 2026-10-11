@@ -335,3 +335,40 @@ verification learner was erased afterward. No real upstream authorization was
 attempted, so OpenAI account eligibility and dynamic registration remain external
 limitations rather than verified behavior. TypeScript compilation passed; later
 LSP diagnostic requests timed out, so this run does not claim a fresh LSP result.
+
+## Live generation pipeline inspection: October 11, 2026
+
+Added owner-scoped request summaries and lazy run details for persisted tutor
+generation. Backend coverage verified the actual running stage while the tutor
+POST remained pending, exact request-to-saved-message isolation, ordered failed
+and repair attempts, resolved runtime model and failed-attempt usage, 404 for a
+foreign owner or wrong conversation, recursive secret redaction, and lazy detail
+loading. Historical missing model, usage, timing, and call snapshots remain null
+or explicitly unavailable rather than being reconstructed.
+
+Final `npm run verify` passed:
+
+- **296 tests passed, one opt-in local-embedding test skipped, 69 test files passed.**
+- Strict type checking, Biome, server compilation, and the production Vite build
+  passed. Biome reported no warnings or errors.
+- TypeScript LSP diagnostics reported zero errors across the scanned `src` and
+  `tests` directories.
+
+The full production-browser suite passed **13/13 scenarios**. It includes a paused
+real HTTP fixture proving immediate live polling, truthful persisted-stage labels,
+reload recovery, and terminal completion, plus a failed-stage record that remains
+inspectable after reload. Fresh generation-inspector captures are:
+
+- `.omo/evidence/generation-inspector-375.png`
+- `.omo/evidence/generation-inspector-768.png`
+- `.omo/evidence/generation-inspector-1280.png`
+
+All three browser states asserted no horizontal document overflow. They use the
+synthetic paused provider fixture and demonstrate application behavior and
+responsive layout, not external model quality. No paid model call was made.
+
+The isolated port-1455 process was rebuilt and restarted with its existing
+database path, ChatGPT credential store location, callback settings, and exact
+manual-origin allowlist. Baseline PID 8 remained running. Local and public health
+both returned `{ "status": "ok" }` at
+`https://tutair--3.remote-main-3.mj-y.com/api/health`.
