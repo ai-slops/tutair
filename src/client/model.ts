@@ -78,6 +78,26 @@ export type KnowledgeReviewEvent = {
   readonly createdAt: string;
 };
 
+export type KnowledgeDocumentBlock = {
+  readonly id: string;
+  readonly type: string;
+  readonly content: string;
+  readonly contentHash: string;
+  readonly sourceBlockId: string | null;
+};
+
+export type KnowledgeDocument = {
+  readonly id: string;
+  readonly role: "english_base" | "localization" | "legacy";
+  readonly languageTag: string;
+  readonly version: number;
+  readonly sourceType: string;
+  readonly sourceRefs: readonly string[];
+  readonly createdAt: string;
+  readonly stale: boolean;
+  readonly blocks: readonly KnowledgeDocumentBlock[];
+};
+
 export type KnowledgeItem = {
   readonly id: string;
   readonly name: string;
@@ -92,6 +112,7 @@ export type KnowledgeItem = {
   readonly reviewStatus: KnowledgeReviewStatus;
   readonly revisions: readonly KnowledgeRevision[];
   readonly reviewHistory: readonly KnowledgeReviewEvent[];
+  readonly documents?: readonly KnowledgeDocument[];
 };
 
 export type ProviderStatus = {

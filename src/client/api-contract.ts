@@ -124,6 +124,29 @@ export const LearnerStateSchema = z
     evidenceIds: z.array(IdSchema),
   })
   .catchall(z.unknown());
+const KnowledgeDocumentSchema = z
+  .object({
+    id: IdSchema,
+    role: z.enum(["english_base", "localization", "legacy"]),
+    languageTag: z.string(),
+    version: z.number().int().positive(),
+    sourceType: z.string(),
+    sourceRefs: z.array(z.string()),
+    createdAt: DateSchema,
+    stale: z.boolean(),
+    blocks: z.array(
+      z
+        .object({
+          id: IdSchema,
+          type: z.string(),
+          content: z.string(),
+          contentHash: z.string(),
+          sourceBlockId: IdSchema.nullable(),
+        })
+        .catchall(z.unknown()),
+    ),
+  })
+  .catchall(z.unknown());
 export const KnowledgeDetailSchema = z
   .object({
     item: KnowledgeRecordSchema,
@@ -133,6 +156,7 @@ export const KnowledgeDetailSchema = z
     learnerState: z.array(LearnerStateSchema).default([]),
     reviewStatus: KnowledgeReviewStatusSchema,
     reviewHistory: z.array(KnowledgeReviewEventSchema),
+    documents: z.array(KnowledgeDocumentSchema).default([]),
   })
   .catchall(z.unknown());
 export const TutorTurnSchema = z

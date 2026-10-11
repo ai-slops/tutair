@@ -66,6 +66,7 @@ export async function loadKnowledge(client: KyInstance): Promise<readonly Knowle
           createdAt: item.createdAt,
         })),
         reviewHistory: detail.reviewHistory,
+        documents: detail.documents,
       };
     }),
   );
