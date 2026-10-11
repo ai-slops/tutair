@@ -2,7 +2,7 @@
 
 This is a chronological record, not a claim that every original requirement is
 complete. See the [requirement audit](phase-one-status.md) for remaining work.
-The latest verification is September 22, 2026, below; earlier observations are
+The latest verification is October 11, 2026, below; earlier observations are
 retained with their original dates and environment limitations.
 
 ## Baseline: September 19, 2026
@@ -311,3 +311,27 @@ Headed mode was unavailable because this container has no X server; screenshots,
 interaction flows, and Lighthouse used the installed Chrome stable binary in
 headless/CDP mode. No external LLM credential, educational-quality study, public
 ingress, or deployed-network audit was performed in this run.
+
+## Manual ChatGPT callback relay: October 11, 2026
+
+Verified the explicitly enabled, exact-origin manual callback relay without using
+a real OpenAI account. The integration fixture exercised authorization redirects,
+PKCE, signed identity verification, issued-client validation, owner binding,
+cross-learner rejection, denial, expiry, and replay rejection. `npm run verify`
+passed with **267 tests passed, one skipped, and 62 test files passed**; the same
+five pre-existing CSS warnings and two upstream Zod annotation warnings remain.
+
+Playwright then completed the mocked OAuth flow at 375, 768, and 1280 pixels,
+including retained invalid input, associated local error feedback, successful
+connection, refreshed visible-model options, disconnect, and token non-disclosure.
+All four browser scenarios passed. Independent visual review passed all six fresh
+manual-error and connected-state captures with no remaining blockers.
+
+The port-1455 process was restarted with manual mode restricted to the configured
+DIM HTTPS origin; the baseline port-3000 process was not stopped. Public health
+returned `{ "status": "ok" }`, and an authenticated public status request returned
+`enabled: true`, `connected: false`, and `manualCallback: true`. The temporary
+verification learner was erased afterward. No real upstream authorization was
+attempted, so OpenAI account eligibility and dynamic registration remain external
+limitations rather than verified behavior. TypeScript compilation passed; later
+LSP diagnostic requests timed out, so this run does not claim a fresh LSP result.
