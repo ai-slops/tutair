@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import { preparationSchema } from "./document-answer-contracts.js";
+import { type preparationSchema, preparationSchemaFor } from "./document-answer-contracts.js";
 import type { blockTypes } from "./knowledge-document-contracts.js";
 import type { KnowledgeDocumentRepository } from "./knowledge-document-repository.js";
 import type { KnowledgeContext } from "./tutor-knowledge.js";
@@ -55,9 +55,23 @@ export class DocumentPreparationService {
           ),
       );
       if (missing.length === 0) return { blocks: available, created };
+      const reusableEnglishDefinitionIds = new Set(
+        missing.flatMap((need) =>
+          this.documents
+            .forRevision(this.stages.input.owner, need.knowledgeRevisionId)
+            .some(
+              (document) =>
+                document.role === "english_base" &&
+                document.languageTag === "en" &&
+                document.blocks.some((block) => block.type === "definition"),
+            )
+            ? [need.knowledgeRevisionId]
+            : [],
+        ),
+      );
       const prepared = await this.stages.stage({
         stage: "preparation",
-        schema: preparationSchema,
+        schema: preparationSchemaFor(reusableEnglishDefinitionIds),
         data: {
           ...context,
           responseLanguage,
@@ -152,6 +166,26 @@ export class DocumentPreparationService {
           "automatic_definition_change",
           "Preparation cannot change an existing concept definition",
         );
+      const immutableDefinition = priorDefinition?.content;
+      if (
+        material.englishBlocks.length > 0 &&
+        nextDefinition === undefined &&
+        immutableDefinition === undefined
+      )
+        throw new ApiError(
+          422,
+          "missing_english_definition",
+          "Preparation requires an immutable English definition",
+        );
+      const englishBlocks =
+        material.englishBlocks.length > 0 &&
+        nextDefinition === undefined &&
+        immutableDefinition !== undefined
+          ? [
+              ...material.englishBlocks,
+              { type: "definition" as const, content: immutableDefinition },
+            ]
+          : material.englishBlocks;
       const english =
         material.englishBlocks.length === 0
           ? existingEnglish
@@ -163,7 +197,7 @@ export class DocumentPreparationService {
               sourceType: "model_generated",
               modelRunId: runId,
               sourceRefs: [],
-              blocks: material.englishBlocks,
+              blocks: englishBlocks,
             });
       if (english === undefined)
         throw new ApiError(

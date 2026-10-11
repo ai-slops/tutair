@@ -43,3 +43,22 @@ export const preparationSchema = z
     if (text > 20_000)
       context.addIssue({ code: "custom", message: "Preparation exceeds 20000 characters" });
   });
+
+export const preparationSchemaFor = (reusableEnglishDefinitionIds: ReadonlySet<string>) =>
+  preparationSchema.superRefine((value, context) => {
+    value.materials.forEach((material, materialIndex) => {
+      if (material.englishBlocks.length === 0) return;
+      const definitionCount = material.englishBlocks.filter(
+        (block) => block.type === "definition",
+      ).length;
+      const required = !reusableEnglishDefinitionIds.has(material.knowledgeRevisionId);
+      if (definitionCount > 1 || (required && definitionCount !== 1))
+        context.addIssue({
+          code: "custom",
+          path: ["materials", materialIndex, "englishBlocks"],
+          message: required
+            ? "New English material requires exactly one English definition"
+            : "English material permits at most one generated definition",
+        });
+    });
+  });

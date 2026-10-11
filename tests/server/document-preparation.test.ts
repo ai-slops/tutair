@@ -13,7 +13,15 @@ import { TutorStageRunner } from "../../src/server/tutor-stage.js";
 const databases: Database[] = [];
 afterEach(() => databases.splice(0).forEach((database) => void database.close()));
 
-function fixture(output: (call: StructuredCall) => unknown) {
+type FixtureOptions = {
+  readonly statement?: string;
+  readonly withEnglishBase?: boolean;
+  readonly withLegacyDocument?: boolean;
+};
+
+function fixture(output: (call: StructuredCall) => unknown, options: FixtureOptions = {}) {
+  const statement =
+    options.statement ?? "A state captures information relevant to future behavior.";
   const database = new Database(":memory:");
   databases.push(database);
   const core = new CoreRepository(database);
@@ -27,7 +35,7 @@ function fixture(output: (call: StructuredCall) => unknown) {
   const knowledge = new KnowledgeRepository(database);
   const created = knowledge.create(owner, {
     title: "State",
-    statement: "A state captures information relevant to future behavior.",
+    statement,
     riskScope: "stable",
     confidence: 0.9,
     sourceType: "learner_manual",
@@ -35,17 +43,31 @@ function fixture(output: (call: StructuredCall) => unknown) {
   const itemId = z.object({ id: z.string() }).parse(created.item).id;
   const revisionId = z.object({ id: z.string() }).parse(created.revision).id;
   const documents = new KnowledgeDocumentRepository(database);
-  documents.create({
-    owner,
-    knowledgeRevisionId: revisionId,
-    role: "english_base",
-    languageTag: "en",
-    sourceType: "learner_manual",
-    sourceRefs: [],
-    blocks: [
-      { type: "definition", content: "A state captures information relevant to future behavior." },
-    ],
-  });
+  if (options.withEnglishBase ?? true)
+    documents.create({
+      owner,
+      knowledgeRevisionId: revisionId,
+      role: "english_base",
+      languageTag: "en",
+      sourceType: "learner_manual",
+      sourceRefs: [],
+      blocks: [
+        {
+          type: "definition",
+          content: statement,
+        },
+      ],
+    });
+  if (options.withLegacyDocument)
+    documents.create({
+      owner,
+      knowledgeRevisionId: revisionId,
+      role: "legacy",
+      languageTag: "und",
+      sourceType: "learner_manual",
+      sourceRefs: [],
+      blocks: [{ type: "definition", content: statement }],
+    });
   const provider: TutorProvider = {
     state: {
       provider: "demo",
@@ -124,5 +146,104 @@ describe("document preparation material plans", () => {
       ),
     ).rejects.toMatchObject({ code: "automatic_definition_change" });
     expect(context.documents.forRevision(context.owner, context.revisionId)).toHaveLength(1);
+  });
+
+  it("reuses the existing English definition when prepared material omits one", async () => {
+    const context = fixture(() => ({
+      materials: [
+        {
+          knowledgeRevisionId: context.revisionId,
+          englishBlocks: [{ type: "example", content: "Locked is a door-controller state." }],
+          localizedBlocks: [
+            {
+              type: "example",
+              content: "잠김은 문 제어기의 상태입니다.",
+              sourceEnglishIndex: 0,
+            },
+          ],
+        },
+      ],
+    }));
+
+    const prepared = await context.service.prepare(
+      context.knowledge,
+      "ko",
+      [{ knowledgeRevisionId: context.revisionId, blockTypes: ["example"] }],
+      {},
+    );
+    const documents = context.documents.forRevision(context.owner, context.revisionId);
+    const english = documents.find(
+      (document) => document.role === "english_base" && document.version === 2,
+    );
+    const localization = documents.find((document) => document.role === "localization");
+
+    expect(prepared.blocks.map((block) => block.type)).toEqual(["example"]);
+    expect(english?.blocks.map((block) => block.type)).toEqual(["example", "definition"]);
+    expect(localization?.blocks[0]?.sourceBlockId).toBe(english?.blocks[0]?.id);
+  });
+
+  it("repairs an omitted definition instead of treating legacy Korean as English", async () => {
+    let providerCalls = 0;
+    const context = fixture(
+      (call) => {
+        providerCalls += 1;
+        const repairing = call.data["outputCorrection"] !== undefined;
+        return {
+          materials: [
+            {
+              knowledgeRevisionId: context.revisionId,
+              englishBlocks: repairing
+                ? [
+                    {
+                      type: "definition",
+                      content: "A state captures information relevant to future behavior.",
+                    },
+                    { type: "example", content: "Locked is a door-controller state." },
+                  ]
+                : [{ type: "example", content: "Locked is a door-controller state." }],
+              localizedBlocks: repairing
+                ? [
+                    {
+                      type: "definition",
+                      content: "상태는 미래 동작과 관련된 정보를 담습니다.",
+                      sourceEnglishIndex: 0,
+                    },
+                    {
+                      type: "example",
+                      content: "잠김은 문 제어기의 상태입니다.",
+                      sourceEnglishIndex: 1,
+                    },
+                  ]
+                : [
+                    {
+                      type: "example",
+                      content: "잠김은 문 제어기의 상태입니다.",
+                      sourceEnglishIndex: 0,
+                    },
+                  ],
+            },
+          ],
+        };
+      },
+      {
+        statement: "상태는 미래 동작과 관련된 정보를 담습니다.",
+        withEnglishBase: false,
+        withLegacyDocument: true,
+      },
+    );
+
+    await context.service.prepare(
+      context.knowledge,
+      "ko",
+      [{ knowledgeRevisionId: context.revisionId, blockTypes: ["example"] }],
+      {},
+    );
+    const documents = context.documents.forRevision(context.owner, context.revisionId);
+    const english = documents.find((document) => document.role === "english_base");
+
+    expect(providerCalls).toBe(2);
+    expect(english?.blocks.find((block) => block.type === "definition")?.content).toBe(
+      "A state captures information relevant to future behavior.",
+    );
   });
 });
