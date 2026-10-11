@@ -21,6 +21,15 @@ const provenanceSchema = z.object({
   availability: z.enum(["available", "unavailable"]),
   providedToModel: z.array(documentSchema),
   created: z.array(documentSchema),
+  createdDocuments: z.array(
+    z.object({
+      documentId: z.string().uuid(),
+      knowledgeId: z.string().uuid(),
+      knowledgeRevisionId: z.string().uuid(),
+      role: z.enum(["english_base", "localization", "legacy"]),
+      languageTag: z.string(),
+    }),
+  ),
   exposedInAnswer: z.array(documentSchema),
   exposureCoverage: z.literal("non_exhaustive"),
   reasoningSummaries: z.array(

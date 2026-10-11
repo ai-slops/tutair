@@ -65,10 +65,10 @@ it("rejects fictional followup references and unbounded ambiguity metadata", () 
 
 it("versions only the changed evaluation stage while retaining unrelated stage versions", () => {
   expect(STAGE_VERSIONS).toEqual({
-    extraction: "phase1-v1",
-    resolution: "phase1-v1",
-    planning: "phase1-v1",
-    preparation: "document-v1",
+    extraction: "document-v2",
+    resolution: "document-v2",
+    planning: "document-v2",
+    preparation: "document-v2",
     draft: "phase1-v1",
     lint: "phase1-v1",
     final: "phase1-v1",
@@ -81,10 +81,10 @@ it("versions only the changed evaluation stage while retaining unrelated stage v
 
 it("versions schemas only for stages whose output contracts changed", () => {
   expect(STAGE_SCHEMA_VERSIONS).toEqual({
-    extraction: "phase1-schema-v3",
-    resolution: "phase1-schema-v3",
-    planning: "phase1-schema-v2",
-    preparation: "document-schema-v1",
+    extraction: "document-schema-v2",
+    resolution: "document-schema-v2",
+    planning: "document-schema-v2",
+    preparation: "document-schema-v2",
     draft: "phase1-schema-v2",
     lint: "phase1-schema-v3",
     final: "phase1-schema-v2",

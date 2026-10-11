@@ -27,6 +27,13 @@ const snapshotDocument = z.object({
   revisionId: z.string(),
   revision: z.number().int().positive(),
 });
+const preparedDocumentRow = z.object({
+  id: z.string(),
+  knowledge_id: z.string(),
+  knowledge_revision_id: z.string(),
+  role: z.enum(["english_base", "localization", "legacy"]),
+  language_tag: z.string(),
+});
 
 type TurnKey = {
   readonly owner: LearnerId;
@@ -92,6 +99,16 @@ export class AnswerProvenanceStore {
             [key.owner, request.tutor_message_id],
             documentRow,
           );
+    const createdDocuments = this.db.all(
+      `SELECT d.id,r.knowledge_id,d.knowledge_revision_id,d.role,d.language_tag
+       FROM knowledge_documents d
+       JOIN knowledge_revisions r ON r.id=d.knowledge_revision_id
+       JOIN model_runs mr ON mr.id=d.model_run_id
+       WHERE d.owner_learner_id=? AND mr.learner_id=? AND mr.conversation_id=?
+         AND mr.input_message_id=? ORDER BY d.created_at,d.id`,
+      [key.owner, key.owner, key.conversationId, request.user_message_id],
+      preparedDocumentRow,
+    );
     return {
       availability: runs.some((run) => run.context_json !== null) ? "available" : "unavailable",
       ...(runs.length === 0
@@ -104,6 +121,13 @@ export class AnswerProvenanceStore {
         stages: [...(provided.get(row.revision_id)?.stages ?? [])],
       })),
       created: createdRows.map(presentDocument),
+      createdDocuments: createdDocuments.map((document) => ({
+        documentId: document.id,
+        knowledgeId: document.knowledge_id,
+        knowledgeRevisionId: document.knowledge_revision_id,
+        role: document.role,
+        languageTag: document.language_tag,
+      })),
       exposedInAnswer: exposedRows.map(presentDocument),
       exposureCoverage: "non_exhaustive",
       reasoningSummaries: runs.map((run) => ({
