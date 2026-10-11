@@ -216,3 +216,16 @@ thread PATCH와 assembled quality summary API 테스트도 추가했다.
 
 새 API 제어를 위한 별도 UI 화면, 통계적 교육 calibration, 자동 클러스터링·정식화·개인 KB를
 구현했다고 주장하지 않는다. 뒤의 세 항목은 명시적인 Phase 2 범위이다.
+
+## 2026-10-11 generation inspection 완료 범위
+
+- request summary와 lazy run detail endpoint를 구현했다. owner/conversation/request/message/run
+  경계가 모두 일치해야 하며 다른 learner 또는 잘못된 conversation은 404다.
+- live·recovery·historical UI가 같은 실제 persisted stage 목록을 사용한다. active polling은 즉시
+  시작해 2초 간격으로 진행되고 terminal 상태 또는 target 변경 시 중단된다.
+- 실패 attempt와 repair는 별도 행으로 남고 원본 run ID로 연결된다. resolved model과 실패
+  응답의 알려진 usage도 저장한다.
+- context/output/trace는 detail 선택 시에만 읽고 secret pattern을 재귀적으로 redaction한다.
+  credential이나 hidden chain-of-thought는 제공하지 않는다.
+- 과거 snapshot, model, usage, timing이 없으면 `null`/Unknown을 유지한다. 현재 설정이나 인접
+  turn에서 값을 추정하지 않으므로 모든 과거 run의 exact replay를 보장하지 않는다.

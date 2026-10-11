@@ -27,6 +27,20 @@
 기존 테스트는 스키마·권한·상태 전이·불변성 등 **런타임 정확성**의 근거다.
 모델의 설명이 맞는지, 전제를 잘 찾는지, 학습자가 실제로 이해했는지는 별도 평가가 필요하다.
 
+### Run summary/detail 해석
+
+요청 summary endpoint는 저장된 attempt를 순서대로 나열하는 가벼운 관측 경계이고, bounded
+StructuredCall·출력·trace는 run을 선택할 때만 detail endpoint에서 읽는다. 각 행은 집계로
+대체할 수 없는 실제 run이다. 실패 원본과 repair는 각각 세고 `repairOfRunId`로 연결하며,
+fallback도 별도로 보고한다. request ID와 저장된 learner message ID의 상관관계를 보고서에
+남겨 다른 turn의 run이 섞이지 않았음을 확인한다.
+
+`usage: null`은 0 token이 아니라 알 수 없음이고, `model: null`은 현재 설정을 과거 실행에
+소급할 수 없다는 뜻이다. snapshot이나 resolved model metadata가 없는 과거 run은 exact replay와
+비용 비교에서 제외한다. polling의 terminal 도달은 런타임 완료일 뿐 교육적 성공이 아니다.
+실험 artifact에는 credential, cookie, authorization code, private chain-of-thought, 불필요한 개인
+문맥을 넣지 않는다.
+
 ## P0: 비교 실험 전에 보강할 것
 
 ### 1. 실제 실행 설정과 비용을 정확하게 기록
