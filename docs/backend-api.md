@@ -18,7 +18,7 @@ When personal mode is enabled, all ChatGPT routes require the learner cookie:
 
 - `GET /api/chatgpt/status` -> learner-scoped connection metadata without tokens
 - `GET /api/chatgpt/connect` -> `302` to official authorization; loopback only
-- `POST /api/chatgpt/manual/authorize` -> `302` to official authorization; enabled and exact-origin allowlisted only
+- `POST /api/chatgpt/manual/authorize` -> `{ authorizationUrl }`; enabled and exact-origin allowlisted only. The browser opens this URL in a separate tab after the same-origin POST succeeds.
 - `POST /api/chatgpt/manual/callback` `{ callbackUrl }` -> learner-scoped connection metadata after exact loopback callback, state, PKCE, identity, and scope validation
 - `GET /auth/callback` -> validates and stores the official callback grant
 - `GET /api/chatgpt/models` -> `{ models: [{ slug, displayName }] }`, list-visible only
