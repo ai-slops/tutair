@@ -93,6 +93,30 @@ grant. The store coordinates same-path mutations within one server process; do
 not share one credential path between multiple Tutair processes. A real browser
 login is not exercised by the automated fixture suite.
 
+For a controlled remote Tutair origin where port forwarding is unavailable, an
+app-specific manual relay can be enabled explicitly:
+
+```dotenv
+TUTOR_CHATGPT_MANUAL_CALLBACK=true
+TUTOR_CHATGPT_MANUAL_ORIGINS=https://tutair.example
+```
+
+Open Settings on that exact origin and choose **Continue with ChatGPT**. Complete
+the legitimate OpenAI authorization. When the browser cannot load the resulting
+`http://127.0.0.1:1455/auth/callback?...` address, copy the full address-bar URL,
+return to the same Tutair learner, paste it into **Full localhost callback URL**,
+and complete the connection. The field is posted in the request body and clears
+after success; Tutair does not put it in browser history or logs.
+
+This relay is a Tutair fallback, not OpenAI's documented remote-VM procedure. The
+registered redirect remains the exact loopback URL, and all state, PKCE, nonce,
+issued-client, identity, scope, expiry, replay, and learner-owner checks still
+apply. OpenAI's documented VM procedure is to authorize locally and transfer the
+protected credential record over a secure channel while preserving the VM host
+ID. If OpenAI reports that dynamic client registration or this client is
+unsupported, Tutair cannot bypass that upstream restriction; use the documented
+credential-transfer path or a supported deployment.
+
 ChatGPT-plan inference always sends `stream: true` and `store: false`, accepts a
 result only after `response.completed`, and rejects failed, incomplete, or
 truncated streams. Tutair buffers and validates that stream server-side; the UI
