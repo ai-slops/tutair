@@ -3,7 +3,9 @@ import type { ReactNode } from "react";
 import { useEffect, useRef } from "react";
 import type { GenerationPipeline } from "../generation-contract";
 import type { Message, ProviderStatus } from "../model";
+import type { AnswerProvenanceRecord } from "../provenance-contract";
 import { useMediaMatch } from "../useMediaMatch";
+import { AnswerProvenance } from "./AnswerProvenance";
 import { TrackingNotice } from "./TrackingNotice";
 import { TutorProgress } from "./TutorProgress";
 
@@ -26,6 +28,7 @@ type ConversationProps = {
   readonly onRetry: () => void;
   readonly onKnowledge: () => void;
   readonly onInspectGeneration?: (requestId: string) => void;
+  readonly onLoadProvenance?: (requestId: string) => Promise<AnswerProvenanceRecord>;
   readonly recovery: ReactNode;
 };
 
@@ -69,6 +72,10 @@ export function Conversation(props: ConversationProps) {
           ) : (
             <MessageList
               messages={props.messages}
+              onLoadProvenance={
+                props.onLoadProvenance ??
+                (() => Promise.reject(new Error("Answer provenance is unavailable")))
+              }
               {...(props.onInspectGeneration === undefined
                 ? {}
                 : { onInspectGeneration: props.onInspectGeneration })}
@@ -160,9 +167,11 @@ function EmptyState({ onPrompt }: { readonly onPrompt: (prompt: string) => void 
 function MessageList({
   messages,
   onInspectGeneration,
+  onLoadProvenance,
 }: {
   readonly messages: readonly Message[];
   readonly onInspectGeneration?: (requestId: string) => void;
+  readonly onLoadProvenance: (requestId: string) => Promise<AnswerProvenanceRecord>;
 }) {
   return (
     <div className="message-list" aria-live="polite">
@@ -193,6 +202,9 @@ function MessageList({
           </article>
           {message.role === "assistant" && message.tracking !== undefined ? (
             <TrackingNotice status={message.tracking} />
+          ) : null}
+          {message.role === "assistant" ? (
+            <AnswerProvenance requestId={message.generationRequestId} load={onLoadProvenance} />
           ) : null}
         </div>
       ))}
