@@ -35,7 +35,10 @@ const documentCreateObject = z.object({
   blocks: z.array(blockInput).min(1).max(24),
 });
 const validateDocumentLinks = (
-  value: Pick<z.infer<typeof documentCreateObject>, "role" | "languageTag" | "baseDocumentId">,
+  value: Pick<
+    z.infer<typeof documentCreateObject>,
+    "role" | "languageTag" | "baseDocumentId" | "blocks"
+  >,
   context: z.RefinementCtx,
 ): void => {
   if (value.role === "english_base" && value.languageTag !== "en")
@@ -62,6 +65,26 @@ const validateDocumentLinks = (
       path: ["baseDocumentId"],
       message: "Only localizations use a base document",
     });
+  if (
+    value.role === "english_base" &&
+    value.blocks.filter((block) => block.type === "definition").length !== 1
+  )
+    context.addIssue({
+      code: "custom",
+      path: ["blocks"],
+      message: "English base documents require exactly one definition block",
+    });
+  if (value.role === "localization") {
+    const sourceIds = value.blocks.flatMap((block) =>
+      block.sourceBlockId === undefined ? [] : [block.sourceBlockId],
+    );
+    if (sourceIds.length !== value.blocks.length || new Set(sourceIds).size !== sourceIds.length)
+      context.addIssue({
+        code: "custom",
+        path: ["blocks"],
+        message: "Localized blocks require unique exact source block IDs",
+      });
+  }
 };
 export const documentCreateSchema = documentCreateObject.superRefine(validateDocumentLinks);
 export const documentCreateBodySchema = documentCreateObject

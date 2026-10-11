@@ -35,7 +35,7 @@ function fixture() {
 
 describe("knowledge documents", () => {
   it("migrates legacy statements byte-for-byte once without claiming English", () => {
-    const { database, revisionId, documents } = fixture();
+    const { database, owner, revisionId, documents } = fixture();
     const before = database.one(
       "SELECT statement FROM knowledge_revisions WHERE id=?",
       [revisionId],
@@ -45,7 +45,7 @@ describe("knowledge documents", () => {
     documents.migrateLegacy();
     documents.migrateLegacy();
 
-    const detail = documents.forRevision(revisionId);
+    const detail = documents.forRevision(owner, revisionId);
     expect(detail).toHaveLength(1);
     expect(detail[0]?.role).toBe("legacy");
     expect(detail[0]?.languageTag).toBe("und");
@@ -141,5 +141,79 @@ describe("knowledge documents", () => {
         blocks: [{ type: "contrast", content: "대조", topicRevisionIds: [revisionId, english.id] }],
       }),
     ).toThrow();
+  });
+
+  it("returns only shared and viewer-owned documents for a shared canonical revision", () => {
+    const database = new Database(":memory:");
+    databases.push(database);
+    const core = new CoreRepository(database);
+    const first = z.object({ id: z.string() }).parse(core.signup("First").learner).id;
+    const second = z.object({ id: z.string() }).parse(core.signup("Second").learner).id;
+    const knowledge = new KnowledgeRepository(database);
+    const created = knowledge.create(null, {
+      title: "Finite-state machine",
+      statement: "A model with finite states and transition rules.",
+      riskScope: "stable",
+      confidence: 1,
+      canonicalKey: "fsm",
+      sourceRef: "test-canonical",
+    });
+    const revisionId = z.object({ id: z.string() }).parse(created.revision).id;
+    const documents = new KnowledgeDocumentRepository(database);
+    const shared = documents.create({
+      owner: null,
+      knowledgeRevisionId: revisionId,
+      role: "english_base",
+      languageTag: "en",
+      sourceType: "canonical_import",
+      sourceRefs: ["test-canonical"],
+      blocks: [{ type: "definition", content: "A model with finite states and transition rules." }],
+    });
+    const privateSupplement = documents.create({
+      owner: first,
+      knowledgeRevisionId: revisionId,
+      role: "english_base",
+      languageTag: "en",
+      sourceType: "model_generated",
+      sourceRefs: [],
+      blocks: [
+        { type: "definition", content: "A model with finite states and transition rules." },
+        { type: "example", content: "A door controller has locked and unlocked states." },
+      ],
+    });
+
+    expect(documents.forRevision(first, revisionId).map((document) => document.id)).toEqual(
+      expect.arrayContaining([shared.id, privateSupplement.id]),
+    );
+    expect(documents.forRevision(second, revisionId).map((document) => document.id)).toEqual([
+      shared.id,
+    ]);
+    expect(() => documents.get(second, privateSupplement.id)).toThrow(/not found/i);
+  });
+
+  it("requires exactly one definition in every English document version", () => {
+    const { owner, revisionId, documents } = fixture();
+    const create = (
+      blocks: { readonly type: "definition" | "example"; readonly content: string }[],
+    ) =>
+      documents.create({
+        owner,
+        knowledgeRevisionId: revisionId,
+        role: "english_base",
+        languageTag: "en",
+        sourceType: "learner_manual",
+        sourceRefs: [],
+        blocks,
+      });
+
+    expect(() => create([{ type: "example", content: "A door controller." }])).toThrow(
+      /exactly one definition/i,
+    );
+    expect(() =>
+      create([
+        { type: "definition", content: "First definition." },
+        { type: "definition", content: "Second definition." },
+      ]),
+    ).toThrow(/exactly one definition/i);
   });
 });

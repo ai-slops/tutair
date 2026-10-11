@@ -46,6 +46,7 @@ export const knowledgeRoutes = (services: Services): Hono => {
       reviewStatus: services.knowledge.reviewStatus(owner, id, item.current_revision),
       reviewHistory: services.knowledge.reviewHistory(owner, id),
       documents: services.documents.forRevision(
+        owner,
         z
           .object({ id: z.string() })
           .parse(services.knowledge.revision(owner, id, item.current_revision)).id,
@@ -59,7 +60,7 @@ export const knowledgeRoutes = (services: Services): Hono => {
     const record = z
       .object({ id: z.string() })
       .parse(services.knowledge.revision(owner, id, revision));
-    return c.json({ documents: services.documents.forRevision(record.id) });
+    return c.json({ documents: services.documents.forRevision(owner, record.id) });
   });
   app.post("/knowledge/:id/revisions/:revision/documents", async (c) => {
     const owner = ownerFor(c, services);

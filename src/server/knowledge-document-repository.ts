@@ -38,6 +38,10 @@ export class KnowledgeDocumentRepository {
     migrateLegacyDocuments(this.db.raw);
   }
 
+  transaction<T>(work: () => T): T {
+    return this.db.transaction(work);
+  }
+
   create(raw: DocumentCreate) {
     const input = documentCreateSchema.parse(raw);
     this.assertRevision(input);
@@ -90,11 +94,16 @@ export class KnowledgeDocumentRepository {
     return this.present(row);
   }
 
-  forRevision(revisionId: string) {
+  forRevision(owner: LearnerId | null, revisionId: string) {
     return this.db
       .all(
-        "SELECT * FROM knowledge_documents WHERE knowledge_revision_id=? ORDER BY role,language_tag,version",
-        [revisionId],
+        `SELECT d.* FROM knowledge_documents d
+         JOIN knowledge_revisions r ON r.id=d.knowledge_revision_id
+         JOIN knowledge_items k ON k.id=r.knowledge_id
+         WHERE d.knowledge_revision_id=?
+           AND (d.owner_learner_id=? OR (d.owner_learner_id IS NULL AND k.learner_id IS NULL))
+         ORDER BY d.role,d.language_tag,d.version`,
+        [revisionId, owner],
         documentRow,
       )
       .map((row) => this.present(row));
@@ -106,10 +115,14 @@ export class KnowledgeDocumentRepository {
       [row.id],
       blockRow,
     );
+    const baseOwner =
+      row.base_document_id === null
+        ? row.owner_learner_id
+        : this.document(row.base_document_id).owner_learner_id;
     const newestEnglish = this.db.one(
       `SELECT id FROM knowledge_documents WHERE knowledge_revision_id=? AND role='english_base'
        AND owner_learner_id IS ? ORDER BY version DESC LIMIT 1`,
-      [row.knowledge_revision_id, row.owner_learner_id],
+      [row.knowledge_revision_id, baseOwner],
       idRow,
     );
     return {
@@ -177,7 +190,10 @@ export class KnowledgeDocumentRepository {
       base.role !== "english_base" ||
       base.language_tag !== "en" ||
       base.knowledge_revision_id !== input.knowledgeRevisionId ||
-      base.owner_learner_id !== input.owner
+      !(
+        base.owner_learner_id === input.owner ||
+        (base.owner_learner_id === null && this.sharedRevision(input.knowledgeRevisionId))
+      )
     )
       throw new ApiError(
         422,
@@ -212,15 +228,36 @@ export class KnowledgeDocumentRepository {
       sourceBlockId === undefined
         ? null
         : this.db.one(
-            "SELECT id FROM knowledge_document_blocks WHERE id=? AND document_id=?",
+            "SELECT id,block_type FROM knowledge_document_blocks WHERE id=? AND document_id=?",
             [sourceBlockId, base?.id ?? ""],
-            idRow,
+            z.object({ id: z.string(), block_type: z.string() }),
           );
     if (source === null)
       throw new ApiError(
         422,
         "invalid_source_block",
         "Localized block must link to its exact source block",
+      );
+    const localized = input.blocks.find((block) => block.sourceBlockId === sourceBlockId);
+    if (localized === undefined || source.block_type !== localized.type)
+      throw new ApiError(
+        422,
+        "localized_block_type_mismatch",
+        "Localized block type must match its English source block",
+      );
+    const sourceTopics = this.db
+      .all(
+        "SELECT knowledge_revision_id AS id FROM knowledge_document_block_topics WHERE block_id=? ORDER BY knowledge_revision_id",
+        [source.id],
+        idRow,
+      )
+      .map((topic) => topic.id);
+    const localizedTopics = [...(localized.topicRevisionIds ?? [input.knowledgeRevisionId])].sort();
+    if (JSON.stringify(sourceTopics) !== JSON.stringify(localizedTopics))
+      throw new ApiError(
+        422,
+        "localized_block_topic_mismatch",
+        "Localized block topics must match its English source block",
       );
   }
 
@@ -246,5 +283,16 @@ export class KnowledgeDocumentRepository {
       z.object({ version: z.number() }),
     );
     return (row?.version ?? 0) + 1;
+  }
+
+  private sharedRevision(revisionId: string): boolean {
+    return (
+      this.db.one(
+        `SELECT r.id FROM knowledge_revisions r JOIN knowledge_items k ON k.id=r.knowledge_id
+         WHERE r.id=? AND k.learner_id IS NULL`,
+        [revisionId],
+        idRow,
+      ) !== null
+    );
   }
 }
