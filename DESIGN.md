@@ -67,6 +67,8 @@ Radius tokens: `--radius-sm` 6px, `--radius-md` 10px, `--radius-lg` 16px, `--rad
 
 Desktop is a fixed-sidenav shell: 288px thread index, fluid conversation, optional 336px evidence folio. The shell is bounded by `100dvh`; each pane owns vertical scroll. Tablet hides the evidence folio in an overlay drawer. Mobile uses one visible layer with thread and evidence drawers; the composer stays in normal grid flow at the bottom of the main shell. Primary content never scrolls horizontally.
 
+The knowledge manager is a deliberate full-page list-detail workspace, not an evidence-folio extension. At wide widths it uses a compact filter rail, a bounded knowledge list, and a fluid detail reader. Tablet folds filters into a toolbar above list and detail; mobile stacks filters, list, and detail in document order. Its header and filter/list/detail regions remain fixed or independently scrollable inside `100dvh` on wide screens.
+
 The outer grid has one explicit `minmax(0, 1fr)` row and a definite `100dvh` height;
 content must never enlarge that row. Overview queue rows stack copy above their
 actions at every viewport because the overview is always a narrow container.
@@ -163,6 +165,15 @@ unbroken tokens rather than a zero-width text column.
 - Desktop folio or modal drawer; close control receives focus, Escape closes, focus returns to opener.
 - Empty and unavailable source states are written plainly.
 - Correction dialog requires an explicit correction intent (revise, claim more, claim less, invalidate evidence, or meaning mismatch); intent is never guessed from prose.
+
+### KnowledgeManager / KnowledgeReviewDialog
+- Entry: a labeled “Manage knowledge” action in the workspace header opens `?view=knowledge`; Back returns to the unchanged conversation and removes only that view parameter.
+- Structure: status/scope filters, searchable list, and a readable detail region containing the current definition, scope/kind metadata, provenance, immutable revisions, review history, and the existing correction entry point.
+- Review status is definition accuracy, never learner mastery. `reviewed` records that the learner checked the pinned revision; it does not promote authority, create evidence, or change learner state. A newer revision starts unreviewed.
+- `incorrect` is revision-specific and excludes only that learner’s current incorrect revision from future search, resolution, thread-target context, and generation. `retired` is unit-level and persists across revisions until an explicit restore.
+- Mark incorrect and Retire require a written reason. Restore requires a separate confirmation checkbox explaining that the unit becomes eligible for future tutor context again. Failed requests retain the reason and confirmation draft; successful requests clear only the completed action draft.
+- States: stable loading shell, empty knowledge base, no filter matches, selected detail, per-action pending, inline request error, and restored success through refreshed server state. Status is always text, never color alone.
+- Layout: manager header stays fixed; wide filter/list/detail regions own their own scroll. At 768px filters become a wrapping toolbar and list/detail remain readable; at 375px all regions stack without horizontal overflow, CJK clipping, or hidden actions.
 
 ### DeferredKnowledge / OpenQuestions
 - Deferred knowledge is a thread-target holding area, not a knowledge-state transition. It explicitly says “Deferred here; this does not change knowledge state,” and each unit offers “Move to learning targets.” No action claims understanding, acceptance, or mastery.
