@@ -89,6 +89,7 @@ export function WorkspaceOverlays(props: WorkspaceOverlaysProps) {
           provider={props.workspace.snapshot.provider}
           chatgpt={props.workspace.snapshot.chatgpt}
           busy={props.workspace.loading}
+          debugSettings={props.workspace.snapshot.debugSettings}
           correction={props.dialogValue}
           correctionKind={props.correctionKind}
           onCorrection={props.setDialogValue}
@@ -99,6 +100,7 @@ export function WorkspaceOverlays(props: WorkspaceOverlaysProps) {
           onBeginChatGptManual={props.workspace.beginChatGptManual}
           onCompleteChatGptManual={props.workspace.completeChatGptManual}
           onDisconnectChatGpt={props.workspace.disconnectChatGpt}
+          onSaveDebugSettings={props.workspace.saveDebugSettings}
         />
       )}
       {props.threadDialog === null ? null : (

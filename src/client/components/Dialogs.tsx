@@ -1,14 +1,17 @@
 import { AlertTriangle, ExternalLink, X } from "lucide-react";
 import { useRef } from "react";
 import type { ChatGptConnection, CorrectionKind, ProviderStatus } from "../model";
+import type { DebugSettings as DebugSettingsValue } from "../provenance-contract";
 import { useFocusTrap } from "../useFocusTrap";
 import { ChatGptSettings } from "./ChatGptSettings";
+import { DebugSettings } from "./DebugSettings";
 
 type DialogProps = {
   readonly kind: "settings" | "delete" | "correction";
   readonly provider: ProviderStatus;
   readonly chatgpt: ChatGptConnection;
   readonly busy: boolean;
+  readonly debugSettings?: DebugSettingsValue;
   readonly correction: string;
   readonly correctionKind: CorrectionKind;
   readonly onCorrection: (value: string) => void;
@@ -19,6 +22,7 @@ type DialogProps = {
   readonly onBeginChatGptManual: () => Promise<string | null>;
   readonly onCompleteChatGptManual: (callbackUrl: string) => Promise<boolean>;
   readonly onDisconnectChatGpt: () => Promise<boolean>;
+  readonly onSaveDebugSettings?: (value: DebugSettingsValue) => Promise<boolean>;
 };
 
 export function Dialog(props: DialogProps) {
@@ -89,6 +93,13 @@ function bodyFor(props: DialogProps) {
             onCompleteManual={props.onCompleteChatGptManual}
             onDisconnect={props.onDisconnectChatGpt}
           />
+          {props.debugSettings === undefined || props.onSaveDebugSettings === undefined ? null : (
+            <DebugSettings
+              value={props.debugSettings}
+              busy={props.busy}
+              onSave={props.onSaveDebugSettings}
+            />
+          )}
           <a
             className="button button-secondary"
             href="/model-setup.html"

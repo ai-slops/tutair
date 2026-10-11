@@ -81,6 +81,7 @@ describe("client runtime contracts", () => {
           models: [],
         }}
         busy={false}
+        debugSettings={{ saveProviderReasoningSummaries: false }}
         correction="Use a narrower definition."
         correctionKind="claim_less"
         onCorrection={vi.fn()}
@@ -91,6 +92,7 @@ describe("client runtime contracts", () => {
         onBeginChatGptManual={() => Promise.resolve("https://auth.example/authorize")}
         onCompleteChatGptManual={() => Promise.resolve(true)}
         onDisconnectChatGpt={() => Promise.resolve(true)}
+        onSaveDebugSettings={() => Promise.resolve(true)}
       />,
     );
 
