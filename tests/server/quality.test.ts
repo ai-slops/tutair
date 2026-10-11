@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { Database } from "../../src/server/database.js";
+import { KnowledgeDocumentRepository } from "../../src/server/knowledge-document-repository.js";
 import { createProvider } from "../../src/server/provider.js";
 import { CoreRepository } from "../../src/server/repository-core.js";
 import { KnowledgeRepository } from "../../src/server/repository-knowledge.js";
@@ -63,6 +64,7 @@ describe("quality measurements", () => {
           db,
           core,
           knowledge,
+          documents: new KnowledgeDocumentRepository(db),
           provider,
           tutor: new TutorPipeline(db, core, knowledge, provider),
           turnLocks: new Set(),

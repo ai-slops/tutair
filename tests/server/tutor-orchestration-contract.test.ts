@@ -113,8 +113,10 @@ describe("tutor orchestration contracts", () => {
     expect(evaluation?.data["recentContext"]).toEqual(
       expect.arrayContaining([expect.objectContaining({ content: "A state is a snapshot." })]),
     );
-    expect(calls.filter((call) => call.stage === "resolution")).toHaveLength(2);
-    expect(calls.filter((call) => call.stage === "lint")).toHaveLength(2);
+    expect(calls.filter((call) => call.stage === "resolution")).toHaveLength(1);
+    expect(calls.filter((call) => call.stage === "preparation")).toHaveLength(1);
+    expect(calls.filter((call) => call.stage === "final")).toHaveLength(1);
+    expect(calls.filter((call) => call.stage === "lint")).toHaveLength(1);
   });
 
   it("updates an existing thread goal with an event", async () => {
@@ -147,7 +149,7 @@ describe("tutor orchestration contracts", () => {
     ).toHaveLength(1);
   });
 
-  it("continues with tracked extraction and lint fallbacks", async () => {
+  it("rejects an extraction fallback that leaves no composable knowledge", async () => {
     const provider = providerFor((call) => {
       if (call.stage === "extraction" || call.stage === "lint")
         throw new Error("stage unavailable");
@@ -155,28 +157,22 @@ describe("tutor orchestration contracts", () => {
     });
     const context = createTutorTestContext(databases, "Fallback", "Keep teaching");
     const messageId = learnerMessage(context, "Please continue");
-    const result = await new TutorPipeline(
-      context.database,
-      context.core,
-      context.knowledge,
-      provider,
-    ).turn({
-      owner: context.owner,
-      conversationId: context.conversationId,
-      messageId,
-      content: "Please continue",
-      assistance: "none",
-      selfReport: "neutral",
-    });
-    const run = z
-      .object({ extractionFallback: z.boolean(), lintSkipped: z.boolean() })
-      .parse(result.run);
-    const fallbacks = context.database.all(
-      "SELECT fallback_status FROM model_run_details WHERE fallback_status='used'",
-      [],
-      z.object({ fallback_status: z.string() }),
-    );
-    expect(run).toEqual({ extractionFallback: true, lintSkipped: true });
-    expect(fallbacks).toHaveLength(3);
+    await expect(
+      new TutorPipeline(context.database, context.core, context.knowledge, provider).turn({
+        owner: context.owner,
+        conversationId: context.conversationId,
+        messageId,
+        content: "Please continue",
+        assistance: "none",
+        selfReport: "neutral",
+      }),
+    ).rejects.toMatchObject({ code: "unresolved_answer_topic" });
+    expect(
+      context.database.all(
+        "SELECT id FROM messages WHERE learner_id=? AND conversation_id=? AND role='tutor'",
+        [context.owner, context.conversationId],
+        z.object({ id: z.string() }),
+      ),
+    ).toEqual([]);
   });
 });

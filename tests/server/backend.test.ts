@@ -92,7 +92,7 @@ describe("Phase 1 tutor backend", () => {
       post({ content: "Why?", assistance: "hint" }),
     );
     expect(result.synthetic).toBe(true);
-    expect((result.run as Json).stages).toBe(8);
+    expect((result.run as Json).stages).toBe(7);
     expect((result.tutorMessage as Json).synthetic).toBe(true);
     expect(result.knowledgeChanges).toHaveLength(1);
     const itemId = (((result.knowledgeChanges as unknown[])[0] as Json).item as Json).id;
