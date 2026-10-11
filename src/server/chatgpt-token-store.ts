@@ -16,12 +16,15 @@ const GrantSchema = z.object({
 });
 export type StoredGrant = z.infer<typeof GrantSchema>;
 
-const StoreSchema = z.object({
+const HostIdSchema = z.templateLiteral(["urn:uuid:", z.uuidv4()]);
+const StoreFields = {
   version: z.literal(1),
-  hostId: z.uuid(),
   grants: z.record(z.string(), GrantSchema),
-});
+} as const;
+const StoreSchema = z.object({ ...StoreFields, hostId: HostIdSchema });
+const LegacyStoreSchema = z.object({ ...StoreFields, hostId: z.uuidv4() });
 type StoreData = z.infer<typeof StoreSchema>;
+type LoadedStore = { readonly data: StoreData; readonly migrated: boolean };
 
 const mutationTails = new Map<string, Promise<void>>();
 
@@ -31,7 +34,10 @@ export class ProtectedTokenStore {
   async hostId(): Promise<string> {
     return this.mutate(async () => {
       const existing = await this.load();
-      if (existing !== null) return existing.hostId;
+      if (existing !== null) {
+        if (existing.migrated) await this.save(existing.data);
+        return existing.data.hostId;
+      }
       const created = this.empty();
       await this.save(created);
       return created.hostId;
@@ -39,20 +45,20 @@ export class ProtectedTokenStore {
   }
 
   async read(owner: string): Promise<StoredGrant | null> {
-    const grant = (await this.load())?.grants[owner];
+    const grant = (await this.load())?.data.grants[owner];
     return grant ?? null;
   }
 
   async write(owner: string, grant: StoredGrant): Promise<void> {
     await this.mutate(async () => {
-      const data = (await this.load()) ?? this.empty();
+      const data = (await this.load())?.data ?? this.empty();
       await this.save({ ...data, grants: { ...data.grants, [owner]: GrantSchema.parse(grant) } });
     });
   }
 
   async delete(owner: string): Promise<void> {
     await this.mutate(async () => {
-      const data = await this.load();
+      const data = (await this.load())?.data ?? null;
       if (data === null || data.grants[owner] === undefined) return;
       const grants = Object.fromEntries(
         Object.entries(data.grants).filter(([learnerId]) => learnerId !== owner),
@@ -63,7 +69,7 @@ export class ProtectedTokenStore {
 
   async selectModel(owner: string, model: string): Promise<void> {
     await this.mutate(async () => {
-      const data = await this.load();
+      const data = (await this.load())?.data ?? null;
       const grant = data?.grants[owner];
       if (data === null || grant === undefined)
         throw new ApiError(401, "chatgpt_not_connected", "Connect ChatGPT for this learner first");
@@ -74,9 +80,19 @@ export class ProtectedTokenStore {
     });
   }
 
-  private async load(): Promise<StoreData | null> {
+  private async load(): Promise<LoadedStore | null> {
     try {
-      return StoreSchema.parse(JSON.parse(await readFile(this.path, "utf8")));
+      const persisted: unknown = JSON.parse(await readFile(this.path, "utf8"));
+      const current = StoreSchema.safeParse(persisted);
+      if (current.success) return { data: current.data, migrated: false };
+      const legacy = LegacyStoreSchema.parse(persisted);
+      return {
+        data: {
+          ...legacy,
+          hostId: HostIdSchema.parse(`urn:uuid:${legacy.hostId}`),
+        },
+        migrated: true,
+      };
     } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "ENOENT") {
         return null;
@@ -86,7 +102,11 @@ export class ProtectedTokenStore {
   }
 
   private empty(): StoreData {
-    return { version: 1, hostId: crypto.randomUUID(), grants: {} };
+    return {
+      version: 1,
+      hostId: HostIdSchema.parse(`urn:uuid:${crypto.randomUUID()}`),
+      grants: {},
+    };
   }
 
   private async mutate<Result>(operation: () => Promise<Result>): Promise<Result> {
