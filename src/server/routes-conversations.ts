@@ -2,6 +2,7 @@ import type { Hono } from "hono";
 import { z } from "zod";
 import { jsonBody, ownerFor, type Services } from "./context.js";
 import { genericRecord } from "./records.js";
+import { registerGenerationPipelineRoutes } from "./routes-generation-pipeline.js";
 import { conversationSchema, messageSchema } from "./schemas.js";
 import { registerTutorTurnRoute } from "./turn-request-route.js";
 import { TurnRequestStore } from "./turn-request-store.js";
@@ -92,4 +93,5 @@ export const registerConversationRoutes = (app: Hono, services: Services): void 
     return c.body(null, 204);
   });
   registerTutorTurnRoute(app, services);
+  registerGenerationPipelineRoutes(app, services);
 };
