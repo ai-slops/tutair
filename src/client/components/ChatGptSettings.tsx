@@ -6,6 +6,7 @@ type ChatGptSettingsProps = {
   readonly connection: ChatGptConnection;
   readonly busy: boolean;
   readonly onSelectModel: (slug: string) => Promise<boolean>;
+  readonly onBeginManual: () => Promise<string | null>;
   readonly onCompleteManual: (callbackUrl: string) => Promise<boolean>;
   readonly onDisconnect: () => Promise<boolean>;
 };
@@ -24,17 +25,31 @@ export function ChatGptSettings(props: ChatGptSettingsProps) {
               Authorize this learner in a new tab. When the localhost page cannot open, copy its
               full address and return here.
             </p>
-            <form
-              action="/api/chatgpt/manual/authorize"
-              method="post"
-              target="_blank"
-              rel="noopener"
+            <button
+              className="button button-primary"
+              type="button"
+              disabled={props.busy}
+              onClick={() => {
+                setManualError(false);
+                const popup = window.open("about:blank", "_blank");
+                if (popup === null) {
+                  setManualError(true);
+                  return;
+                }
+                popup.opener = null;
+                void props.onBeginManual().then((authorizationUrl) => {
+                  if (authorizationUrl === null) {
+                    popup.close();
+                    setManualError(true);
+                    return;
+                  }
+                  popup.location.replace(authorizationUrl);
+                });
+              }}
             >
-              <button className="button button-primary" type="submit" disabled={props.busy}>
-                <ExternalLink className="icon" />
-                Continue with ChatGPT
-              </button>
-            </form>
+              <ExternalLink className="icon" />
+              Continue with ChatGPT
+            </button>
             <ol className="manual-auth-steps">
               <li>Approve access in the official ChatGPT authorization page.</li>
               <li>At the failed 127.0.0.1 page, copy the full URL from the address bar.</li>

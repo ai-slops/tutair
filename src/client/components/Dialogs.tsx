@@ -16,6 +16,7 @@ type DialogProps = {
   readonly onClose: () => void;
   readonly onConfirm: () => void;
   readonly onSelectChatGptModel: (slug: string) => Promise<boolean>;
+  readonly onBeginChatGptManual: () => Promise<string | null>;
   readonly onCompleteChatGptManual: (callbackUrl: string) => Promise<boolean>;
   readonly onDisconnectChatGpt: () => Promise<boolean>;
 };
@@ -84,6 +85,7 @@ function bodyFor(props: DialogProps) {
             connection={props.chatgpt}
             busy={props.busy}
             onSelectModel={props.onSelectChatGptModel}
+            onBeginManual={props.onBeginChatGptManual}
             onCompleteManual={props.onCompleteChatGptManual}
             onDisconnect={props.onDisconnectChatGpt}
           />

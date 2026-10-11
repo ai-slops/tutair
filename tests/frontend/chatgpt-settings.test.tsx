@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Dialog } from "../../src/client/components/Dialogs";
@@ -42,8 +42,12 @@ describe("ChatGPT account settings", () => {
     await user.type(callback, "http://127.0.0.1:1455/auth/callback?code=one&state=two");
     await user.click(screen.getByRole("button", { name: "Complete ChatGPT connection" }));
 
-    expect(complete).toHaveBeenCalledWith("http://127.0.0.1:1455/auth/callback?code=one&state=two");
-    expect(inputValue(callback)).toBe("");
+    await waitFor(() => {
+      expect(complete).toHaveBeenCalledWith(
+        "http://127.0.0.1:1455/auth/callback?code=one&state=two",
+      );
+      expect(inputValue(callback)).toBe("");
+    });
   });
 
   it("keeps the manual callback available when completion fails", async () => {
@@ -66,6 +70,7 @@ describe("ChatGPT account settings", () => {
     await user.type(callback, "http://127.0.0.1:1455/auth/callback?error=access_denied&state=two");
     await user.click(screen.getByRole("button", { name: "Complete ChatGPT connection" }));
 
+    await waitFor(() => expect(complete).toHaveBeenCalledOnce());
     expect(inputValue(callback)).not.toBe("");
   });
 
@@ -107,6 +112,7 @@ function renderDialog(
   onSelectModel = vi.fn(() => Promise.resolve(true)),
   onDisconnect = vi.fn(() => Promise.resolve(true)),
   onCompleteManual = vi.fn(() => Promise.resolve(true)),
+  onBeginManual = vi.fn(() => Promise.resolve("https://auth.example/authorize")),
 ) {
   return render(
     <Dialog
@@ -123,6 +129,7 @@ function renderDialog(
       onSelectChatGptModel={onSelectModel}
       onDisconnectChatGpt={onDisconnect}
       onCompleteChatGptManual={onCompleteManual}
+      onBeginChatGptManual={onBeginManual}
     />,
   );
 }

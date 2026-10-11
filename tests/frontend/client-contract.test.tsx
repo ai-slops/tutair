@@ -76,6 +76,7 @@ describe("client runtime contracts", () => {
         onClose={vi.fn()}
         onConfirm={vi.fn()}
         onSelectChatGptModel={() => Promise.resolve(true)}
+        onBeginChatGptManual={() => Promise.resolve("https://auth.example/authorize")}
         onCompleteChatGptManual={() => Promise.resolve(true)}
         onDisconnectChatGpt={() => Promise.resolve(true)}
       />,
