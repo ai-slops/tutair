@@ -86,6 +86,21 @@
   border: 0;
   background: transparent;
 }
+.manual-auth-flow,
+.manual-auth-steps {
+  display: grid;
+  gap: var(--space-3);
+  overflow-wrap: anywhere;
+}
+.manual-auth-steps {
+  padding-inline-start: var(--space-5);
+  color: var(--color-ink-muted);
+  font-size: var(--type-small);
+}
+.field-error {
+  color: var(--color-error);
+  font-size: var(--type-small);
+}
 .thread-list {
   display: grid;
   gap: var(--space-1);
@@ -489,6 +504,15 @@
 }
 
 @media (max-width: 45rem) {
+  .dialog {
+    padding: var(--space-4);
+  }
+  .manual-auth-flow {
+    gap: var(--space-2);
+  }
+  .manual-auth-steps {
+    gap: var(--space-1);
+  }
   .thread-pane .icon-button.mobile-only,
   .main-header .icon-button.mobile-only {
     display: inline-flex;

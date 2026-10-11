@@ -230,6 +230,7 @@ export function App() {
             void confirmDialog();
           }}
           onSelectChatGptModel={workspace.selectChatGptModel}
+          onCompleteChatGptManual={workspace.completeChatGptManual}
           onDisconnectChatGpt={workspace.disconnectChatGpt}
         />
       )}

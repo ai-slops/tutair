@@ -61,7 +61,13 @@ describe("client runtime contracts", () => {
       <Dialog
         kind="correction"
         provider={{ mode: "configured", label: "Provider", guidance: "Available" }}
-        chatgpt={{ enabled: false, connected: false, selectedModel: null, models: [] }}
+        chatgpt={{
+          enabled: false,
+          connected: false,
+          manualCallback: false,
+          selectedModel: null,
+          models: [],
+        }}
         busy={false}
         correction="Use a narrower definition."
         correctionKind="claim_less"
@@ -70,6 +76,7 @@ describe("client runtime contracts", () => {
         onClose={vi.fn()}
         onConfirm={vi.fn()}
         onSelectChatGptModel={() => Promise.resolve(true)}
+        onCompleteChatGptManual={() => Promise.resolve(true)}
         onDisconnectChatGpt={() => Promise.resolve(true)}
       />,
     );

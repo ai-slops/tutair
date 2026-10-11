@@ -134,8 +134,10 @@ unbroken tokens rather than a zero-width text column.
 ### ChatGPTConnection
 - Personal mode appears only when the server explicitly enables it. Disconnected, connected-without-model, ready, refreshing, and error states use the existing Notice, TextField, and Button primitives.
 - Connect opens the official authorization page in a separate tab through the same-origin loopback bridge. The dialog never renders, logs, exports, or stores access, refresh, or ID tokens.
+- When the server explicitly enables manual callback relay for the current origin, the disconnected state shows a numbered continuation sequence: open the official authorization page, copy the full failed `127.0.0.1` callback URL from the browser address bar, then submit it through a labeled sensitive TextField. The field uses `autocomplete="off"`, is never reflected into browser history, and clears only after confirmed success.
+- Manual relay keeps errors local to the connection section. A failed or denied callback remains retryable without closing Settings or changing unrelated workspace drafts; success refreshes connection state and the account model picker immediately.
 - A connected learner chooses only from account-returned models whose visibility is `list`; the display name is visible and the slug is the submitted value. Disconnect is explicit and learner-scoped.
-- Container and VM users receive concise loopback-forwarding guidance rather than an invented external callback. Remote/public origins cannot start authorization.
+- Container and VM users are told that OpenAI's documented VM path is local authorization plus protected credential transfer. Manual callback relay is labeled as a Tutair fallback, appears only for explicitly allowlisted origins, and never changes the registered loopback redirect.
 
 ### Message
 - Variants: learner and tutor.

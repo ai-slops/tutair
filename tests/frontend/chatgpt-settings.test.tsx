@@ -9,11 +9,64 @@ afterEach(cleanup);
 
 describe("ChatGPT account settings", () => {
   it("offers the local bridge without exposing credentials when disconnected", () => {
-    renderDialog({ enabled: true, connected: false, selectedModel: null, models: [] });
+    renderDialog({
+      enabled: true,
+      connected: false,
+      manualCallback: false,
+      selectedModel: null,
+      models: [],
+    });
 
-    const connect = screen.getByRole("link", { name: "Connect ChatGPT" });
+    const connect = screen.getByRole("link", { name: "Continue with ChatGPT" });
     expect(connect.getAttribute("href")).toBe("/api/chatgpt/connect");
     expect(document.body.textContent).not.toContain("token");
+  });
+
+  it("submits and clears a manual callback after successful completion", async () => {
+    const complete = vi.fn(() => Promise.resolve(true));
+    const user = userEvent.setup();
+    renderDialog(
+      {
+        enabled: true,
+        connected: false,
+        manualCallback: true,
+        selectedModel: null,
+        models: [],
+      },
+      undefined,
+      undefined,
+      complete,
+    );
+    const callback = screen.getByLabelText("Full localhost callback URL");
+
+    await user.type(callback, "http://127.0.0.1:1455/auth/callback?code=one&state=two");
+    await user.click(screen.getByRole("button", { name: "Complete ChatGPT connection" }));
+
+    expect(complete).toHaveBeenCalledWith("http://127.0.0.1:1455/auth/callback?code=one&state=two");
+    expect(inputValue(callback)).toBe("");
+  });
+
+  it("keeps the manual callback available when completion fails", async () => {
+    const complete = vi.fn(() => Promise.resolve(false));
+    const user = userEvent.setup();
+    renderDialog(
+      {
+        enabled: true,
+        connected: false,
+        manualCallback: true,
+        selectedModel: null,
+        models: [],
+      },
+      undefined,
+      undefined,
+      complete,
+    );
+    const callback = screen.getByLabelText("Full localhost callback URL");
+
+    await user.type(callback, "http://127.0.0.1:1455/auth/callback?error=access_denied&state=two");
+    await user.click(screen.getByRole("button", { name: "Complete ChatGPT connection" }));
+
+    expect(inputValue(callback)).not.toBe("");
   });
 
   it("selects an account-visible model and disconnects the learner connection", async () => {
@@ -24,6 +77,7 @@ describe("ChatGPT account settings", () => {
       {
         enabled: true,
         connected: true,
+        manualCallback: false,
         selectedModel: "gpt-one",
         models: [
           { slug: "gpt-one", displayName: "GPT One" },
@@ -46,11 +100,13 @@ function renderDialog(
   chatgpt: {
     readonly enabled: boolean;
     readonly connected: boolean;
+    readonly manualCallback: boolean;
     readonly selectedModel: string | null;
     readonly models: readonly { readonly slug: string; readonly displayName: string }[];
   },
   onSelectModel = vi.fn(() => Promise.resolve(true)),
   onDisconnect = vi.fn(() => Promise.resolve(true)),
+  onCompleteManual = vi.fn(() => Promise.resolve(true)),
 ) {
   return render(
     <Dialog
@@ -66,6 +122,12 @@ function renderDialog(
       onConfirm={vi.fn()}
       onSelectChatGptModel={onSelectModel}
       onDisconnectChatGpt={onDisconnect}
+      onCompleteChatGptManual={onCompleteManual}
     />,
   );
+}
+
+function inputValue(element: HTMLElement): string {
+  if (!(element instanceof HTMLInputElement)) throw new Error("Expected callback input");
+  return element.value;
 }
