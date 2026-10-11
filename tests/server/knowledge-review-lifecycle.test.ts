@@ -158,6 +158,82 @@ describe("knowledge review lifecycle", () => {
     expect((await client.json("/api/search?q=Second")).results).toHaveLength(1);
   });
 
+  it("creates an unreviewed correction revision while preserving evidence on the prior revision", async () => {
+    // Given
+    const { client } = harness.setup();
+    await client.call("/api/auth/local-signup", post({}));
+    const conversation = await client.json("/api/conversations", post({ title: "Correction" }));
+    const conversationId = z
+      .object({ conversation: z.object({ id: z.string() }) })
+      .parse(conversation).conversation.id;
+    const message = await client.json(
+      `/api/conversations/${conversationId}/messages`,
+      post({ content: "original learner evidence" }),
+    );
+    const messageId = z.object({ message: z.object({ id: z.string() }) }).parse(message).message.id;
+    const created = await client.json(
+      "/api/knowledge",
+      post({ title: "Editable unit", statement: "First definition" }),
+    );
+    const parsed = z
+      .object({
+        item: z.object({ id: z.string() }),
+        revision: z.object({ id: z.string() }),
+      })
+      .parse(created);
+    await client.call(
+      `/api/knowledge/${parsed.item.id}/reviews`,
+      post({ revision: 1, action: "reviewed" }),
+    );
+    await client.call(
+      "/api/evidence",
+      post({
+        knowledgeId: parsed.item.id,
+        knowledgeRevisionId: parsed.revision.id,
+        revision: 1,
+        conversationId,
+        messageId,
+        dimension: "explanation",
+        evidenceType: "free_explanation",
+        score: 0.8,
+        polarity: "positive",
+        evaluatorConfidence: 1,
+        evaluator: { type: "human", rubricVersion: "manual-v1" },
+        assistance: {
+          hints: 0,
+          answerVisible: false,
+          openBook: false,
+          copiedFromRecentContext: false,
+        },
+        supportingSpans: [],
+        limitations: [],
+        relatedUnitIds: [],
+      }),
+    );
+
+    // When
+    const response = await client.call(
+      "/api/corrections",
+      post({
+        knowledgeId: parsed.item.id,
+        revision: 1,
+        statement: "Corrected definition",
+        reason: "The original was incomplete.",
+        kind: "revise",
+      }),
+    );
+
+    // Then
+    expect(response.status).toBe(201);
+    const detail = await client.json(`/api/knowledge/${parsed.item.id}`);
+    expect(detail["reviewStatus"]).toMatchObject({ status: "unreviewed", revision: 2 });
+    expect(detail["revisions"]).toHaveLength(2);
+    expect(
+      z.array(z.object({ knowledgeRevisionId: z.string() })).parse(detail["evidence"])[0]
+        ?.knowledgeRevisionId,
+    ).toBe(parsed.revision.id);
+  });
+
   it("exports immutable review history and removes only the erased learner's events", async () => {
     // Given
     const { app, client, database } = harness.setup();
