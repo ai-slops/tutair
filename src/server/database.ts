@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import { migrateExposures } from "./exposure-migration.js";
 import { migrateKnowledgeMetadata } from "./knowledge-migration.js";
+import { migrateKnowledgeReviews } from "./knowledge-review-migration.js";
 import { projectionVersion } from "./learner-projection.js";
 import { migrateModelContexts } from "./model-context-migration.js";
 import { migrateThreads } from "./thread-migration.js";
@@ -86,6 +87,7 @@ export class Database {
       migrateExposures(this.raw);
       migrateModelContexts(this.raw);
       migrateKnowledgeMetadata(this.raw);
+      migrateKnowledgeReviews(this.raw);
       migrateThreads(this.raw);
       migrateTurnRequests(this.raw);
     } catch (error) {
