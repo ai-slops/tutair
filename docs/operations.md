@@ -213,3 +213,28 @@ Do not put API keys in browser settings, query strings, commits, or screenshots.
 Provider-side logs and retention are outside Tutair's local privacy-erasure
 boundary. Review the chosen provider's retention policy before using sensitive
 learning material.
+
+## Generation inspection records
+
+The browser fetches a small request summary immediately and every two seconds
+only while the request is active. Polling stops at a terminal state and stale
+requests are aborted when navigation changes. Summary and detail GETs are
+idempotent and do not retry generation.
+
+Pipeline routes derive learner ownership from the session cookie and additionally
+bind conversation, request, saved learner message, and run IDs. Privacy-preserving
+404 responses are expected for foreign owners or mismatched identities. Run
+details can contain bounded private messages, learning state, definitions, and
+schema output; protect them like conversations and do not place them in public
+logs, support bundles, screenshots, or caches.
+
+The response boundary recursively redacts credential-shaped keys and common token
+patterns. It is defense in depth, not permission to put credentials into model
+context. Never add authorization headers, cookies, callback URLs/codes, API keys,
+or hidden chain-of-thought to stored diagnostics.
+
+Failed attempts, repairs, and fallback markers are audit history and must not be
+collapsed or deleted. Historical rows may legitimately lack inspection metadata,
+the exact structured-call snapshot, resolved model, token usage, or timing. Keep
+those fields null/Unknown; do not infer them from current settings, current learner
+state, neighboring runs, or provider price tables.

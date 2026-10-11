@@ -66,6 +66,43 @@ again. A request still running can be continued with the same ID; unknown delive
 is checked before retry, while a confirmed failed request is refreshed rather than
 blindly resubmitted.
 
+### Generation pipeline inspection
+
+- `GET /api/conversations/:id/tutor-turns/:requestId/pipeline` returns the cheap
+  request summary: request/user/tutor message IDs, request state, timestamps,
+  redacted request error/flags, and one ordered row per persisted model run.
+- `GET /api/conversations/:id/tutor-turns/:requestId/pipeline/:runId` lazily
+  returns one owned run plus its bounded recorded `StructuredCall`, structured
+  response, versions, repair parent, and redacted traces.
+
+The implemented request states are `running`, `needs_selection`, `completed`, and
+`failed`; stage states are `running`, `completed`, and `failed`. GETs are
+idempotent. Clients fetch immediately, poll only active work, and stop after a
+terminal request state. A retry or resumed request retains the same request ID and
+saved learner message instead of creating a second message.
+
+Correlation is exact: the request is resolved by authenticated learner,
+conversation, and request ID, then stages are restricted to model runs whose
+`input_message_id` equals that request's `user_message_id`. A run from another
+turn cannot appear merely because it is adjacent in time. Foreign-owner,
+wrong-conversation, wrong-request, and unrelated-run lookups return 404.
+
+Each stage row preserves the actual run ID, stage/version, status, attempt,
+timestamps, duration, provider, resolved model when known, output mode, usage,
+failure/fallback status, context hash, and `repairOfRunId`. Original failures and
+repairs are separate ordered records. `model`, `usage`, duration, context version,
+and context hash may be `null`; null means not recorded or unavailable, never zero.
+The UI renders these values as **Unknown** or unavailable rather than inventing a
+historical model or cost.
+
+Detail responses recursively redact secret-bearing keys and credential/token
+patterns from recorded calls, outputs, errors, and traces. Snapshots contain
+private learner context and receive conversation-level protection, but never
+provider credentials or requested hidden chain-of-thought. Historical runs made
+before snapshot or inspection metadata existed remain inspectable only to the
+extent of their persisted fields; exact inputs, model identity, usage, or timing
+are not reconstructed from current state.
+
 Turn `run.evaluationSkipped` distinguishes a successful empty evaluation from a
 failed or persistently invalid evaluation. `run.followupTrackingSkipped` identifies
 a suggested follow-up that did not reference offered knowledge. Evaluator output

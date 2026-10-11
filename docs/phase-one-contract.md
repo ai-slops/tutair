@@ -116,6 +116,14 @@ are independent versioned structured calls. Model runs preserve provider/model,
 purpose, prompt/schema versions, input hash, structured output, usage, latency,
 and failure/fallback status. Do not request or store private chain-of-thought.
 
+Generation inspection preserves exact persisted attempts. A request resolves to
+one saved learner message, and only model runs correlated to that message may be
+listed. Summary reads are cheap; bounded call/output/trace detail is lazy,
+authenticated, owner-scoped, and recursively redacted. Polling observes state and
+must never create another message or model run. Failed attempts and schema repairs
+remain separate and linked. Missing historical model, usage, timing, or snapshots
+remain null/Unknown and are never reconstructed or converted to zero.
+
 Extraction failure permits an explicitly untracked general answer. Linter failure
 permits an answer marked `lintSkipped`. Model service unavailability is not an
 excuse to pretend a scripted response came from a real model.
