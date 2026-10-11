@@ -144,6 +144,13 @@ unbroken tokens rather than a zero-width text column.
 - Learner uses a compact forest-wash note aligned to the reading measure; tutor is editorial prose without a chat bubble.
 - States: sending, failed with retry, complete; correction action is explicit and keyboard reachable.
 
+### TutorProgress
+- Appears in the conversation reading measure only while a tutor turn is actively awaiting its response; it is not used for unrelated workspace loading.
+- Structure: compact spinner, “Preparing your answer” title, a plain explanation that multi-stage review can take a few minutes, and elapsed `m:ss` time. It never invents a percentage or claims an internal stage completed.
+- The initial state is announced once through a polite atomic status. The elapsed clock is visible but excluded from the live region so screen readers are not interrupted every second.
+- While active, the current composer text stays editable and intact so a learner can prepare a later question. Submit controls and the keyboard submit shortcut are disabled to prevent a duplicate paid request. Completion removes the progress surface and clears only the exact draft that was submitted; newer edits remain.
+- If delivery recovery reports the request is still running after a client timeout, the running RecoveryNotice remains authoritative and no generic failure notice appears alongside it.
+
 ### DimensionStrip
 - Exactly six labels: Recognition, Recall, Explanation, Application, Discrimination, Transfer.
 - The selected concept shows the server projection for its current immutable revision: estimate, uncertainty, status, effective evidence, supporting evidence IDs, projection version, and knowledge revision ID.
@@ -173,7 +180,7 @@ unbroken tokens rather than a zero-width text column.
 
 ## 6. Motion & Interaction
 
-Tokens: `--motion-fast` 120ms, `--motion-standard` 220ms, `--ease-out` cubic-bezier(0.16, 1, 0.3, 1). Only opacity and transform animate. Drawers fade/translate on entry to explain spatial continuity; button press confirms input; a sending indicator communicates work. No decorative looping motion. `prefers-reduced-motion: reduce` makes transitions immediate.
+Tokens: `--motion-fast` 120ms, `--motion-standard` 220ms, `--ease-out` cubic-bezier(0.16, 1, 0.3, 1). Only opacity and transform animate. Drawers fade/translate on entry to explain spatial continuity; button press confirms input; a sending indicator communicates work. The TutorProgress spinner uses the existing linear rotation only to communicate active work; reduced motion replaces repeated rotation with a still indicator while the textual state remains complete. No decorative looping motion. `prefers-reduced-motion: reduce` makes transitions immediate.
 
 Keyboard: `/` focuses thread search when focus is not in an input; `Ctrl/Cmd+Enter` submits; Escape closes the top drawer/dialog. Native tab order follows visual order.
 
