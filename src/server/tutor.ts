@@ -14,6 +14,7 @@ import {
   knowledgeContext,
   orderedResolutionCandidates,
   persistResolution,
+  resolutionProbeQueries,
 } from "./tutor-knowledge.js";
 import { boundModelContext } from "./tutor-model-context.js";
 import { copiedFromTutor, enforceCopiedDiscount } from "./tutor-policies.js";
@@ -140,6 +141,18 @@ export class TutorPipeline {
       },
     });
     const candidates = extractionCandidates(extracted.value);
+    const resolutionRetrieval = [...retrieval.results];
+    for (const query of resolutionProbeQueries(candidates)) {
+      const probe = await searchKnowledge(this.db, this.provider, input.owner, query, 8);
+      resolutionRetrieval.push(...probe.results);
+    }
+    const retrievedKnowledgeIds = resolutionRetrieval.flatMap((raw) => {
+      const parsed = z.object({ id: z.string() }).safeParse(raw);
+      return parsed.success ? [parsed.data.id] : [];
+    });
+    const offeredKnowledge = knowledgeContext(this.knowledge, input.owner, [
+      ...new Set([...context.selectedKnowledgeIds, ...retrievedKnowledgeIds]),
+    ]);
     const resolved = await stages.stage({
       stage: "resolution",
       schema: resolutionSchema,
@@ -147,8 +160,8 @@ export class TutorPipeline {
         ...refreshedCommon,
         candidates,
         resolutionCandidates: orderedResolutionCandidates(
-          immutableKnowledge,
-          retrieval.results,
+          offeredKnowledge,
+          resolutionRetrieval,
           candidates.map((item) => item.label),
         ),
       }),
@@ -161,7 +174,7 @@ export class TutorPipeline {
       runId: resolved.runId,
       resolution: resolved.value,
       candidates,
-      offeredKnowledge: immutableKnowledge,
+      offeredKnowledge,
     });
     store.relations(input, extracted.value.relations, first.resolvedByKey);
     const turnKnowledgeIds = [

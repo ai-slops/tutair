@@ -102,6 +102,23 @@ export function extractionCandidates(
   ];
 }
 
+export function resolutionProbeQueries(
+  candidates: readonly z.infer<typeof candidateSchema>[],
+): readonly string[] {
+  return [
+    ...new Set(
+      candidates.map((candidate) =>
+        [candidate.label, candidate.definition, candidate.semanticScope]
+          .filter((part) => part.trim() !== "")
+          .join("\n")
+          .slice(0, 500),
+      ),
+    ),
+  ]
+    .filter((query) => query !== "")
+    .slice(0, 4);
+}
+
 export function orderedResolutionCandidates(
   knowledge: readonly KnowledgeContext[],
   retrieved: readonly unknown[],
@@ -177,8 +194,32 @@ export function persistResolution(input: {
         });
         continue;
       }
+      case "attach": {
+        const revision = z
+          .object({ id: z.string().uuid() })
+          .parse(
+            input.repository.revision(
+              input.owner,
+              decision.knowledge.id,
+              decision.knowledge.revision,
+            ),
+          );
+        ids.add(decision.knowledge.id);
+        resolvedByKey.set(raw.key, { knowledgeId: decision.knowledge.id, revisionId: revision.id });
+        decisions.push({
+          key: raw.key,
+          resolution: "attach_material",
+          knowledgeId: decision.knowledge.id,
+          revisionId: revision.id,
+          reasonCodes: decision.reasonCodes,
+        });
+        continue;
+      }
       case "new":
         break;
+      case "skip":
+        decisions.push({ key: raw.key, resolution: "skip", reasonCodes: decision.reasonCodes });
+        continue;
       default: {
         const unreachable: never = decision;
         return unreachable;
