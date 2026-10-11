@@ -6,6 +6,24 @@ import { ProtectedTokenStore } from "./chatgpt-token-store.js";
 
 export function createChatGptAuth(env: NodeJS.ProcessEnv): ChatGptAuth | null {
   if (env["TUTOR_CHATGPT_PERSONAL"] !== "true") return null;
+  const manualCallback = env["TUTOR_CHATGPT_MANUAL_CALLBACK"] === "true";
+  const manualOrigins = (env["TUTOR_CHATGPT_MANUAL_ORIGINS"] ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+    .map((origin) =>
+      z
+        .url()
+        .refine(
+          (value) => new URL(value).origin === value,
+          "Expected an exact origin without a path",
+        )
+        .parse(origin),
+    );
+  if (manualCallback && manualOrigins.length === 0)
+    throw new Error(
+      "TUTOR_CHATGPT_MANUAL_ORIGINS is required when manual callback mode is enabled",
+    );
   return new ChatGptAuth({
     enabled: true,
     callbackPort: z.coerce
@@ -21,6 +39,8 @@ export function createChatGptAuth(env: NodeJS.ProcessEnv): ChatGptAuth | null {
     jwksUrl: env["TUTOR_CHATGPT_JWKS_URL"] ?? "https://auth.openai.com/.well-known/jwks.json",
     issuer: env["TUTOR_CHATGPT_ISSUER"] ?? "https://auth.openai.com",
     apiBaseUrl: env["TUTOR_CHATGPT_API_URL"] ?? "https://api.openai.com/v1",
+    manualCallback,
+    manualOrigins,
     store: new ProtectedTokenStore(
       env["TUTOR_CHATGPT_STORE"] ?? join(homedir(), ".config", "tutair", "chatgpt.json"),
     ),
