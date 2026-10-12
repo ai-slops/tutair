@@ -5,14 +5,7 @@ import type { candidateSchema, extractionSchema } from "./tutor-schemas.js";
 export function extractionCandidates(
   extraction: z.infer<typeof extractionSchema>,
 ): readonly z.infer<typeof candidateSchema>[] {
-  return [
-    ...extraction.targets,
-    ...extraction.prerequisites,
-    ...extraction.terms,
-    ...extraction.distinctions,
-    ...extraction.misconceptions,
-    ...extraction.claims,
-  ];
+  return extraction.artifacts;
 }
 
 export function resolutionProbeQueries(
@@ -21,7 +14,7 @@ export function resolutionProbeQueries(
   return [
     ...new Set(
       candidates.map((candidate) =>
-        [candidate.label, candidate.definition, candidate.semanticScope]
+        [candidate.label, artifactSearchText(candidate)]
           .filter((part) => part.trim() !== "")
           .join("\n")
           .slice(0, 500),
@@ -30,6 +23,21 @@ export function resolutionProbeQueries(
   ]
     .filter((query) => query !== "")
     .slice(0, 4);
+}
+
+function artifactSearchText(candidate: z.infer<typeof candidateSchema>): string {
+  switch (candidate.artifactType) {
+    case "definition":
+      return `${candidate.definition}\n${candidate.semanticScope}`;
+    case "claim":
+      return candidate.proposition;
+    case "distinction":
+      return `${candidate.criterion}\n${candidate.contrast}`;
+    case "material":
+      return candidate.label;
+    case "misconception":
+      return `${candidate.mistakenProposition}\n${candidate.correction}`;
+  }
 }
 
 export function orderedResolutionCandidates(

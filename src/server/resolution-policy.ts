@@ -1,110 +1,165 @@
 import type { z } from "zod";
 import { knowledgeScopeFingerprint } from "./knowledge-contracts.js";
 import type { KnowledgeContext } from "./tutor-knowledge.js";
-import type { candidateSchema, resolutionSchema } from "./tutor-schemas.js";
-import { ApiError } from "./types.js";
+import type { admissionArtifactSchema, resolutionSchema } from "./tutor-schemas.js";
 
 export const semanticReuseConfidence = 0.9;
-type Candidate = z.infer<typeof candidateSchema>;
-type Decision = {
-  readonly candidate: Candidate;
-  readonly reasonCodes: readonly string[];
+type Artifact = z.infer<typeof admissionArtifactSchema>;
+type Admission = z.infer<typeof resolutionSchema>["admissions"][number];
+export type ResolutionDecision = {
+  readonly artifact: Artifact;
+  readonly reasons: readonly string[];
+  readonly admission?: Admission;
 } & (
   | { readonly resolution: "reuse"; readonly knowledge: KnowledgeContext }
   | { readonly resolution: "attach"; readonly knowledge: KnowledgeContext }
-  | { readonly resolution: "new" }
+  | { readonly resolution: "new_knowledge" }
+  | { readonly resolution: "new_misconception" }
   | { readonly resolution: "skip" }
 );
 
+function knowledgeKind(artifact: Artifact): string | null {
+  switch (artifact.artifactType) {
+    case "definition":
+      return artifact.definitionKind;
+    case "claim":
+      return "claim";
+    case "distinction":
+      return "distinction";
+    case "material":
+    case "misconception":
+      return null;
+  }
+}
+
+function referenceSetIsOfferedDefinitions(
+  artifact: Artifact,
+  offeredByRevision: ReadonlyMap<string, KnowledgeContext>,
+): boolean {
+  const ids =
+    artifact.artifactType === "claim"
+      ? [artifact.subjectDefinitionRevisionId]
+      : artifact.artifactType === "distinction"
+        ? artifact.definitionRevisionIds
+        : artifact.artifactType === "misconception"
+          ? artifact.definitionRevisionLinks.map((link) => link.definitionRevisionId)
+          : [];
+  return ids.every((id) => {
+    const item = offeredByRevision.get(id);
+    return item !== undefined && (item.kind === "concept" || item.kind === "term_sense");
+  });
+}
+
+function compatibleReuse(artifact: Artifact, offered: KnowledgeContext): boolean {
+  const expectedKind = knowledgeKind(artifact);
+  if (expectedKind === null || offered.kind !== expectedKind) return false;
+  if (artifact.artifactType !== "definition") return true;
+  return (
+    knowledgeScopeFingerprint(offered.semanticScope, offered.definitionScope) ===
+    knowledgeScopeFingerprint(artifact.semanticScope, artifact.definitionScope)
+  );
+}
+
 export function normalizeResolution(input: {
-  readonly candidates: readonly Candidate[];
+  readonly artifacts: readonly Artifact[];
   readonly offeredKnowledge: readonly KnowledgeContext[];
   readonly resolution: z.infer<typeof resolutionSchema>;
-}): { readonly decisions: readonly Decision[]; readonly ignoredKeys: readonly string[] } {
-  const originals = new Map(input.candidates.map((candidate) => [candidate.key, candidate]));
-  for (const candidate of input.candidates) {
-    if (JSON.stringify(originals.get(candidate.key)) !== JSON.stringify(candidate)) {
-      throw new ApiError(
-        502,
-        "candidate_key_conflict",
-        "Extraction reused a key for different meanings",
-      );
-    }
-  }
+}): { readonly decisions: readonly ResolutionDecision[]; readonly ignoredKeys: readonly string[] } {
+  const originals = new Map(input.artifacts.map((artifact) => [artifact.key, artifact]));
+  const offeredByRevision = new Map(input.offeredKnowledge.map((item) => [item.revisionId, item]));
   const outputKeys = [
     ...input.resolution.matches.map((match) => match.candidateKey),
-    ...input.resolution.provisional.map((candidate) => candidate.key),
+    ...input.resolution.admissions.map((admission) => admission.candidateKey),
   ];
-  const decisions: Decision[] = [];
-  for (const candidate of originals.values()) {
-    const matches = input.resolution.matches.filter(
-      (match) => match.candidateKey === candidate.key,
+  const decisions: ResolutionDecision[] = [];
+  for (const artifact of originals.values()) {
+    const matches = input.resolution.matches.filter((match) => match.candidateKey === artifact.key);
+    const admissions = input.resolution.admissions.filter(
+      (admission) => admission.candidateKey === artifact.key,
     );
-    const proposed = input.resolution.provisional.filter((item) => item.key === candidate.key);
     const match = matches[0];
+    const admission = admissions[0];
     const offered = input.offeredKnowledge.find(
       (item) => item.id === match?.knowledgeId && item.revision === match.revision,
     );
-    const reviewed = proposed[0];
-    const attachment = input.offeredKnowledge.find(
-      (item) => item.id === reviewed?.knowledgeId && item.revision === reviewed.revision,
-    );
     if (
       matches.length === 1 &&
-      proposed.length === 0 &&
-      match &&
-      offered &&
+      admissions.length === 0 &&
+      match !== undefined &&
+      offered !== undefined &&
       match.decision !== "provisional" &&
       match.confidence >= semanticReuseConfidence &&
-      offered.kind === candidate.kind &&
-      knowledgeScopeFingerprint(offered.semanticScope, offered.definitionScope) ===
-        knowledgeScopeFingerprint(candidate.semanticScope, candidate.definitionScope)
+      compatibleReuse(artifact, offered)
     ) {
       decisions.push({
         resolution: "reuse",
-        candidate,
+        artifact,
         knowledge: offered,
-        reasonCodes: [...match.reasonCodes, "offered_revision_verified", "scope_compatible"],
+        reasons: [...match.reasonCodes, "offered_revision_verified", "typed_contract_compatible"],
       });
-    } else if (
-      matches.length === 0 &&
-      proposed.length === 1 &&
-      reviewed?.review === "attach_material" &&
-      reviewed.classification === "material_request" &&
-      attachment !== undefined
-    ) {
-      decisions.push({
-        resolution: "attach",
-        candidate,
-        knowledge: attachment,
-        reasonCodes: [...reviewed.reasonCodes, "offered_revision_verified"],
-      });
-    } else if (
-      matches.length === 0 &&
-      proposed.length === 1 &&
-      reviewed?.review === "create" &&
-      reviewed.independentlyValidated &&
-      candidate.classification === "knowledge_unit"
-    ) {
-      decisions.push({ resolution: "new", candidate, reasonCodes: reviewed.reasonCodes });
-    } else {
+      continue;
+    }
+    if (matches.length !== 0 || admissions.length !== 1 || admission === undefined) {
       decisions.push({
         resolution: "skip",
-        candidate,
-        reasonCodes: [
-          ...(reviewed?.reasonCodes ?? []),
-          matches.length + proposed.length === 0
+        artifact,
+        reasons: [
+          matches.length + admissions.length === 0
             ? "omitted_candidate_skipped"
-            : matches.length + proposed.length > 1
-              ? "conflicting_resolution"
-              : match
-                ? "equivalence_not_established"
-                : reviewed?.review === "ignore"
-                  ? "explicitly_ignored"
-                  : "creation_not_independently_validated",
+            : "conflicting_resolution",
         ],
       });
+      continue;
     }
+    if (admission.artifactType !== artifact.artifactType || admission.verdict !== "approve") {
+      decisions.push({
+        resolution: "skip",
+        artifact,
+        admission,
+        reasons: [
+          ...admission.reasons,
+          admission.verdict === "reject" ? "model_review_rejected" : "artifact_type_mismatch",
+        ],
+      });
+      continue;
+    }
+    if (artifact.artifactType === "material" && admission.artifactType === "material") {
+      const attachment = input.offeredKnowledge.find(
+        (item) => item.id === admission.knowledgeId && item.revision === admission.revision,
+      );
+      if (attachment === undefined) {
+        decisions.push({
+          resolution: "skip",
+          artifact,
+          admission,
+          reasons: [...admission.reasons, "unoffered_attachment"],
+        });
+      } else {
+        decisions.push({
+          resolution: "attach",
+          artifact,
+          admission,
+          knowledge: attachment,
+          reasons: [...admission.reasons, "offered_revision_verified"],
+        });
+      }
+      continue;
+    }
+    if (!referenceSetIsOfferedDefinitions(artifact, offeredByRevision)) {
+      decisions.push({
+        resolution: "skip",
+        artifact,
+        admission,
+        reasons: [...admission.reasons, "definition_revision_link_unoffered_or_ineligible"],
+      });
+      continue;
+    }
+    decisions.push({
+      resolution: artifact.artifactType === "misconception" ? "new_misconception" : "new_knowledge",
+      artifact,
+      admission,
+      reasons: admission.reasons,
+    });
   }
   return {
     decisions,

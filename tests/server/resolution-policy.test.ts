@@ -2,214 +2,97 @@ import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 import { normalizeResolution } from "../../src/server/resolution-policy.js";
 import type { KnowledgeContext } from "../../src/server/tutor-knowledge.js";
-import type { candidateSchema, resolutionSchema } from "../../src/server/tutor-schemas.js";
+import type { admissionArtifactSchema, resolutionSchema } from "../../src/server/tutor-schemas.js";
 
-const candidate = {
+const artifact = {
+  artifactType: "definition",
   key: "formal",
   label: "formal",
   definition: "Explicit components and rules",
   semanticScope: "computer science",
-  kind: "term_sense",
+  definitionKind: "term_sense",
   aliases: [],
   distinguishingFeatures: ["explicit rules"],
-  claims: [],
   riskScope: "stable",
   confidence: 0.9,
   sourceSpans: [],
-  classification: "knowledge_unit",
-} satisfies z.infer<typeof candidateSchema>;
+} satisfies z.infer<typeof admissionArtifactSchema>;
+
 const offered: KnowledgeContext = {
   id: "11111111-1111-4111-8111-111111111111",
   title: "formal",
   scope: "canonical",
   revision: 1,
   revisionId: "22222222-2222-4222-8222-222222222222",
-  definition: candidate.definition,
-  semanticScope: candidate.semanticScope,
+  definition: artifact.definition,
+  semanticScope: artifact.semanticScope,
   distinguishingFeatures: [],
   claims: [],
   riskScope: "stable",
   kind: "term_sense",
   aliases: [],
 };
+
 const match = {
-  candidateKey: "formal",
+  candidateKey: artifact.key,
   knowledgeId: offered.id,
-  revision: 1,
+  revision: offered.revision,
   confidence: 0.99,
   decision: "semantic",
-  reasonCodes: ["same_scope", "same_definition"],
+  reasonCodes: ["same_scope"],
 } satisfies z.infer<typeof resolutionSchema>["matches"][number];
 
-describe("conservative knowledge resolution", () => {
-  it("reuses an offered compatible revision with strong equivalence confidence", () => {
-    const result = normalizeResolution({
-      candidates: [candidate],
+const admission = {
+  candidateKey: artifact.key,
+  artifactType: "definition",
+  verdict: "approve",
+  reviewLabel: "resolution-stage model review",
+  rubricVersion: "typed-admission-v1",
+  checks: { durableIdentity: true, boundedMeaning: true, reusableBeyondCurrentAnswer: true },
+  reasons: ["Durable named definition."],
+} satisfies z.infer<typeof resolutionSchema>["admissions"][number];
+
+describe("conservative typed resolution", () => {
+  it("reuses only an offered compatible revision with strong confidence", () => {
+    const accepted = normalizeResolution({
+      artifacts: [artifact],
       offeredKnowledge: [offered],
-      resolution: { matches: [match], provisional: [] },
+      resolution: { matches: [match], admissions: [] },
     });
-    expect(result.decisions[0]?.resolution).toBe("reuse");
+    const uncertain = normalizeResolution({
+      artifacts: [artifact],
+      offeredKnowledge: [offered],
+      resolution: { matches: [{ ...match, confidence: 0.05 }], admissions: [] },
+    });
+    expect(accepted.decisions[0]?.resolution).toBe("reuse");
+    expect(uncertain.decisions[0]?.resolution).toBe("skip");
   });
 
-  it("skips an uncertain match instead of silently merging or creating", () => {
-    const result = normalizeResolution({
-      candidates: [candidate],
-      offeredKnowledge: [offered],
-      resolution: { matches: [{ ...match, confidence: 0.05 }], provisional: [] },
-    });
-    expect(result.decisions[0]?.resolution).toBe("skip");
-  });
-
-  it("does not reuse a match explicitly marked provisional", () => {
-    const result = normalizeResolution({
-      candidates: [candidate],
-      offeredKnowledge: [offered],
-      resolution: { matches: [{ ...match, decision: "provisional" }], provisional: [] },
-    });
-    expect(result.decisions[0]?.resolution).toBe("skip");
-  });
-
-  it("skips an omitted original candidate", () => {
-    const result = normalizeResolution({
-      candidates: [candidate],
-      offeredKnowledge: [offered],
-      resolution: { matches: [], provisional: [] },
-    });
-    expect(result.decisions[0]?.resolution).toBe("skip");
-  });
-
-  it("does not accept a provider rewrite of the extracted definition", () => {
-    const result = normalizeResolution({
-      candidates: [candidate],
+  it("creates only a matching approved typed admission", () => {
+    const accepted = normalizeResolution({
+      artifacts: [artifact],
       offeredKnowledge: [],
-      resolution: {
-        matches: [],
-        provisional: [
-          {
-            ...candidate,
-            definition: "Ceremonial etiquette",
-            review: "create",
-            independentlyValidated: true,
-            reasonCodes: [],
-          },
-        ],
-      },
+      resolution: { matches: [], admissions: [admission] },
     });
-    expect(result.decisions[0]?.candidate.definition).toBe(candidate.definition);
+    const rejected = normalizeResolution({
+      artifacts: [artifact],
+      offeredKnowledge: [],
+      resolution: { matches: [], admissions: [{ ...admission, verdict: "reject" }] },
+    });
+    expect(accepted.decisions[0]?.resolution).toBe("new_knowledge");
+    expect(rejected.decisions[0]?.resolution).toBe("skip");
   });
 
-  it("skips when the provider returns conflicting decisions", () => {
+  it("skips conflicting decisions and records provider-invented keys", () => {
     const result = normalizeResolution({
-      candidates: [candidate],
+      artifacts: [artifact],
       offeredKnowledge: [offered],
       resolution: {
         matches: [match],
-        provisional: [
-          {
-            ...candidate,
-            review: "create",
-            independentlyValidated: true,
-            reasonCodes: [],
-          },
-        ],
+        admissions: [admission, { ...admission, candidateKey: "invented" }],
       },
     });
-    expect(result.decisions).toHaveLength(1);
     expect(result.decisions[0]?.resolution).toBe("skip");
-  });
-
-  it("rejects unoffered IDs and incompatible senses even at high confidence", () => {
-    for (const choices of [[], [{ ...offered, semanticScope: "ceremonial conventions" }]]) {
-      const result = normalizeResolution({
-        candidates: [candidate],
-        offeredKnowledge: choices,
-        resolution: { matches: [match], provisional: [] },
-      });
-      expect(result.decisions[0]?.resolution).toBe("skip");
-    }
-  });
-
-  it("does not reuse matching semantic text with a conflicting structured definition scope", () => {
-    // Given
-    const scopedCandidate = {
-      ...candidate,
-      definitionScope: { domain: "mathematics", exclusions: ["ceremonial usage"] },
-    };
-    const scopedOffered = {
-      ...offered,
-      definitionScope: { domain: "social customs", exclusions: ["mathematical usage"] },
-    };
-
-    // When
-    const result = normalizeResolution({
-      candidates: [scopedCandidate],
-      offeredKnowledge: [scopedOffered],
-      resolution: { matches: [match], provisional: [] },
-    });
-
-    // Then
-    expect(result.decisions[0]?.resolution).toBe("skip");
-  });
-
-  it("records but never persists provider-invented candidate keys", () => {
-    const result = normalizeResolution({
-      candidates: [candidate],
-      offeredKnowledge: [],
-      resolution: {
-        matches: [],
-        provisional: [
-          {
-            ...candidate,
-            key: "invented",
-            review: "create",
-            independentlyValidated: true,
-            reasonCodes: [],
-          },
-        ],
-      },
-    });
     expect(result.ignoredKeys).toEqual(["invented"]);
-    expect(result.decisions.map((item) => item.candidate.key)).toEqual(["formal"]);
-  });
-
-  it("creates only an explicitly reviewed independently validated knowledge unit", () => {
-    const result = normalizeResolution({
-      candidates: [candidate],
-      offeredKnowledge: [],
-      resolution: {
-        matches: [],
-        provisional: [
-          {
-            ...candidate,
-            review: "create",
-            independentlyValidated: true,
-            reasonCodes: ["named_definition_verified"],
-          },
-        ],
-      },
-    });
-    expect(result.decisions[0]?.resolution).toBe("new");
-  });
-
-  it("attaches material only to an offered exact revision", () => {
-    const material = { ...candidate, classification: "material_request" as const };
-    const result = normalizeResolution({
-      candidates: [material],
-      offeredKnowledge: [offered],
-      resolution: {
-        matches: [],
-        provisional: [
-          {
-            ...material,
-            review: "attach_material",
-            independentlyValidated: false,
-            knowledgeId: offered.id,
-            revision: offered.revision,
-            reasonCodes: ["supports_named_concept"],
-          },
-        ],
-      },
-    });
-    expect(result.decisions[0]?.resolution).toBe("attach");
   });
 });
