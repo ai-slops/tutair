@@ -2,6 +2,7 @@ import type { z } from "zod";
 import { knowledgeScopeFingerprint } from "./knowledge-contracts.js";
 import type { KnowledgeContext } from "./tutor-knowledge.js";
 import type { admissionArtifactSchema, resolutionSchema } from "./tutor-schemas.js";
+import { typedRelationalIdentityMatches } from "./typed-knowledge-reuse.js";
 
 export const semanticReuseConfidence = 0.9;
 type Artifact = z.infer<typeof admissionArtifactSchema>;
@@ -66,14 +67,29 @@ function claimSourcesAreOffered(
   return artifact.sourceRefs.every((sourceRef) => offeredSourceRefs.has(sourceRef));
 }
 
-function compatibleReuse(artifact: Artifact, offered: KnowledgeContext): boolean {
+function compatibleReuse(
+  artifact: Artifact,
+  offered: KnowledgeContext,
+  offeredByRevision: ReadonlyMap<string, KnowledgeContext>,
+): boolean {
   const expectedKind = knowledgeKind(artifact);
   if (expectedKind === null || offered.kind !== expectedKind) return false;
-  if (artifact.artifactType !== "definition") return true;
-  return (
-    knowledgeScopeFingerprint(offered.semanticScope, offered.definitionScope) ===
-    knowledgeScopeFingerprint(artifact.semanticScope, artifact.definitionScope)
-  );
+  switch (artifact.artifactType) {
+    case "definition":
+      return (
+        knowledgeScopeFingerprint(offered.semanticScope, offered.definitionScope) ===
+        knowledgeScopeFingerprint(artifact.semanticScope, artifact.definitionScope)
+      );
+    case "claim":
+    case "distinction":
+      return (
+        referenceSetIsOfferedDefinitions(artifact, offeredByRevision) &&
+        typedRelationalIdentityMatches(artifact, offered.typedContract ?? null)
+      );
+    case "material":
+    case "misconception":
+      return false;
+  }
 }
 
 export function normalizeResolution(input: {
@@ -105,7 +121,7 @@ export function normalizeResolution(input: {
       offered !== undefined &&
       match.decision !== "provisional" &&
       match.confidence >= semanticReuseConfidence &&
-      compatibleReuse(artifact, offered)
+      compatibleReuse(artifact, offered, offeredByRevision)
     ) {
       decisions.push({
         resolution: "reuse",
