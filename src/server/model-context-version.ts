@@ -15,10 +15,10 @@ export const STAGE_VERSIONS = {
 } as const satisfies Readonly<Record<Stage, string>>;
 
 export const STAGE_SCHEMA_VERSIONS = {
-  extraction: "document-schema-v2",
+  extraction: "document-schema-v3",
   resolution: "document-schema-v2",
   planning: "document-schema-v2",
-  preparation: "document-schema-v2",
+  preparation: "document-schema-v3",
   draft: "phase1-schema-v2",
   lint: "phase1-schema-v3",
   final: "phase1-schema-v2",
@@ -26,8 +26,8 @@ export const STAGE_SCHEMA_VERSIONS = {
 } as const satisfies Readonly<Record<Stage, string>>;
 
 export const PROMPT_SCHEMA_VERSIONS = {
-  prompt: "document-prompt-v2",
-  compatibilityPrompt: "document-prompt-v2-compatibility",
+  prompt: "document-prompt-v3",
+  compatibilityPrompt: "document-prompt-v3-compatibility",
   schema: "document-schema-v2",
   evaluationSchema: "phase1-evaluation-schema-v3",
 } as const;

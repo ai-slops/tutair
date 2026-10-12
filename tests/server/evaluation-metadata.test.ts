@@ -81,10 +81,10 @@ it("versions only the changed evaluation stage while retaining unrelated stage v
 
 it("versions schemas only for stages whose output contracts changed", () => {
   expect(STAGE_SCHEMA_VERSIONS).toEqual({
-    extraction: "document-schema-v2",
+    extraction: "document-schema-v3",
     resolution: "document-schema-v2",
     planning: "document-schema-v2",
-    preparation: "document-schema-v2",
+    preparation: "document-schema-v3",
     draft: "phase1-schema-v2",
     lint: "phase1-schema-v3",
     final: "phase1-schema-v2",
