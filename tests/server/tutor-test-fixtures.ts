@@ -13,18 +13,17 @@ export const providerState = {
 } as const;
 
 export const machine = {
+  artifactType: "definition",
   key: "fsm",
   label: "finite-state machine",
   definition: "A finite collection of states and transition rules.",
   semanticScope: "formal system",
-  kind: "concept",
+  definitionKind: "concept",
   aliases: ["FSM"],
   distinguishingFeatures: ["finite states", "explicit transitions"],
-  claims: ["Transitions select a next state"],
   riskScope: "stable",
   confidence: 0.9,
   sourceSpans: [{ start: 0, end: 8 }],
-  classification: "knowledge_unit",
 } as const;
 
 export function stageOutput(call: StructuredCall): unknown {
@@ -36,33 +35,28 @@ export function stageOutput(call: StructuredCall): unknown {
         goal: "Model a door controller",
         sourceLanguage: "en",
         responseLanguage: "en",
-        targets: [machine],
-        prerequisites: [],
-        terms: [],
-        distinctions: [
-          {
-            ...machine,
-            key: "formal-senses",
-            label: "formal versus ceremonial",
-            kind: "distinction",
-          },
-        ],
-        misconceptions: [],
-        claims: [],
+        artifacts: [machine],
         relations: [],
       };
     case "resolution":
       return {
         matches: [],
-        provisional: Array.isArray(call.data["candidates"])
+        admissions: Array.isArray(call.data["candidates"])
           ? call.data["candidates"].flatMap((candidate) =>
               typeof candidate === "object" && candidate !== null
                 ? [
                     {
-                      ...candidate,
-                      review: "create",
-                      independentlyValidated: true,
-                      reasonCodes: ["test_validated"],
+                      candidateKey: "key" in candidate ? candidate.key : "",
+                      artifactType: "definition",
+                      verdict: "approve",
+                      reviewLabel: "resolution-stage model review",
+                      rubricVersion: "typed-admission-v1",
+                      checks: {
+                        durableIdentity: true,
+                        boundedMeaning: true,
+                        reusableBeyondCurrentAnswer: true,
+                      },
+                      reasons: ["test_validated"],
                     },
                   ]
                 : [],

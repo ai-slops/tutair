@@ -43,18 +43,17 @@ export type Client = {
 
 const scriptedValue = (call: StructuredCall): unknown => {
   const candidate = {
+    artifactType: "definition",
     key: "claim",
     label: "Claim",
     definition: "Tentative claim",
     semanticScope: "test",
-    kind: "claim",
+    definitionKind: "concept",
     aliases: [],
     distinguishingFeatures: [],
-    claims: [],
     riskScope: "stable",
     confidence: 0.4,
     sourceSpans: [],
-    classification: "knowledge_unit",
   } as const;
   switch (call.stage) {
     case "extraction":
@@ -62,26 +61,28 @@ const scriptedValue = (call: StructuredCall): unknown => {
         goal: "Test the current claim",
         sourceLanguage: "en",
         responseLanguage: "en",
-        targets: [candidate],
-        prerequisites: [],
-        terms: [],
-        distinctions: [],
-        misconceptions: [],
-        claims: [],
+        artifacts: [candidate],
         relations: [],
       };
     case "resolution":
       return {
         matches: [],
-        provisional: Array.isArray(call.data["candidates"])
+        admissions: Array.isArray(call.data["candidates"])
           ? call.data["candidates"].flatMap((item) =>
               typeof item === "object" && item !== null
                 ? [
                     {
-                      ...item,
-                      review: "create",
-                      independentlyValidated: true,
-                      reasonCodes: ["test_validated"],
+                      candidateKey: "key" in item ? item.key : "",
+                      artifactType: "definition",
+                      verdict: "approve",
+                      reviewLabel: "resolution-stage model review",
+                      rubricVersion: "typed-admission-v1",
+                      checks: {
+                        durableIdentity: true,
+                        boundedMeaning: true,
+                        reusableBeyondCurrentAnswer: true,
+                      },
+                      reasons: ["test_validated"],
                     },
                   ]
                 : [],
