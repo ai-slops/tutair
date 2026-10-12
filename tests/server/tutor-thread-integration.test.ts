@@ -13,6 +13,24 @@ describe("thread-aware tutor API", () => {
 
   it("persists planned targets and gaps without overwriting the project's desired outcome", async () => {
     const provider = providerFor((call) => {
+      if (call.stage === "extraction") {
+        const extracted = z
+          .object({ artifacts: z.array(z.record(z.string(), z.unknown())) })
+          .passthrough()
+          .parse(stageOutput(call));
+        return {
+          ...extracted,
+          artifacts: [
+            ...extracted.artifacts,
+            {
+              ...extracted.artifacts[0],
+              key: "transition-system",
+              label: "transition system",
+              definition: "A system whose behavior is represented by transitions between states.",
+            },
+          ],
+        };
+      }
       if (call.stage !== "planning") return stageOutput(call);
       const ids = z.array(z.string()).parse(call.data["knowledgeIds"]);
       return {

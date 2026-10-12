@@ -62,10 +62,10 @@ describe("same-turn knowledge propagation", () => {
       title: machine.label,
       statement: machine.definition,
       semanticScope: machine.semanticScope,
-      kind: machine.kind,
+      kind: machine.definitionKind,
       aliases: machine.aliases,
       distinguishingFeatures: machine.distinguishingFeatures,
-      claims: machine.claims,
+      claims: [],
       riskScope: machine.riskScope,
       confidence: machine.confidence,
       sourceType: "learner_manual",
@@ -95,7 +95,7 @@ describe("same-turn knowledge propagation", () => {
                 },
               ];
         }),
-        provisional: [],
+        admissions: [],
       };
     }, calls);
 
