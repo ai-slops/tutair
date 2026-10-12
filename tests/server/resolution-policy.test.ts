@@ -47,7 +47,6 @@ const admission = {
   artifactType: "definition",
   verdict: "approve",
   reviewLabel: "resolution-stage model review",
-  rubricVersion: "typed-admission-v1",
   checks: { durableIdentity: true, boundedMeaning: true, reusableBeyondCurrentAnswer: true },
   reasons: ["Durable named definition."],
 } satisfies z.infer<typeof resolutionSchema>["admissions"][number];
@@ -81,6 +80,119 @@ describe("conservative typed resolution", () => {
     });
     expect(accepted.decisions[0]?.resolution).toBe("new_knowledge");
     expect(rejected.decisions[0]?.resolution).toBe("skip");
+  });
+
+  it("skips an approval when any required criterion is false", () => {
+    const result = normalizeResolution({
+      artifacts: [artifact],
+      offeredKnowledge: [],
+      resolution: {
+        matches: [],
+        admissions: [{ ...admission, checks: { ...admission.checks, durableIdentity: false } }],
+      },
+    });
+
+    expect(result.decisions[0]?.resolution).toBe("skip");
+    expect(result.decisions[0]?.reasons).toContain("admission_criteria_failed");
+  });
+
+  it("skips source-supported claims whose reference was not offered", () => {
+    const claim = {
+      artifactType: "claim",
+      key: "claim",
+      label: "Deterministic transition",
+      proposition: "One event selects one next state.",
+      subjectDefinitionRevisionId: offered.revisionId,
+      predicate: "selects",
+      object: "one next state",
+      evidentialScope: "deterministic controllers",
+      provenanceStatus: "source_supported",
+      provenanceBasis: "A source was cited by the model.",
+      sourceRefs: ["invented:source"],
+      riskScope: "stable",
+      confidence: 0.9,
+      sourceSpans: [],
+    } satisfies z.infer<typeof admissionArtifactSchema>;
+    const result = normalizeResolution({
+      artifacts: [claim],
+      offeredKnowledge: [offered],
+      resolution: {
+        matches: [],
+        admissions: [
+          {
+            candidateKey: claim.key,
+            artifactType: "claim",
+            verdict: "approve",
+            reviewLabel: "resolution-stage model review",
+            checks: {
+              subjectBindingMeaningful: true,
+              relationExplicit: true,
+              evidentialScopeHonest: true,
+              reusable: true,
+            },
+            reasons: ["Structured claim."],
+          },
+        ],
+      },
+    });
+
+    expect(result.decisions[0]?.resolution).toBe("skip");
+    expect(result.decisions[0]?.reasons).toContain("claim_source_reference_unoffered");
+  });
+
+  it("admits a source-supported claim only when its exact reference was offered", () => {
+    const claim = {
+      artifactType: "claim",
+      key: "claim",
+      label: "Deterministic transition",
+      proposition: "One event selects one next state.",
+      subjectDefinitionRevisionId: offered.revisionId,
+      predicate: "selects",
+      object: "one next state",
+      evidentialScope: "deterministic controllers",
+      provenanceStatus: "source_supported",
+      provenanceBasis: "The offered document states the relation.",
+      sourceRefs: ["document:controller#transition"],
+      riskScope: "stable",
+      confidence: 0.9,
+      sourceSpans: [],
+    } satisfies z.infer<typeof admissionArtifactSchema>;
+    const result = normalizeResolution({
+      artifacts: [claim],
+      offeredKnowledge: [
+        {
+          ...offered,
+          claimDetails: [
+            {
+              text: "One event selects one next state.",
+              authority: "external",
+              sourceRefs: ["document:controller#transition"],
+              status: "source_supported",
+            },
+          ],
+        },
+      ],
+      resolution: {
+        matches: [],
+        admissions: [
+          {
+            candidateKey: claim.key,
+            artifactType: "claim",
+            verdict: "approve",
+            reviewLabel: "resolution-stage model review",
+            checks: {
+              subjectBindingMeaningful: true,
+              relationExplicit: true,
+              evidentialScopeHonest: true,
+              reusable: true,
+            },
+            reasons: ["Structured claim."],
+          },
+        ],
+      },
+    });
+
+    expect(result.decisions[0]?.resolution).toBe("new_knowledge");
   });
 
   it("skips conflicting decisions and records provider-invented keys", () => {

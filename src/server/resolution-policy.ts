@@ -50,6 +50,22 @@ function referenceSetIsOfferedDefinitions(
   });
 }
 
+function claimSourcesAreOffered(
+  artifact: Artifact,
+  offeredKnowledge: readonly KnowledgeContext[],
+): boolean {
+  if (artifact.artifactType !== "claim" || artifact.provenanceStatus === "model_generated")
+    return true;
+  const offeredSourceRefs = new Set(
+    offeredKnowledge.flatMap((item) =>
+      (item.claimDetails ?? []).flatMap((claim) =>
+        typeof claim === "string" ? [] : claim.sourceRefs,
+      ),
+    ),
+  );
+  return artifact.sourceRefs.every((sourceRef) => offeredSourceRefs.has(sourceRef));
+}
+
 function compatibleReuse(artifact: Artifact, offered: KnowledgeContext): boolean {
   const expectedKind = knowledgeKind(artifact);
   if (expectedKind === null || offered.kind !== expectedKind) return false;
@@ -111,14 +127,23 @@ export function normalizeResolution(input: {
       });
       continue;
     }
-    if (admission.artifactType !== artifact.artifactType || admission.verdict !== "approve") {
+    const criteriaPassed = Object.values(admission.checks).every((check) => check);
+    if (
+      admission.artifactType !== artifact.artifactType ||
+      admission.verdict !== "approve" ||
+      !criteriaPassed
+    ) {
       decisions.push({
         resolution: "skip",
         artifact,
         admission,
         reasons: [
           ...admission.reasons,
-          admission.verdict === "reject" ? "model_review_rejected" : "artifact_type_mismatch",
+          admission.verdict === "reject"
+            ? "model_review_rejected"
+            : admission.artifactType !== artifact.artifactType
+              ? "artifact_type_mismatch"
+              : "admission_criteria_failed",
         ],
       });
       continue;
@@ -151,6 +176,15 @@ export function normalizeResolution(input: {
         artifact,
         admission,
         reasons: [...admission.reasons, "definition_revision_link_unoffered_or_ineligible"],
+      });
+      continue;
+    }
+    if (!claimSourcesAreOffered(artifact, input.offeredKnowledge)) {
+      decisions.push({
+        resolution: "skip",
+        artifact,
+        admission,
+        reasons: [...admission.reasons, "claim_source_reference_unoffered"],
       });
       continue;
     }
