@@ -1,46 +1,37 @@
 import { z } from "zod";
 
 type DemoCandidate = {
+  readonly artifactType: "definition";
   readonly key: string;
   readonly label: string;
   readonly definition: string;
   readonly semanticScope: string;
-  readonly kind:
-    | "term_sense"
-    | "concept"
-    | "claim"
-    | "procedure"
-    | "skill"
-    | "distinction"
-    | "misconception";
+  readonly definitionKind: "term_sense" | "concept";
   readonly aliases: readonly string[];
   readonly distinguishingFeatures: readonly string[];
-  readonly claims: readonly string[];
   readonly riskScope: "stable" | "definition-sensitive" | "current-contested" | "high-stakes";
   readonly confidence: number;
   readonly sourceSpans: readonly { readonly start: number; readonly end: number }[];
-  readonly classification: "knowledge_unit" | "material_request";
 };
 
 export const candidate = (
   key: string,
   label: string,
   definition: string,
-  kind: DemoCandidate["kind"],
+  kind: DemoCandidate["definitionKind"],
   features: readonly string[],
 ): DemoCandidate => ({
+  artifactType: "definition",
   key,
   label,
   definition,
-  kind,
+  definitionKind: kind,
   aliases: [],
   distinguishingFeatures: features,
   semanticScope: "finite-state machine modeling",
-  claims: [definition],
   riskScope: "stable",
   confidence: 0.72,
   sourceSpans: [],
-  classification: "knowledge_unit",
 });
 export const fsm = {
   ...candidate(
@@ -63,7 +54,7 @@ export const transition = candidate(
   "transition",
   "transition",
   "A rule that maps a state and event or condition to a next state.",
-  "procedure",
+  "concept",
   ["source state", "trigger", "destination state"],
 );
 const formal = candidate(

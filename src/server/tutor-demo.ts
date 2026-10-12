@@ -1,7 +1,6 @@
 import { z } from "zod";
 import type { StructuredCall } from "./provider.js";
 import {
-  candidate,
   ceremonialFormal,
   fsm,
   knownSchema,
@@ -20,20 +19,7 @@ export function demoCall(call: StructuredCall): unknown {
         goal: message || "Understand finite-state machines",
         sourceLanguage: "en",
         responseLanguage: "en",
-        targets: [fsm],
-        prerequisites: [state, transition],
-        terms: [technicalFormal, ceremonialFormal],
-        distinctions: [
-          candidate(
-            "formal-distinction",
-            "technical versus ceremonial formality",
-            "Technical formality means explicit specification; ceremonial formality means convention.",
-            "distinction",
-            ["same label", "different semantic scopes"],
-          ),
-        ],
-        misconceptions: [],
-        claims: [],
+        artifacts: [fsm, state, transition, technicalFormal, ceremonialFormal],
         relations: [
           {
             fromKey: "state",
@@ -62,6 +48,7 @@ export function demoCall(call: StructuredCall): unknown {
           const found = existing.find(
             (knownItem) =>
               knownItem.title.toLocaleLowerCase() === item.label.toLocaleLowerCase() &&
+              item.artifactType === "definition" &&
               knownItem.semanticScope === item.semanticScope,
           );
           return found === undefined
@@ -77,21 +64,35 @@ export function demoCall(call: StructuredCall): unknown {
                 },
               ];
         }),
-        provisional: pending
+        admissions: pending
           .filter(
             (item) =>
               !existing.some(
                 (knownItem) =>
                   knownItem.title.toLocaleLowerCase() === item.label.toLocaleLowerCase() &&
+                  item.artifactType === "definition" &&
                   knownItem.semanticScope === item.semanticScope,
               ),
           )
-          .map((item) => ({
-            ...item,
-            review: "create" as const,
-            independentlyValidated: true,
-            reasonCodes: ["independently_validated_named_concept"],
-          })),
+          .flatMap((item) =>
+            item.artifactType === "definition"
+              ? [
+                  {
+                    candidateKey: item.key,
+                    artifactType: "definition" as const,
+                    verdict: "approve" as const,
+                    reviewLabel: "resolution-stage model review" as const,
+                    rubricVersion: "typed-admission-v1" as const,
+                    checks: {
+                      durableIdentity: true as const,
+                      boundedMeaning: true as const,
+                      reusableBeyondCurrentAnswer: true as const,
+                    },
+                    reasons: ["independently_validated_named_concept"],
+                  },
+                ]
+              : [],
+          ),
       };
     }
     case "planning":
