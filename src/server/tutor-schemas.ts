@@ -50,8 +50,8 @@ const relationTypes = [
 export const extractionSchema = z
   .object({
     goal: z.string().min(1).max(2_000),
-    sourceLanguage: languageTagSchema.default("en"),
-    responseLanguage: languageTagSchema.default("en"),
+    sourceLanguage: languageTagSchema,
+    responseLanguage: languageTagSchema,
     targets: z.array(candidateSchema).max(24),
     prerequisites: z.array(candidateSchema).max(24),
     terms: z.array(candidateSchema).max(24),
