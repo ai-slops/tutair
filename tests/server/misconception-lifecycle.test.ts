@@ -147,4 +147,121 @@ describe("misconception lifecycle", () => {
       context.database.run("DELETE FROM misconception_review_events WHERE id=?", [reviewed.id]),
     ).toThrow(/immutable/i);
   });
+
+  it("restores retirement without erasing an incorrect accuracy review", () => {
+    const context = fixture();
+    const created = context.misconceptions.createOrReuse(context.owner, {
+      ...details,
+      definitionRevisionLinks: [
+        {
+          definitionRevisionId: context.revisionId,
+          role: "subject",
+          learningValue: "Supports the correction against the exact definition.",
+        },
+      ],
+      sourceType: "learner_manual",
+      sourceRefs: [],
+      modelReview: null,
+      extractionRunId: null,
+      resolutionRunId: null,
+    });
+
+    context.misconceptions.review(context.owner, created.id, "mark_incorrect", "Wrong", false);
+    context.misconceptions.review(context.owner, created.id, "retire", "Not useful now", false);
+    context.misconceptions.review(context.owner, created.id, "restore", null, true);
+
+    const restored = context.misconceptions.get(context.owner, created.id);
+    expect(restored.reviewStatus).toBe("incorrect");
+    expect(restored.eligibilityReason).toBe("incorrect");
+  });
+
+  it("orders same-millisecond review events by insertion order", () => {
+    const context = fixture();
+    const created = context.misconceptions.createOrReuse(context.owner, {
+      ...details,
+      definitionRevisionLinks: [
+        {
+          definitionRevisionId: context.revisionId,
+          role: "subject",
+          learningValue: "Supports the correction against the exact definition.",
+        },
+      ],
+      sourceType: "learner_manual",
+      sourceRefs: [],
+      modelReview: null,
+      extractionRunId: null,
+      resolutionRunId: null,
+    });
+    const timestamp = "2026-10-12T00:00:00.000Z";
+    context.database.run("INSERT INTO misconception_review_events VALUES(?,?,?,?,?,?,?)", [
+      "ffffffff-ffff-4fff-8fff-ffffffffffff",
+      created.id,
+      created.revisionId,
+      context.owner,
+      "mark_incorrect",
+      "Wrong",
+      timestamp,
+    ]);
+    context.database.run("INSERT INTO misconception_review_events VALUES(?,?,?,?,?,?,?)", [
+      "00000000-0000-4000-8000-000000000001",
+      created.id,
+      created.revisionId,
+      context.owner,
+      "reviewed",
+      null,
+      timestamp,
+    ]);
+
+    const item = context.misconceptions.get(context.owner, created.id);
+    expect(item.reviewHistory.map((event) => event.action)).toEqual(["mark_incorrect", "reviewed"]);
+    expect(item.reviewStatus).toBe("reviewed");
+  });
+
+  it("requires explicit confirmation before restoring retirement", () => {
+    const context = fixture();
+    const created = context.misconceptions.createOrReuse(context.owner, {
+      ...details,
+      definitionRevisionLinks: [
+        {
+          definitionRevisionId: context.revisionId,
+          role: "subject",
+          learningValue: "Supports the correction against the exact definition.",
+        },
+      ],
+      sourceType: "learner_manual",
+      sourceRefs: [],
+      modelReview: null,
+      extractionRunId: null,
+      resolutionRunId: null,
+    });
+
+    expect(() =>
+      context.misconceptions.review(context.owner, created.id, "restore", null, false),
+    ).toThrow(/confirmation/i);
+  });
+
+  it("allows a reviewed accuracy event to supersede an incorrect event", () => {
+    const context = fixture();
+    const created = context.misconceptions.createOrReuse(context.owner, {
+      ...details,
+      definitionRevisionLinks: [
+        {
+          definitionRevisionId: context.revisionId,
+          role: "subject",
+          learningValue: "Supports the correction against the exact definition.",
+        },
+      ],
+      sourceType: "learner_manual",
+      sourceRefs: [],
+      modelReview: null,
+      extractionRunId: null,
+      resolutionRunId: null,
+    });
+    context.misconceptions.review(context.owner, created.id, "mark_incorrect", "Wrong", false);
+
+    context.misconceptions.review(context.owner, created.id, "reviewed", null, false);
+
+    expect(context.misconceptions.get(context.owner, created.id).reviewStatus).toBe("reviewed");
+    expect(context.misconceptions.get(context.owner, created.id).eligibilityReason).toBeNull();
+  });
 });
