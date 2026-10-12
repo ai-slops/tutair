@@ -95,6 +95,12 @@ type WorkspaceState = {
     reason: string,
     confirmed: boolean,
   ) => Promise<boolean>;
+  readonly reviewMisconception: (
+    itemId: string,
+    action: ReviewAction,
+    reason: string,
+    confirmed: boolean,
+  ) => Promise<boolean>;
   readonly deleteAll: () => Promise<boolean>;
   readonly selectChatGptModel: (slug: string) => Promise<boolean>;
   readonly beginChatGptManual: () => Promise<string | null>;
@@ -202,6 +208,8 @@ export function useWorkspace(api: WorkspaceApi): WorkspaceState {
         ? Promise.resolve(false)
         : run(() => api.reviewKnowledge(itemId, item.revision, action, reason, confirmed));
     },
+    reviewMisconception: (itemId, action, reason, confirmed) =>
+      run(() => api.reviewMisconception(itemId, action, reason, confirmed)),
     deleteAll: () => run(() => api.deleteAll()),
     selectChatGptModel: (slug) => run(() => api.selectChatGptModel(slug)),
     beginChatGptManual: async () => {

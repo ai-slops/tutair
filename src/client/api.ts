@@ -90,6 +90,19 @@ export function createWorkspaceApi(client: KyInstance): WorkspaceApi {
       );
       return workspace.snapshot(conversationId, generation);
     },
+    async reviewMisconception(itemId, action, reason, confirmed) {
+      const generation = workspace.begin();
+      await request(
+        () =>
+          client
+            .post(`misconceptions/${itemId}/reviews`, {
+              json: { action, reason: reason.trim() === "" ? null : reason, confirmed },
+            })
+            .json(),
+        z.object({ event: z.object({ id: IdSchema }).catchall(z.unknown()) }).catchall(z.unknown()),
+      );
+      return workspace.snapshot(workspace.activeConversationId, generation);
+    },
     async deleteAll() {
       const generation = workspace.begin();
       await client.delete("privacy");

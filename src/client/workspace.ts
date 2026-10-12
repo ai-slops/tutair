@@ -18,6 +18,7 @@ import type {
   CorrectionKind,
   KnowledgeItem,
   Message,
+  MisconceptionItem,
   ProviderStatus,
   ReviewAction,
   SearchResult,
@@ -32,6 +33,7 @@ export type WorkspaceSnapshot = {
   readonly recovery: TurnRecovery | null;
   readonly messages: readonly Message[];
   readonly knowledge: readonly KnowledgeItem[];
+  readonly misconceptions: readonly MisconceptionItem[];
   readonly provider: ProviderStatus;
   readonly chatgpt: ChatGptConnection;
   readonly debugSettings: DebugSettings;
@@ -75,6 +77,12 @@ export interface WorkspaceApi {
     reason: string,
     confirmed: boolean,
   ): Promise<WorkspaceSnapshot>;
+  reviewMisconception(
+    itemId: string,
+    action: ReviewAction,
+    reason: string,
+    confirmed: boolean,
+  ): Promise<WorkspaceSnapshot>;
   deleteAll(): Promise<WorkspaceSnapshot>;
   selectChatGptModel(slug: string): Promise<WorkspaceSnapshot>;
   beginChatGptManual(): Promise<string>;
@@ -113,6 +121,7 @@ export const EMPTY_SNAPSHOT: WorkspaceSnapshot = {
   recovery: null,
   messages: [],
   knowledge: [],
+  misconceptions: [],
   provider: EMPTY_PROVIDER,
   chatgpt: {
     enabled: false,

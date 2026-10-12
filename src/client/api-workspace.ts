@@ -11,7 +11,7 @@ import {
   request,
   SignupSchema,
 } from "./api-contract";
-import { loadKnowledge } from "./api-knowledge";
+import { loadKnowledge, loadMisconceptions } from "./api-knowledge";
 import {
   candidateIds,
   LearningThreadDetailSchema,
@@ -85,13 +85,15 @@ export class WorkspaceClient {
     generation = this.generation,
   ): Promise<WorkspaceSnapshot> {
     await this.ensureSession();
-    const [capabilities, conversations, threads, knowledge, debugSettings] = await Promise.all([
-      request(() => this.http.get("capabilities").json(), CapabilitiesSchema),
-      request(() => this.http.get("conversations").json(), ConversationsSchema),
-      request(() => this.http.get("threads").json(), LearningThreadsSchema),
-      loadKnowledge(this.http),
-      request(() => this.http.get("settings/debug").json(), DebugSettingsSchema),
-    ]);
+    const [capabilities, conversations, threads, knowledge, misconceptions, debugSettings] =
+      await Promise.all([
+        request(() => this.http.get("capabilities").json(), CapabilitiesSchema),
+        request(() => this.http.get("conversations").json(), ConversationsSchema),
+        request(() => this.http.get("threads").json(), LearningThreadsSchema),
+        loadKnowledge(this.http),
+        loadMisconceptions(this.http),
+        request(() => this.http.get("settings/debug").json(), DebugSettingsSchema),
+      ]);
     const detail =
       conversationId === null
         ? null
@@ -180,6 +182,7 @@ export class WorkspaceClient {
           };
         }) ?? [],
       knowledge,
+      misconceptions,
       provider: providerFrom(capabilities),
       chatgpt: {
         enabled: capabilities.chatgpt.enabled,
