@@ -1,5 +1,9 @@
-import type { z } from "zod";
-import { type preparationSchema, preparationSchemaFor } from "./document-answer-contracts.js";
+import { z } from "zod";
+import { preparationSchemaFor } from "./document-answer-contracts.js";
+import {
+  misconceptionRiskSchema,
+  persistPreparedMaterials,
+} from "./document-preparation-persistence.js";
 import type { blockTypes } from "./knowledge-document-contracts.js";
 import type { KnowledgeDocumentRepository } from "./knowledge-document-repository.js";
 import type { KnowledgeContext } from "./tutor-knowledge.js";
@@ -39,6 +43,13 @@ export class DocumentPreparationService {
         "No resolved knowledge revision is available for composition",
       );
     const knowledgeIds = new Set(knowledge.map((item) => item.revisionId));
+    const misconceptionRisks = z
+      .array(misconceptionRiskSchema)
+      .catch([])
+      .parse(context["misconceptionRisks"])
+      .filter((risk) =>
+        risk.definitionRevisionLinks.some((link) => knowledgeIds.has(link.definitionRevisionId)),
+      );
     const needs = materialNeeds.filter((need) => knowledgeIds.has(need.knowledgeRevisionId));
     if (needs.length === 0)
       throw new ApiError(422, "missing_material_plan", "Planning selected no answer material");
@@ -95,13 +106,16 @@ export class DocumentPreparationService {
         },
       });
       this.documents.transaction(() =>
-        this.persist(
-          prepared.runId,
-          prepared.value,
-          missing.map((need) => need.knowledgeRevisionId),
-          responseLanguage,
+        persistPreparedMaterials({
+          documents: this.documents,
+          owner: this.stages.input.owner,
+          runId: prepared.runId,
+          output: prepared.value,
+          missing: missing.map((need) => need.knowledgeRevisionId),
+          language: responseLanguage,
           created,
-        ),
+          misconceptionRisks,
+        }),
       );
     }
     throw new ApiError(
@@ -139,111 +153,5 @@ export class DocumentPreparationService {
             documentId: latest.id,
           }));
     });
-  }
-
-  private persist(
-    runId: string,
-    output: z.infer<typeof preparationSchema>,
-    missing: readonly string[],
-    language: string,
-    created: string[],
-  ): void {
-    const offered = new Set(missing);
-    for (const material of output.materials) {
-      if (!offered.has(material.knowledgeRevisionId))
-        throw new ApiError(
-          422,
-          "unoffered_preparation_topic",
-          "Preparation returned an unknown revision",
-        );
-      const existingEnglish = this.documents
-        .forRevision(this.stages.input.owner, material.knowledgeRevisionId)
-        .filter((document) => document.role === "english_base" && document.languageTag === "en")
-        .toSorted(
-          (left, right) =>
-            Number(right.owner === null) - Number(left.owner === null) ||
-            right.version - left.version,
-        )[0];
-      const priorDefinition = existingEnglish?.blocks.find((block) => block.type === "definition");
-      const nextDefinition = material.englishBlocks.find((block) => block.type === "definition");
-      if (
-        priorDefinition !== undefined &&
-        nextDefinition !== undefined &&
-        priorDefinition.content !== nextDefinition.content
-      )
-        throw new ApiError(
-          422,
-          "automatic_definition_change",
-          "Preparation cannot change an existing concept definition",
-        );
-      const immutableDefinition = priorDefinition?.content;
-      if (
-        material.englishBlocks.length > 0 &&
-        nextDefinition === undefined &&
-        immutableDefinition === undefined
-      )
-        throw new ApiError(
-          422,
-          "missing_english_definition",
-          "Preparation requires an immutable English definition",
-        );
-      const englishBlocks =
-        material.englishBlocks.length > 0 &&
-        nextDefinition === undefined &&
-        immutableDefinition !== undefined
-          ? [
-              ...material.englishBlocks,
-              { type: "definition" as const, content: immutableDefinition },
-            ]
-          : material.englishBlocks;
-      const english =
-        material.englishBlocks.length === 0
-          ? existingEnglish
-          : this.documents.create({
-              owner: this.stages.input.owner,
-              knowledgeRevisionId: material.knowledgeRevisionId,
-              role: "english_base",
-              languageTag: "en",
-              sourceType: "model_generated",
-              modelRunId: runId,
-              sourceRefs: [],
-              blocks: englishBlocks,
-            });
-      if (english === undefined)
-        throw new ApiError(
-          422,
-          "missing_english_base",
-          "Preparation must create English source material first",
-        );
-      if (material.englishBlocks.length > 0) created.push(english.id);
-      if (language !== "en" && material.localizedBlocks.length > 0) {
-        const localized = this.documents.create({
-          owner: this.stages.input.owner,
-          knowledgeRevisionId: material.knowledgeRevisionId,
-          role: "localization",
-          languageTag: language,
-          baseDocumentId: english.id,
-          sourceType: "model_generated",
-          modelRunId: runId,
-          sourceRefs: [],
-          blocks: material.localizedBlocks.map((block) => {
-            const source = english.blocks[block.sourceEnglishIndex];
-            if (source === undefined)
-              throw new ApiError(
-                422,
-                "invalid_preparation_source",
-                "Localized block source index is unavailable",
-              );
-            return {
-              type: block.type,
-              content: block.content,
-              sourceBlockId: source.id,
-              topicRevisionIds: source.topicRevisionIds,
-            };
-          }),
-        });
-        created.push(localized.id);
-      }
-    }
   }
 }

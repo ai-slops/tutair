@@ -246,4 +246,49 @@ describe("document preparation material plans", () => {
       "A state captures information relevant to future behavior.",
     );
   });
+
+  it("offers misconception risks and persists exact correction provenance", async () => {
+    let offeredRisks: unknown;
+    const context = fixture((call) => {
+      offeredRisks = call.data["misconceptionRisks"];
+      return {
+        materials: [
+          {
+            knowledgeRevisionId: context.revisionId,
+            englishBlocks: [{ type: "caveat", content: "An event triggers a state change." }],
+            localizedBlocks: [],
+          },
+        ],
+      };
+    });
+    const misconceptionRevisionId = "11111111-1111-4111-8111-111111111115";
+    const misconceptionRisks = [
+      {
+        misconceptionRevisionId,
+        definitionRevisionLinks: [
+          {
+            definitionRevisionId: context.revisionId,
+            role: "subject",
+            learningValue: "Separates a persistent state from its triggering event.",
+          },
+        ],
+      },
+    ];
+
+    await context.service.prepare(
+      context.knowledge,
+      "en",
+      [{ knowledgeRevisionId: context.revisionId, blockTypes: ["caveat"] }],
+      { misconceptionRisks },
+    );
+    const generated = context.documents
+      .forRevision(context.owner, context.revisionId)
+      .find((document) => document.sourceType === "model_generated");
+
+    expect(offeredRisks).toEqual(misconceptionRisks);
+    expect(generated?.sourceRefs).toEqual([
+      `misconception-revision:${misconceptionRevisionId}`,
+      `definition-revision:${context.revisionId}`,
+    ]);
+  });
 });

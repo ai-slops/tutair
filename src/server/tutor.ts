@@ -5,6 +5,7 @@ import { ModelRunner } from "./model-runner.js";
 import type { TutorProvider } from "./provider.js";
 import type { CoreRepository } from "./repository-core.js";
 import type { KnowledgeRepository } from "./repository-knowledge.js";
+import { MisconceptionRepository } from "./repository-misconceptions.js";
 import { searchKnowledge } from "./search.js";
 import { loadTutorContext } from "./tutor-context.js";
 import { evaluationSchemaFor } from "./tutor-evaluation-boundary.js";
@@ -16,6 +17,7 @@ import {
   persistResolution,
   resolutionProbeQueries,
 } from "./tutor-knowledge.js";
+import { misconceptionRiskContext } from "./tutor-misconception-context.js";
 import { boundModelContext } from "./tutor-model-context.js";
 import { copiedFromTutor, enforceCopiedDiscount } from "./tutor-policies.js";
 import { TutorResponseService } from "./tutor-response.js";
@@ -177,10 +179,16 @@ export class TutorPipeline {
       ...new Set([...first.knowledgeIds, ...refreshedContext.selectedKnowledgeIds]),
     ].slice(0, 24);
     const turnKnowledge = loadTurnKnowledge(this.knowledge, input.owner, turnKnowledgeIds);
+    const misconceptionRisks = misconceptionRiskContext(
+      new MisconceptionRepository(this.db),
+      input.owner,
+      turnKnowledge.knowledge.map((item) => item.revisionId),
+    );
     const turnCommon = boundModelContext({
       ...refreshedCommon,
       ...turnKnowledge,
       micrograph: extracted.value,
+      misconceptionRisks,
     });
     const planned = await stages.stage({
       stage: "planning",
