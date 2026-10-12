@@ -87,30 +87,33 @@ independent semantic reviewer or human review event. The universal document rule
 then required one definition block for every kind, forcing claim, misconception,
 and distinction records into concept-shaped source documents.
 
-## Admission improvement proposal
+## Typed admission and document contract
 
 Do not blacklist these Korean titles, delete the records, or auto-merge them into
 the two concept nodes. Preserve their provenance and review history.
 
-1. Introduce typed extracted artifacts before admission: durable knowledge units,
+1. Extraction now emits typed artifacts before admission: definitions, claims,
+   distinctions,
    answer-material requests, misconceptions-to-correct, and outline/rhetorical
    nodes. Only durable identities enter ordinary knowledge reuse automatically.
-2. Define named endpoint requirements by kind. A distinction must identify both
+2. Named endpoint requirements are enforced by kind. A distinction identifies both
    compared revision IDs; a misconception must identify the mistaken proposition
    and corrective revision; a claim must identify its subject/relation or evidence
    scope. A heading with no stable endpoints remains answer material.
-3. Replace the universal definition-block template with kind-specific document
-   templates. Concepts and term senses require a definition; claims require a
-   claim plus scope/evidence; distinctions require contrast and endpoints;
-   misconceptions require the mistaken belief and correction. This is a proposed
-   migration and is not implemented by the language-policy change.
+3. Kind-specific primary documents replace the universal definition template.
+   Concepts and term senses require a definition block, claims require a claim
+   block, and distinctions require a contrast block. Legacy claim, procedure,
+   skill, and misconception-shaped knowledge rows retain their existing readable
+   definition documents; only newly typed contracts use the new primary blocks.
 4. Separate stable identity from answer outline. Planning may create headings and
    transitions for the current answer, but those should remain document blocks
    attached to stable revisions unless a later semantic admission step establishes
    an independently reusable identity.
-5. Rename or strengthen `independentlyValidated`: either use a distinct reviewer
-   or record the current flag as same-run model validation. Human review status
-   must remain separate and visible.
+5. The generic `independentlyValidated` flag is removed. Every admitted artifact
+   records a `resolution-stage model review` under rubric `typed-admission-v1`
+   with all kind-specific checks true. Human review status remains separate.
 
-These changes require a deliberate admission/data-model migration with preservation
-of existing learner records. They must not be smuggled into this incident fix.
+Misconceptions now use separate identities, immutable revisions, blocks, exact
+definition-revision links with specific learning-value explanations, and review
+events. They are labeled potential general learning risks, never learner diagnoses,
+and stale or ineligible definition links exclude them from future tutor context.

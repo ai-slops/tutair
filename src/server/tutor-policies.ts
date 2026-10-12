@@ -25,9 +25,7 @@ export function enforceCopiedDiscount(
   };
 }
 
-export function applyKnowledgeRisk(
-  candidate: z.infer<typeof candidateSchema>,
-): z.infer<typeof candidateSchema> {
+export function applyKnowledgeRisk<T extends z.infer<typeof candidateSchema>>(candidate: T): T {
   if (candidate.riskScope === "stable" || candidate.riskScope === "definition-sensitive") {
     return candidate;
   }

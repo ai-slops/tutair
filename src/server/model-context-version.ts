@@ -4,8 +4,8 @@ import type { Stage, StructuredCall } from "./provider.js";
 export const MODEL_CONTEXT_VERSION = "model-context-v2";
 
 export const STAGE_VERSIONS = {
-  extraction: "document-v2",
-  resolution: "document-v2",
+  extraction: "typed-admission-v1",
+  resolution: "typed-admission-v1",
   planning: "document-v2",
   preparation: "document-v2",
   draft: "phase1-v1",
@@ -15,8 +15,8 @@ export const STAGE_VERSIONS = {
 } as const satisfies Readonly<Record<Stage, string>>;
 
 export const STAGE_SCHEMA_VERSIONS = {
-  extraction: "document-schema-v3",
-  resolution: "document-schema-v2",
+  extraction: "document-schema-v4",
+  resolution: "document-schema-v3",
   planning: "document-schema-v2",
   preparation: "document-schema-v3",
   draft: "phase1-schema-v2",
