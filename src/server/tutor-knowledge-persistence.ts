@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { verifiedExplicitReuseRevision } from "./explicit-reuse-verification.js";
+import { knowledgeArtifactData } from "./knowledge-artifact-persistence.js";
 import type { KnowledgeRepository } from "./repository-knowledge.js";
 import { MisconceptionRepository } from "./repository-misconceptions.js";
 import { normalizeResolution, semanticReuseConfidence } from "./resolution-policy.js";
@@ -9,11 +11,6 @@ import type { LearnerId } from "./types.js";
 import { ApiError, isoNow, newId } from "./types.js";
 
 type Artifact = z.infer<typeof admissionArtifactSchema>;
-type KnowledgeArtifact = Extract<
-  Artifact,
-  { readonly artifactType: "definition" | "claim" | "distinction" }
->;
-
 export function persistResolution(input: {
   readonly repository: KnowledgeRepository;
   readonly owner: LearnerId;
@@ -47,7 +44,36 @@ export function persistResolution(input: {
   for (const decision of normalized.decisions) {
     const artifact = decision.artifact;
     switch (decision.resolution) {
-      case "reuse":
+      case "reuse": {
+        const revisionId = verifiedExplicitReuseRevision({
+          repository: input.repository,
+          owner: input.owner,
+          artifact,
+          knowledge: decision.knowledge,
+          offeredKnowledge: input.offeredKnowledge,
+        });
+        if (revisionId === null) {
+          traces.push({
+            key: artifact.key,
+            resolution: "skip",
+            reasons: [...decision.reasons, "typed_reuse_reverification_failed"],
+          });
+          continue;
+        }
+        ids.add(decision.knowledge.id);
+        resolvedByKey.set(artifact.key, {
+          knowledgeId: decision.knowledge.id,
+          revisionId,
+        });
+        traces.push({
+          key: artifact.key,
+          resolution: decision.resolution,
+          knowledgeId: decision.knowledge.id,
+          revisionId,
+          reasons: decision.reasons,
+        });
+        continue;
+      }
       case "attach": {
         const revision = z
           .object({ id: z.string().uuid() })
@@ -121,7 +147,7 @@ export function persistResolution(input: {
         "invalid_knowledge_artifact",
         "Non-knowledge artifact reached knowledge persistence",
       );
-    const data = knowledgeArtifact(artifact);
+    const data = knowledgeArtifactData(artifact);
     const candidate = applyKnowledgeRisk(data);
     const modelReviewJson = JSON.stringify({
       rubricVersion: "typed-admission-v1",
@@ -192,43 +218,4 @@ export function persistResolution(input: {
     isoNow(),
   ]);
   return { changes, knowledgeIds: [...ids], resolvedByKey };
-}
-
-function knowledgeArtifact(artifact: KnowledgeArtifact) {
-  switch (artifact.artifactType) {
-    case "definition":
-      return {
-        ...artifact,
-        kind: artifact.definitionKind,
-        statement: artifact.definition,
-        claims: [] as readonly string[],
-      };
-    case "claim":
-      return {
-        ...artifact,
-        kind: "claim" as const,
-        statement: artifact.proposition,
-        aliases: [] as readonly string[],
-        semanticScope: artifact.evidentialScope,
-        distinguishingFeatures: [artifact.predicate, artifact.object],
-        claims: [
-          {
-            text: artifact.proposition,
-            authority: "provisional" as const,
-            sourceRefs: artifact.sourceRefs,
-            status: artifact.provenanceStatus,
-          },
-        ],
-      };
-    case "distinction":
-      return {
-        ...artifact,
-        kind: "distinction" as const,
-        statement: artifact.contrast,
-        aliases: [] as readonly string[],
-        semanticScope: artifact.criterion,
-        distinguishingFeatures: [artifact.criterion],
-        claims: [artifact.contrast],
-      };
-  }
 }
