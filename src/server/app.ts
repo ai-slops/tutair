@@ -10,6 +10,7 @@ import type { TutorProvider } from "./provider.js";
 import { createProvider } from "./provider-factory.js";
 import { CoreRepository } from "./repository-core.js";
 import { KnowledgeRepository } from "./repository-knowledge.js";
+import { MisconceptionRepository } from "./repository-misconceptions.js";
 import { chatGptRoutes } from "./routes-chatgpt.js";
 import { coreRoutes } from "./routes-core.js";
 import { exportRoutes } from "./routes-export.js";
@@ -43,6 +44,7 @@ export const createApp = (
     provider,
     core,
     knowledge,
+    misconceptions: new MisconceptionRepository(database),
     documents,
     tutor: new TutorPipeline(database, core, knowledge, provider),
     turnLocks: new Set<string>(),

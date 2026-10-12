@@ -8,6 +8,10 @@ import {
   knowledgeCreateBoundarySchema,
 } from "./knowledge-contracts.js";
 import { documentCreateBodySchema } from "./knowledge-document-contracts.js";
+import {
+  misconceptionReviewSchema,
+  misconceptionRevisionInputSchema,
+} from "./misconception-contracts.js";
 import { genericRecord } from "./records.js";
 import { registerEvidenceRoutes } from "./routes-evidence.js";
 import { importSchema, knowledgeReviewSchema } from "./schemas.js";
@@ -23,6 +27,36 @@ export const knowledgeRoutes = (services: Services): Hono => {
       .catch("all")
       .parse(c.req.query("scope"));
     return c.json({ items: services.knowledge.listWithReview(owner, scope) });
+  });
+  app.get("/misconceptions", (c) => {
+    const owner = ownerFor(c, services);
+    return c.json({ items: services.misconceptions.list(owner) });
+  });
+  app.get("/misconceptions/:id", (c) => {
+    const owner = ownerFor(c, services);
+    return c.json({ item: services.misconceptions.get(owner, c.req.param("id")) });
+  });
+  app.post("/misconceptions/:id/reviews", async (c) => {
+    const owner = ownerFor(c, services);
+    const body = misconceptionReviewSchema.parse(await jsonBody(c));
+    return c.json(
+      {
+        event: services.misconceptions.review(
+          owner,
+          c.req.param("id"),
+          body.action,
+          body.reason,
+          body.confirmed,
+        ),
+        item: services.misconceptions.get(owner, c.req.param("id")),
+      },
+      201,
+    );
+  });
+  app.post("/misconceptions/:id/corrections", async (c) => {
+    const owner = ownerFor(c, services);
+    const body = misconceptionRevisionInputSchema.parse(await jsonBody(c));
+    return c.json({ item: services.misconceptions.correct(owner, c.req.param("id"), body) }, 201);
   });
   app.get("/knowledge/:id", (c) => {
     const owner = ownerFor(c, services);

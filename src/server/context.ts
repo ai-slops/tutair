@@ -6,6 +6,7 @@ import type { KnowledgeDocumentRepository } from "./knowledge-document-repositor
 import type { TutorProvider } from "./provider.js";
 import type { CoreRepository } from "./repository-core.js";
 import type { KnowledgeRepository } from "./repository-knowledge.js";
+import type { MisconceptionRepository } from "./repository-misconceptions.js";
 import type { TutorPipeline } from "./tutor.js";
 import type { LearnerId } from "./types.js";
 import { ApiError } from "./types.js";
@@ -14,6 +15,7 @@ export type Services = {
   readonly db: Database;
   readonly core: CoreRepository;
   readonly knowledge: KnowledgeRepository;
+  readonly misconceptions: MisconceptionRepository;
   readonly documents: KnowledgeDocumentRepository;
   readonly provider: TutorProvider;
   readonly tutor: TutorPipeline;
