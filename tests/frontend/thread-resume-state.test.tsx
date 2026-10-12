@@ -43,6 +43,7 @@ const http = vi.hoisted(() => {
           });
         if (path === "conversations") return Promise.resolve({ conversations: [conversation] });
         if (path === "knowledge") return Promise.resolve({ items: [] });
+        if (path === "misconceptions") return Promise.resolve({ items: [] });
         if (path === "settings/debug")
           return Promise.resolve({ saveProviderReasoningSummaries: false });
         if (path === "conversations/conversation-linked")

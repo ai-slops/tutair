@@ -34,6 +34,7 @@ const snapshot = (activeConversationId: string): WorkspaceSnapshot => ({
   recovery: null,
   messages: [],
   knowledge: [],
+  misconceptions: [],
   provider: {
     mode: "configured",
     label: "Test provider",

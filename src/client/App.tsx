@@ -90,6 +90,7 @@ export function App() {
     return (
       <KnowledgeManager
         items={workspace.snapshot.knowledge}
+        misconceptions={workspace.snapshot.misconceptions}
         error={workspace.error}
         initialSelectedId={initialManagerSelection?.get("knowledge") ?? null}
         initialRevision={
@@ -97,6 +98,7 @@ export function App() {
         }
         onBack={() => setManagerView(false)}
         onReview={workspace.review}
+        onMisconceptionReview={workspace.reviewMisconception}
         onCorrect={(item) => {
           setSelectedKnowledgeId(item.id);
           setDialog("correction");

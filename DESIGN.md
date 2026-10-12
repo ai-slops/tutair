@@ -197,6 +197,7 @@ unbroken tokens rather than a zero-width text column.
 - Mark incorrect and Retire require a written reason. Restore requires a separate confirmation checkbox explaining that the unit becomes eligible for future tutor context again. Failed requests retain the reason and confirmation draft; successful requests clear only the completed action draft.
 - States: stable loading shell, empty knowledge base, no filter matches, selected detail, per-action pending, inline request error, and restored success through refreshed server state. Status is always text, never color alone.
 - Layout: manager header stays fixed; wide filter/list/detail regions own their own scroll. At 768px filters become a wrapping toolbar and list/detail remain readable; at 375px all regions stack without horizontal overflow, CJK clipping, or hidden actions.
+- The header switches explicitly between Definitions and Misconceptions. Misconception rows and detail readers reuse the same list-detail primitives, but always carry the text “Potential general learning risk”; they never describe a learner belief or diagnosis. Detail shows the mistaken proposition, correction, observable failure task, discriminating example, exact definition-revision links, and its separate review lifecycle.
 
 ### KnowledgeDocumentHistory
 - Lives inside KnowledgeManager detail after provenance. It presents immutable learner-facing expressions separately from semantic revision history so translation never reads as a new fact revision.
