@@ -43,6 +43,29 @@ export const exportRoutes = (services: Services): Hono => {
       learnerState: owned("learner_state"),
       corrections: owned("corrections"),
       knowledgeReviewEvents: owned("knowledge_review_events"),
+      misconceptions: owned("misconceptions"),
+      misconceptionRevisions: services.db.all(
+        `SELECT r.* FROM misconception_revisions r JOIN misconceptions m ON m.id=r.misconception_id
+         WHERE m.learner_id=? ORDER BY r.misconception_id,r.revision`,
+        [owner],
+        genericRecord,
+      ),
+      misconceptionDefinitionLinks: services.db.all(
+        `SELECT l.* FROM misconception_definition_links l
+         JOIN misconception_revisions r ON r.id=l.misconception_revision_id
+         JOIN misconceptions m ON m.id=r.misconception_id WHERE m.learner_id=?
+         ORDER BY l.misconception_revision_id,l.definition_revision_id`,
+        [owner],
+        genericRecord,
+      ),
+      misconceptionBlocks: services.db.all(
+        `SELECT b.* FROM misconception_blocks b JOIN misconception_revisions r ON r.id=b.misconception_revision_id
+         JOIN misconceptions m ON m.id=r.misconception_id WHERE m.learner_id=?
+         ORDER BY b.misconception_revision_id,b.position`,
+        [owner],
+        genericRecord,
+      ),
+      misconceptionReviewEvents: owned("misconception_review_events"),
       knowledgeDocuments: services.db.all(
         `SELECT d.* FROM knowledge_documents d JOIN knowledge_revisions r ON r.id=d.knowledge_revision_id
          JOIN knowledge_items k ON k.id=r.knowledge_id
