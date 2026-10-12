@@ -10,6 +10,7 @@ import {
   STAGE_VERSIONS,
 } from "./model-context-version.js";
 import { modelInstruction } from "./model-instructions.js";
+import { modelLanguagePolicy } from "./model-language-policy.js";
 import type { Stage, TutorProvider } from "./provider.js";
 import { strictOutputSchema } from "./strict-output-schema.js";
 import { boundModelContext } from "./tutor-model-context.js";
@@ -45,6 +46,7 @@ export class ModelRunner {
     const message = data["message"];
     const boundedData = boundModelContext({
       ...data,
+      languagePolicy: modelLanguagePolicy(stage),
       ...(stage === "evaluation" && typeof message === "string"
         ? { messageUtf16Length: message.length }
         : {}),

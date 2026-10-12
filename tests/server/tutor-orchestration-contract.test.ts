@@ -135,6 +135,22 @@ describe("tutor orchestration contracts", () => {
     expect(calls.filter((call) => call.stage === "preparation")).toHaveLength(1);
     expect(calls.filter((call) => call.stage === "final")).toHaveLength(1);
     expect(calls.filter((call) => call.stage === "lint")).toHaveLength(1);
+    expect(calls.find((call) => call.stage === "extraction")?.data["languagePolicy"]).toMatchObject(
+      {
+        observableIntermediateLanguage: "en",
+        responseLanguageSource: "question_bcp47",
+      },
+    );
+    expect(
+      calls.find((call) => call.stage === "preparation")?.data["languagePolicy"],
+    ).toMatchObject({
+      englishBaseLanguage: "en",
+      localizedContentLanguage: "responseLanguage",
+    });
+    expect(calls.find((call) => call.stage === "final")?.data["languagePolicy"]).toMatchObject({
+      output: "selection_ids_and_layout_only",
+      rendering: "server",
+    });
   });
 
   it("updates an existing thread goal with an event", async () => {
