@@ -26,8 +26,12 @@ export const preparationSchema = z
   })
   .strict()
   .superRefine((value, context) => {
-    const blocks = value.materials.reduce(
-      (count, material) => count + material.englishBlocks.length + material.localizedBlocks.length,
+    const englishBlocks = value.materials.reduce(
+      (count, material) => count + material.englishBlocks.length,
+      0,
+    );
+    const localizedBlocks = value.materials.reduce(
+      (count, material) => count + material.localizedBlocks.length,
       0,
     );
     const text = value.materials.reduce(
@@ -39,7 +43,10 @@ export const preparationSchema = z
         ),
       0,
     );
-    if (blocks > 24) context.addIssue({ code: "custom", message: "Preparation exceeds 24 blocks" });
+    if (englishBlocks > 24)
+      context.addIssue({ code: "custom", message: "Preparation exceeds 24 English blocks" });
+    if (localizedBlocks > 24)
+      context.addIssue({ code: "custom", message: "Preparation exceeds 24 localized blocks" });
     if (text > 20_000)
       context.addIssue({ code: "custom", message: "Preparation exceeds 20000 characters" });
   });
