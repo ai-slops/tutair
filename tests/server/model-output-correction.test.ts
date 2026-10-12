@@ -90,8 +90,7 @@ it("repairs candidate keys reused across extraction categories", async () => {
     );
     const duplicatedOutput = {
       ...validOutput,
-      distinctions: [machine, ...validOutput.distinctions],
-      claims: validOutput.distinctions,
+      artifacts: [machine, ...validOutput.artifacts],
     };
     const calls: StructuredCall[] = [];
     const provider: TutorProvider = {
@@ -137,10 +136,9 @@ it("repairs candidate keys reused across extraction categories", async () => {
     expect(correction.issues).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ code: "custom", path: ["candidateKey", "fsm"] }),
-        expect.objectContaining({ code: "custom", path: ["candidateKey", "formal-senses"] }),
       ]),
     );
-    expect(correction.issues).toHaveLength(2);
+    expect(correction.issues).toHaveLength(1);
     expect(result.value).toEqual(validOutput);
     const rows = db.all(
       `SELECT r.status,i.attempt,i.repair_of_run_id FROM model_runs r
@@ -168,7 +166,7 @@ it("rejects one key shared by a knowledge unit and material request", () => {
   expect(
     extractionSchema.safeParse({
       ...validOutput,
-      terms: [{ ...machine, classification: "material_request" }],
+      artifacts: [...validOutput.artifacts, machine],
     }).success,
   ).toBe(false);
 });
@@ -181,7 +179,7 @@ it("permits distinct keys for candidates with the same label", () => {
   expect(
     extractionSchema.safeParse({
       ...validOutput,
-      terms: [{ ...machine, key: "fsm-material", classification: "material_request" }],
+      artifacts: [...validOutput.artifacts, { ...machine, key: "fsm-material" }],
     }).success,
   ).toBe(true);
 });

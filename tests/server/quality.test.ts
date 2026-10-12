@@ -6,6 +6,7 @@ import { KnowledgeDocumentRepository } from "../../src/server/knowledge-document
 import { createProvider } from "../../src/server/provider.js";
 import { CoreRepository } from "../../src/server/repository-core.js";
 import { KnowledgeRepository } from "../../src/server/repository-knowledge.js";
+import { MisconceptionRepository } from "../../src/server/repository-misconceptions.js";
 import { qualityRoutes, summarizeQuality } from "../../src/server/routes-quality.js";
 import { TutorPipeline } from "../../src/server/tutor.js";
 import { ApiError } from "../../src/server/types.js";
@@ -64,6 +65,7 @@ describe("quality measurements", () => {
           db,
           core,
           knowledge,
+          misconceptions: new MisconceptionRepository(db),
           documents: new KnowledgeDocumentRepository(db),
           provider,
           tutor: new TutorPipeline(db, core, knowledge, provider),
