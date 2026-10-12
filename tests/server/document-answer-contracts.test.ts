@@ -51,27 +51,21 @@ describe("document answer contracts", () => {
       goal: "Explain the relationship between propositional and classical logic.",
       sourceLanguage: "ko",
       responseLanguage: "ko",
-      targets: [
+      artifacts: [
         {
+          artifactType: "definition",
           key: "propositional-logic",
           label: "propositional logic",
           definition: "A logical system whose basic units are whole propositions.",
           semanticScope: "formal logic",
-          kind: "concept",
+          definitionKind: "concept",
           aliases: ["명제 논리"],
           distinguishingFeatures: ["Whole propositions are the basic units."],
-          claims: [],
           riskScope: "stable",
           confidence: 0.95,
           sourceSpans: [{ start: 0, end: 5 }],
-          classification: "knowledge_unit",
         },
       ],
-      prerequisites: [],
-      terms: [],
-      distinctions: [],
-      misconceptions: [],
-      claims: [],
       relations: [],
     });
     const localized = "‘명제 논리’는 문장 전체를 기본 단위로 다룹니다.";
@@ -80,7 +74,9 @@ describe("document answer contracts", () => {
       [{ id: revisionId(7), content: localized, contentHash: "unused" }],
     );
 
-    expect(extracted.targets[0]?.aliases).toEqual(["명제 논리"]);
+    expect(
+      extracted.artifacts[0]?.artifactType === "definition" ? extracted.artifacts[0].aliases : [],
+    ).toEqual(["명제 논리"]);
     expect(rendered.text).toBe(localized);
   });
 });

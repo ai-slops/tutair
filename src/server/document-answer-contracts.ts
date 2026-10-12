@@ -51,21 +51,25 @@ export const preparationSchema = z
       context.addIssue({ code: "custom", message: "Preparation exceeds 20000 characters" });
   });
 
-export const preparationSchemaFor = (reusableEnglishDefinitionIds: ReadonlySet<string>) =>
+export const preparationSchemaFor = (
+  reusableEnglishPrimaryIds: ReadonlySet<string>,
+  primaryBlockByRevision: ReadonlyMap<string, "definition" | "claim" | "contrast"> = new Map(),
+) =>
   preparationSchema.superRefine((value, context) => {
     value.materials.forEach((material, materialIndex) => {
       if (material.englishBlocks.length === 0) return;
-      const definitionCount = material.englishBlocks.filter(
-        (block) => block.type === "definition",
+      const primaryType = primaryBlockByRevision.get(material.knowledgeRevisionId) ?? "definition";
+      const primaryCount = material.englishBlocks.filter(
+        (block) => block.type === primaryType,
       ).length;
-      const required = !reusableEnglishDefinitionIds.has(material.knowledgeRevisionId);
-      if (definitionCount > 1 || (required && definitionCount !== 1))
+      const required = !reusableEnglishPrimaryIds.has(material.knowledgeRevisionId);
+      if (primaryCount > 1 || (required && primaryCount !== 1))
         context.addIssue({
           code: "custom",
           path: ["materials", materialIndex, "englishBlocks"],
           message: required
-            ? "New English material requires exactly one English definition"
-            : "English material permits at most one generated definition",
+            ? `New English material requires exactly one ${primaryType} block`
+            : `English material permits at most one generated ${primaryType} block`,
         });
     });
   });

@@ -67,12 +67,14 @@ const validateDocumentLinks = (
     });
   if (
     value.role === "english_base" &&
-    value.blocks.filter((block) => block.type === "definition").length !== 1
+    value.blocks.filter((block) => ["definition", "claim", "contrast"].includes(block.type))
+      .length !== 1
   )
     context.addIssue({
       code: "custom",
       path: ["blocks"],
-      message: "English base documents require exactly one definition block",
+      message:
+        "English base documents require exactly one definition, claim, or contrast primary content block",
     });
   if (value.role === "localization") {
     const sourceIds = value.blocks.flatMap((block) =>
