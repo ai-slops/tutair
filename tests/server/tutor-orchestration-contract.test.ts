@@ -23,8 +23,7 @@ describe("tutor orchestration contracts", () => {
     const extracted = extractionSchema.parse(stageOutput({ ...call, stage: "extraction" }));
     const planned = planningSchema.parse(stageOutput({ ...call, stage: "planning" }));
     const linted = lintedSchema.parse(stageOutput({ ...call, stage: "lint" }));
-    expect(extracted.targets.map((item) => item.label)).toEqual(["finite-state machine"]);
-    expect(extracted.distinctions.map((item) => item.label)).toEqual(["formal versus ceremonial"]);
+    expect(extracted.artifacts.map((item) => item.label)).toEqual(["finite-state machine"]);
     expect(planned.assessmentOpportunities.map((item) => item.prompt)).toEqual([
       "Ask for the next transition",
     ]);

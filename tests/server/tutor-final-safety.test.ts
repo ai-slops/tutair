@@ -23,7 +23,7 @@ describe("tutor final safety", () => {
         const value = extractionSchema.parse(stageOutput(call));
         return {
           ...value,
-          targets: [{ ...machine, riskScope: "high-stakes", label: "medication dosage" }],
+          artifacts: [{ ...machine, riskScope: "high-stakes", label: "medication dosage" }],
         };
       }
       if (call.stage === "lint" && call.data["finalReview"] === true)

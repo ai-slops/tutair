@@ -84,8 +84,7 @@ describe("tutor reply grounding", () => {
       return extractionAttempts === 1
         ? {
             ...validOutput,
-            distinctions: [machine, ...validOutput.distinctions],
-            claims: validOutput.distinctions,
+            artifacts: [machine, ...validOutput.artifacts],
           }
         : validOutput;
     });
@@ -128,6 +127,6 @@ describe("tutor reply grounding", () => {
     expect(resolutionCandidates.map((candidate) => candidate.key)).toHaveLength(
       new Set(resolutionCandidates.map((candidate) => candidate.key)).size,
     );
-    expect(context.knowledge.list(context.owner)).toHaveLength(2);
+    expect(context.knowledge.list(context.owner)).toHaveLength(1);
   });
 });
