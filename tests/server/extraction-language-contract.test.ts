@@ -7,12 +7,7 @@ it("requires explicit source and response languages without an English default",
     goal: "Explain the requested topic.",
     sourceLanguage: "ko",
     responseLanguage: "ko",
-    targets: [machine],
-    prerequisites: [],
-    terms: [],
-    distinctions: [],
-    misconceptions: [],
-    claims: [],
+    artifacts: [machine],
     relations: [],
   };
   const { sourceLanguage: _sourceLanguage, ...withoutSourceLanguage } = extraction;
