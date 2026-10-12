@@ -7,7 +7,9 @@ import { loadTutorContext } from "../../src/server/tutor-context.js";
 import {
   createTutorTestContext,
   learnerMessage,
+  machine,
   providerFor,
+  stageOutput,
   type TutorTestContext,
 } from "./tutor-test-fixtures.js";
 
@@ -84,6 +86,84 @@ describe("provisional knowledge reuse", () => {
     // Then
     expect(firstIds.length).toBeGreaterThan(0);
     expect(secondIds).toEqual(firstIds);
+  });
+
+  it("does not reuse a legacy generated row without an exact typed contract", async () => {
+    const context = createTutorTestContext(databases, "Legacy", "Require typed identity");
+    context.knowledge.create(context.owner, {
+      title: machine.label,
+      statement: machine.definition,
+      riskScope: machine.riskScope,
+      confidence: machine.confidence,
+      kind: machine.definitionKind,
+      aliases: machine.aliases,
+      semanticScope: machine.semanticScope,
+      distinguishingFeatures: machine.distinguishingFeatures,
+      sourceType: "model_generated",
+    });
+    const pipeline = new TutorPipeline(
+      context.database,
+      context.core,
+      context.knowledge,
+      providerFor(),
+    );
+    const content = "Explain an FSM";
+
+    await pipeline.turn({
+      owner: context.owner,
+      conversationId: context.conversationId,
+      messageId: learnerMessage(context, content),
+      content,
+      assistance: "none",
+      selfReport: "neutral",
+    });
+
+    expect(context.knowledge.list(context.owner, "provisional")).toHaveLength(2);
+    expect(
+      context.database.raw.prepare("SELECT COUNT(*) AS count FROM typed_knowledge_contracts").get(),
+    ).toMatchObject({ count: 1 });
+  });
+
+  it("does not merge equal statements across different typed artifact keys", async () => {
+    const context = createTutorTestContext(databases, "Identity", "Keep typed IDs separate");
+    let second = false;
+    const pipeline = new TutorPipeline(
+      context.database,
+      context.core,
+      context.knowledge,
+      providerFor((call) => {
+        if (call.stage !== "extraction" || !second) return stageOutput(call);
+        return {
+          goal: "Model a door controller",
+          sourceLanguage: "en",
+          responseLanguage: "en",
+          artifacts: [{ ...machine, key: "fsm-second" }],
+          relations: [],
+        };
+      }),
+    );
+    const firstContent = "Explain an FSM";
+    await pipeline.turn({
+      owner: context.owner,
+      conversationId: context.conversationId,
+      messageId: learnerMessage(context, firstContent),
+      content: firstContent,
+      assistance: "none",
+      selfReport: "neutral",
+    });
+    second = true;
+    const secondContent = "Explain that same FSM under another candidate identity";
+
+    await pipeline.turn({
+      owner: context.owner,
+      conversationId: context.conversationId,
+      messageId: learnerMessage(context, secondContent),
+      content: secondContent,
+      assistance: "none",
+      selfReport: "neutral",
+    });
+
+    expect(context.knowledge.list(context.owner, "provisional")).toHaveLength(2);
   });
 
   it("reuses exact semantics before insert whether the current revision is unreviewed or reviewed", () => {

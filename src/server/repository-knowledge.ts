@@ -86,6 +86,7 @@ export class KnowledgeRepository {
   create(
     owner: LearnerId | null,
     input: NewKnowledge,
+    expectedContractJson?: string,
   ): { readonly item: unknown; readonly revision: unknown } {
     if (owner === null && input.canonicalKey !== undefined) {
       const existing = this.db.one(
@@ -125,7 +126,7 @@ export class KnowledgeRepository {
     }
     return this.db.transaction(() => {
       if (owner !== null && input.sourceType === "model_generated") {
-        const existing = exactGeneratedKnowledge(this.db, owner, input);
+        const existing = exactGeneratedKnowledge(this.db, owner, input, expectedContractJson);
         if (existing !== null) return existing;
       }
       const id = newId();
@@ -164,11 +165,29 @@ export class KnowledgeRepository {
   createOrReuseGenerated(
     owner: LearnerId,
     input: NewKnowledge,
+    contract: {
+      readonly artifactType: "definition" | "claim" | "distinction";
+      readonly contractJson: string;
+      readonly extractionRunId: string;
+      readonly resolutionRunId: string;
+      readonly modelReviewJson: string;
+    },
   ): { readonly item: unknown; readonly revision: unknown; readonly created: boolean } {
     return this.db.transaction(() => {
-      const existing = exactGeneratedKnowledge(this.db, owner, input);
+      const existing = exactGeneratedKnowledge(this.db, owner, input, contract.contractJson);
       if (existing !== null) return { ...existing, created: false };
-      return { ...this.create(owner, input), created: true };
+      const created = this.create(owner, input, contract.contractJson);
+      const revision = revisionRecord.parse(created.revision);
+      this.db.run("INSERT INTO typed_knowledge_contracts VALUES(?,?,?,?,?,?,?)", [
+        revision.id,
+        contract.artifactType,
+        contract.contractJson,
+        contract.extractionRunId,
+        contract.resolutionRunId,
+        contract.modelReviewJson,
+        isoNow(),
+      ]);
+      return { ...created, created: true };
     });
   }
   addRevision(owner: LearnerId, input: NewRevision): unknown {
