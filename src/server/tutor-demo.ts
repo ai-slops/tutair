@@ -82,7 +82,6 @@ export function demoCall(call: StructuredCall): unknown {
                     artifactType: "definition" as const,
                     verdict: "approve" as const,
                     reviewLabel: "resolution-stage model review" as const,
-                    rubricVersion: "typed-admission-v1" as const,
                     checks: {
                       durableIdentity: true as const,
                       boundedMeaning: true as const,

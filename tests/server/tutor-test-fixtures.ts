@@ -50,7 +50,6 @@ export function stageOutput(call: StructuredCall): unknown {
                       artifactType: "definition",
                       verdict: "approve",
                       reviewLabel: "resolution-stage model review",
-                      rubricVersion: "typed-admission-v1",
                       checks: {
                         durableIdentity: true,
                         boundedMeaning: true,

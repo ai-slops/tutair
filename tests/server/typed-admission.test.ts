@@ -23,6 +23,15 @@ const definitionChecks = {
   reusableBeyondCurrentAnswer: true,
 } as const;
 
+const definitionAdmission = {
+  candidateKey: definition.key,
+  artifactType: definition.artifactType,
+  verdict: "approve",
+  reviewLabel: "resolution-stage model review",
+  checks: definitionChecks,
+  reasons: ["Durable named definition."],
+} as const;
+
 describe("typed artifact admission", () => {
   it("does not let a generic boolean admit a definition", () => {
     const legacy = {
@@ -35,18 +44,44 @@ describe("typed artifact admission", () => {
     expect(resolutionSchema.safeParse({ matches: [], admissions: [legacy] }).success).toBe(false);
   });
 
-  it("requires every kind-specific model-review check to be true", () => {
+  it("parses a rejected review with a false kind-specific check", () => {
     const rejected = {
       candidateKey: definition.key,
       artifactType: definition.artifactType,
       verdict: "approve",
       reviewLabel: "resolution-stage model review",
-      rubricVersion: "typed-admission-v1",
       checks: { ...definitionChecks, durableIdentity: false },
       reasons: ["This is a contextual heading, not a durable identity."],
     };
 
-    expect(resolutionSchema.safeParse({ matches: [], admissions: [rejected] }).success).toBe(false);
+    expect(resolutionSchema.safeParse({ matches: [], admissions: [rejected] }).success).toBe(true);
+  });
+
+  it("keeps the admission rubric version server-owned", () => {
+    expect(
+      resolutionSchema.safeParse({
+        matches: [],
+        admissions: [{ ...definitionAdmission, rubricVersion: "model-asserted-rubric" }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects missing and additional kind-specific checks", () => {
+    const { boundedMeaning: _boundedMeaning, ...missingCheck } = definitionChecks;
+    expect(
+      resolutionSchema.safeParse({
+        matches: [],
+        admissions: [{ ...definitionAdmission, checks: missingCheck }],
+      }).success,
+    ).toBe(false);
+    expect(
+      resolutionSchema.safeParse({
+        matches: [],
+        admissions: [
+          { ...definitionAdmission, checks: { ...definitionChecks, inventedCriterion: true } },
+        ],
+      }).success,
+    ).toBe(false);
   });
 
   it("requires claims and distinctions to pin exact definition revisions", () => {
@@ -60,7 +95,9 @@ describe("typed artifact admission", () => {
       predicate: "selects",
       object: "one next state",
       evidentialScope: "deterministic finite-state machines",
-      sourceRefs: ["source:learner-question"],
+      provenanceStatus: "model_generated",
+      provenanceBasis: "Generated from the current question and retained as provisional.",
+      sourceRefs: [],
       riskScope: "stable",
       confidence: 0.9,
       sourceSpans: [],
@@ -83,6 +120,93 @@ describe("typed artifact admission", () => {
         .success,
     ).toBe(false);
     expect(admissionArtifactSchema.safeParse(distinction).success).toBe(false);
+  });
+
+  it("separates generated claim basis from source-supported references", () => {
+    const claim = {
+      artifactType: "claim",
+      key: "transition-determinism",
+      label: "Deterministic transition",
+      proposition: "One state and event select one next state.",
+      subjectDefinitionRevisionId: definitionRevisionId,
+      predicate: "selects",
+      object: "one next state",
+      evidentialScope: "deterministic finite-state machines",
+      provenanceStatus: "model_generated",
+      provenanceBasis: "Generated as a provisional relation from the current question.",
+      sourceRefs: [],
+      riskScope: "stable",
+      confidence: 0.9,
+      sourceSpans: [],
+    } as const;
+
+    expect(admissionArtifactSchema.safeParse(claim).success).toBe(true);
+    expect(
+      admissionArtifactSchema.safeParse({ ...claim, sourceRefs: ["invented:source"] }).success,
+    ).toBe(false);
+    expect(
+      admissionArtifactSchema.safeParse({
+        ...claim,
+        provenanceStatus: "source_supported",
+        sourceRefs: [],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts a source-supported claim with explicit references and basis", () => {
+    expect(
+      admissionArtifactSchema.safeParse({
+        artifactType: "claim",
+        key: "supported-transition",
+        label: "Supported transition",
+        proposition: "The transition is deterministic.",
+        subjectDefinitionRevisionId: definitionRevisionId,
+        predicate: "is",
+        object: "deterministic",
+        evidentialScope: "the offered controller definition",
+        provenanceStatus: "source_supported",
+        provenanceBasis: "The offered source explicitly defines one next state.",
+        sourceRefs: ["document:controller#transition"],
+        riskScope: "stable",
+        confidence: 0.9,
+        sourceSpans: [],
+      }).success,
+    ).toBe(true);
+  });
+
+  it("requires an explicit provenance basis for generated claims", () => {
+    expect(
+      admissionArtifactSchema.safeParse({
+        artifactType: "claim",
+        key: "unsupported-transition",
+        label: "Unsupported transition",
+        proposition: "The transition is deterministic.",
+        subjectDefinitionRevisionId: definitionRevisionId,
+        predicate: "is",
+        object: "deterministic",
+        evidentialScope: "finite-state systems",
+        provenanceStatus: "model_generated",
+        provenanceBasis: "",
+        sourceRefs: [],
+        riskScope: "stable",
+        confidence: 0.9,
+        sourceSpans: [],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("parses an approval with a false criterion for policy-level rejection", () => {
+    const parsed = resolutionSchema.safeParse({
+      matches: [],
+      admissions: [
+        {
+          ...definitionAdmission,
+          checks: { ...definitionChecks, boundedMeaning: false },
+        },
+      ],
+    });
+
+    expect(parsed.success).toBe(true);
   });
 
   it("requires misconception links to explain specific learning value", () => {

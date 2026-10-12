@@ -10,6 +10,7 @@ import type { LearnerId } from "./types.js";
 import { riskScopes } from "./types.js";
 
 export { evaluatedSchema } from "./evaluation-schema.js";
+export { resolutionSchema } from "./tutor-admission-schema.js";
 
 const sourceSpanSchema = z.object({
   start: z.number().int().nonnegative(),
@@ -43,9 +44,25 @@ const claimArtifact = artifactBase
     predicate: z.string().min(1).max(500),
     object: z.string().min(1).max(2_000),
     evidentialScope: z.string().min(1).max(2_000),
-    sourceRefs: z.array(z.string().min(1).max(2_000)).min(1).max(32),
+    provenanceStatus: z.enum(["model_generated", "source_supported"]),
+    provenanceBasis: z.string().min(1).max(2_000),
+    sourceRefs: z.array(z.string().min(1).max(2_000)).max(32),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (value.provenanceStatus === "model_generated" && value.sourceRefs.length !== 0)
+      context.addIssue({
+        code: "custom",
+        path: ["sourceRefs"],
+        message: "Model-generated claims cannot assert source references",
+      });
+    if (value.provenanceStatus === "source_supported" && value.sourceRefs.length === 0)
+      context.addIssue({
+        code: "custom",
+        path: ["sourceRefs"],
+        message: "Source-supported claims require exact offered references",
+      });
+  });
 const distinctionArtifact = artifactBase
   .extend({
     artifactType: z.literal("distinction"),
@@ -136,109 +153,6 @@ export const extractionSchema = z
       else seen.add(candidate.key);
     }
   });
-
-export const resolutionSchema = z
-  .object({
-    matches: z
-      .array(
-        z.object({
-          candidateKey: z.string().max(200),
-          knowledgeId: z.string().uuid(),
-          revision: z.number().int().positive(),
-          confidence: z.number().min(0).max(1),
-          decision: z.enum(["exact", "semantic", "provisional"]),
-          reasonCodes: z.array(z.string().max(200)).max(16),
-        }),
-      )
-      .max(24),
-    admissions: z
-      .array(
-        z.discriminatedUnion("artifactType", [
-          z
-            .object({
-              candidateKey: z.string().max(200),
-              artifactType: z.literal("definition"),
-              verdict: z.enum(["approve", "reject"]),
-              reviewLabel: z.literal("resolution-stage model review"),
-              rubricVersion: z.literal("typed-admission-v1"),
-              checks: z.object({
-                durableIdentity: z.literal(true),
-                boundedMeaning: z.literal(true),
-                reusableBeyondCurrentAnswer: z.literal(true),
-              }),
-              reasons: z.array(z.string().min(1).max(1_000)).min(1).max(16),
-            })
-            .strict(),
-          z
-            .object({
-              candidateKey: z.string().max(200),
-              artifactType: z.literal("claim"),
-              verdict: z.enum(["approve", "reject"]),
-              reviewLabel: z.literal("resolution-stage model review"),
-              rubricVersion: z.literal("typed-admission-v1"),
-              checks: z.object({
-                subjectBindingMeaningful: z.literal(true),
-                relationExplicit: z.literal(true),
-                evidentialScopeHonest: z.literal(true),
-                reusable: z.literal(true),
-              }),
-              reasons: z.array(z.string().min(1).max(1_000)).min(1).max(16),
-            })
-            .strict(),
-          z
-            .object({
-              candidateKey: z.string().max(200),
-              artifactType: z.literal("distinction"),
-              verdict: z.enum(["approve", "reject"]),
-              reviewLabel: z.literal("resolution-stage model review"),
-              rubricVersion: z.literal("typed-admission-v1"),
-              checks: z.object({
-                endpointsComparable: z.literal(true),
-                criterionDiscriminates: z.literal(true),
-                reusable: z.literal(true),
-              }),
-              reasons: z.array(z.string().min(1).max(1_000)).min(1).max(16),
-            })
-            .strict(),
-          z
-            .object({
-              candidateKey: z.string().max(200),
-              artifactType: z.literal("misconception"),
-              verdict: z.enum(["approve", "reject"]),
-              reviewLabel: z.literal("resolution-stage model review"),
-              rubricVersion: z.literal("typed-admission-v1"),
-              checks: z.object({
-                linksMeaningfulForLearning: z.literal(true),
-                correctionConsistentWithDefinitions: z.literal(true),
-                failureModeConcrete: z.literal(true),
-                exampleDiscriminates: z.literal(true),
-                reusableBeyondCurrentAnswer: z.literal(true),
-                notLearnerBeliefInference: z.literal(true),
-              }),
-              reasons: z.array(z.string().min(1).max(1_000)).min(1).max(16),
-            })
-            .strict(),
-          z
-            .object({
-              candidateKey: z.string().max(200),
-              artifactType: z.literal("material"),
-              verdict: z.enum(["approve", "reject"]),
-              reviewLabel: z.literal("resolution-stage model review"),
-              rubricVersion: z.literal("typed-admission-v1"),
-              checks: z.object({
-                targetBindingExact: z.literal(true),
-                answerMaterialOnly: z.literal(true),
-              }),
-              reasons: z.array(z.string().min(1).max(1_000)).min(1).max(16),
-              knowledgeId: z.string().uuid().optional(),
-              revision: z.number().int().positive().optional(),
-            })
-            .strict(),
-        ]),
-      )
-      .max(24),
-  })
-  .strict();
 
 export const planningSchema = z.object({
   move: z.string().min(1).max(1_000),
