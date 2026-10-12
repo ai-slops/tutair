@@ -5,6 +5,7 @@ import {
   migrateRevisionMetadata,
 } from "./knowledge-contracts.js";
 import type { KnowledgeRepository } from "./repository-knowledge.js";
+import { type KnowledgeArtifact, loadTypedKnowledgeContract } from "./typed-knowledge-reuse.js";
 import type { LearnerId } from "./types.js";
 
 const itemSchema = z.object({
@@ -44,6 +45,7 @@ export type KnowledgeContext = {
   readonly riskScope: string;
   readonly kind: string;
   readonly aliases: readonly string[];
+  readonly typedContract?: KnowledgeArtifact;
 };
 
 export { persistResolution } from "./tutor-knowledge-persistence.js";
@@ -68,6 +70,7 @@ export function knowledgeContext(
         repository.revision(owner, item.id, item.current_revision),
       );
       const metadata = migrateRevisionMetadata(revision);
+      const typedContract = loadTypedKnowledgeContract(repository.db, revision.id);
       return {
         id: item.id,
         title: item.title,
@@ -88,6 +91,7 @@ export function knowledgeContext(
         riskScope: item.risk_scope,
         kind: item.kind,
         aliases: z.array(z.string()).parse(JSON.parse(item.aliases_json)),
+        ...(typedContract === null ? {} : { typedContract }),
       };
     });
 }
