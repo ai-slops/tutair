@@ -1,6 +1,17 @@
 import type { KyInstance } from "ky";
-import { dimensionFor, KnowledgeDetailSchema, KnowledgeListSchema, request } from "./api-contract";
-import { DIMENSION_LABELS, type Evidence, type KnowledgeItem } from "./model";
+import {
+  dimensionFor,
+  KnowledgeDetailSchema,
+  KnowledgeListSchema,
+  MisconceptionListSchema,
+  request,
+} from "./api-contract";
+import {
+  DIMENSION_LABELS,
+  type Evidence,
+  type KnowledgeItem,
+  type MisconceptionItem,
+} from "./model";
 
 export async function loadKnowledge(client: KyInstance): Promise<readonly KnowledgeItem[]> {
   const list = await request(
@@ -70,4 +81,10 @@ export async function loadKnowledge(client: KyInstance): Promise<readonly Knowle
       };
     }),
   );
+}
+
+export async function loadMisconceptions(
+  client: KyInstance,
+): Promise<readonly MisconceptionItem[]> {
+  return (await request(() => client.get("misconceptions").json(), MisconceptionListSchema)).items;
 }

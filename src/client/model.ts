@@ -115,6 +115,38 @@ export type KnowledgeItem = {
   readonly documents?: readonly KnowledgeDocument[];
 };
 
+export type MisconceptionItem = {
+  readonly id: string;
+  readonly revision: number;
+  readonly revisionId: string;
+  readonly label: string;
+  readonly mistakenProposition: string;
+  readonly correction: string;
+  readonly failureTask: string;
+  readonly likelyError: string;
+  readonly discriminatingExample: {
+    readonly scenario: string;
+    readonly mistakenResponse: string;
+    readonly correctedResponse: string;
+    readonly decisiveCue: string;
+  };
+  readonly reuseValueReason: string;
+  readonly definitionRevisionLinks: readonly {
+    readonly definitionRevisionId: string;
+    readonly role: "subject" | "contrast" | "correction_basis";
+    readonly learningValue: string;
+  }[];
+  readonly reviewStatus: ReviewStatusName;
+  readonly reviewHistory: readonly {
+    readonly id: string;
+    readonly action: ReviewAction;
+    readonly reason: string | null;
+    readonly createdAt: string;
+  }[];
+  readonly eligibilityReason: string | null;
+  readonly createdAt: string;
+};
+
 export type ProviderStatus = {
   readonly mode: "configured" | "synthetic" | "unavailable";
   readonly label: string;

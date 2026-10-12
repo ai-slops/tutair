@@ -159,6 +159,42 @@ export const KnowledgeDetailSchema = z
     documents: z.array(KnowledgeDocumentSchema).default([]),
   })
   .catchall(z.unknown());
+export const MisconceptionSchema = z.object({
+  id: IdSchema,
+  revision: z.number().int().positive(),
+  revisionId: IdSchema,
+  label: z.string(),
+  mistakenProposition: z.string(),
+  correction: z.string(),
+  failureTask: z.string(),
+  likelyError: z.string(),
+  discriminatingExample: z.object({
+    scenario: z.string(),
+    mistakenResponse: z.string(),
+    correctedResponse: z.string(),
+    decisiveCue: z.string(),
+  }),
+  reuseValueReason: z.string(),
+  definitionRevisionLinks: z.array(
+    z.object({
+      definitionRevisionId: IdSchema,
+      role: z.enum(["subject", "contrast", "correction_basis"]),
+      learningValue: z.string(),
+    }),
+  ),
+  reviewStatus: z.enum(REVIEW_STATUSES),
+  reviewHistory: z.array(
+    z.object({
+      id: IdSchema,
+      action: z.enum(REVIEW_ACTIONS),
+      reason: z.string().nullable(),
+      createdAt: DateSchema,
+    }),
+  ),
+  eligibilityReason: z.string().nullable(),
+  createdAt: DateSchema,
+});
+export const MisconceptionListSchema = z.object({ items: z.array(MisconceptionSchema) });
 export const TutorTurnSchema = z
   .object({
     userMessage: MessageSchema,
