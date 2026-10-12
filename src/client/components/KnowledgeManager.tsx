@@ -1,11 +1,13 @@
 import { ArrowLeft, Library, Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { KnowledgeItem, ReviewAction, ReviewStatusName } from "../model";
+import type { KnowledgeItem, MisconceptionItem, ReviewAction, ReviewStatusName } from "../model";
 import { KnowledgeManagerDetail } from "./KnowledgeManagerDetail";
 import { KnowledgeReviewDialog } from "./KnowledgeReviewDialog";
+import { MisconceptionManager } from "./MisconceptionManager";
 
 type KnowledgeManagerProps = {
   readonly items: readonly KnowledgeItem[];
+  readonly misconceptions: readonly MisconceptionItem[];
   readonly error: string | null;
   readonly initialSelectedId?: string | null;
   readonly initialRevision?: number | null;
@@ -17,6 +19,12 @@ type KnowledgeManagerProps = {
     confirmed: boolean,
   ) => Promise<boolean>;
   readonly onCorrect: (item: KnowledgeItem) => void;
+  readonly onMisconceptionReview: (
+    itemId: string,
+    action: ReviewAction,
+    reason: string,
+    confirmed: boolean,
+  ) => Promise<boolean>;
 };
 
 type StatusFilter = "all" | ReviewStatusName;
@@ -25,6 +33,7 @@ type PendingAction = Exclude<ReviewAction, "reviewed">;
 
 export function KnowledgeManager(props: KnowledgeManagerProps) {
   const [query, setQuery] = useState("");
+  const [view, setView] = useState<"definitions" | "misconceptions">("definitions");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [scope, setScope] = useState<ScopeFilter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(
@@ -97,112 +106,142 @@ export function KnowledgeManager(props: KnowledgeManagerProps) {
             <h1>Knowledge manager</h1>
           </div>
         </div>
-        <p className="manager-count">{props.items.length} units</p>
+        <div className="cluster">
+          <button
+            className={view === "definitions" ? "button button-primary" : "button button-secondary"}
+            type="button"
+            onClick={() => setView("definitions")}
+          >
+            Definitions
+          </button>
+          <button
+            className={
+              view === "misconceptions" ? "button button-primary" : "button button-secondary"
+            }
+            type="button"
+            onClick={() => setView("misconceptions")}
+          >
+            Misconceptions
+          </button>
+          <p className="manager-count">
+            {view === "definitions" ? props.items.length : props.misconceptions.length} records
+          </p>
+        </div>
       </header>
       <div className="knowledge-manager-body">
-        <aside className="manager-filters" aria-label="Knowledge filters">
-          <h2>Find definitions</h2>
-          <label className="search">
-            <Search className="icon" aria-hidden="true" />
-            <span className="sr-only">Search knowledge</span>
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.currentTarget.value)}
-              placeholder="Title or definition"
-            />
-          </label>
-          <label className="field-stack">
-            <span>Review status</span>
-            <select
-              value={status}
-              onChange={(event) => setStatus(event.currentTarget.value as StatusFilter)}
-            >
-              <option value="all">All statuses</option>
-              <option value="unreviewed">Unreviewed</option>
-              <option value="reviewed">Reviewed</option>
-              <option value="incorrect">Incorrect</option>
-              <option value="retired">Retired</option>
-            </select>
-          </label>
-          <label className="field-stack">
-            <span>Knowledge scope</span>
-            <select
-              value={scope}
-              onChange={(event) => setScope(event.currentTarget.value as ScopeFilter)}
-            >
-              <option value="all">All scopes</option>
-              <option value="canonical">Canonical</option>
-              <option value="provisional">My provisional units</option>
-            </select>
-          </label>
-          <p className="muted">
-            Unreviewed definitions remain available to the tutor. Incorrect revisions and retired
-            units are excluded; review records accuracy, never mastery or authority.
-          </p>
-        </aside>
-        <section className="manager-list" aria-labelledby="manager-list-heading">
-          <div className="manager-section-heading">
-            <h2 id="manager-list-heading">Definitions</h2>
-            <span>{visible.length} shown</span>
-          </div>
-          {visible.length === 0 ? (
-            <p className="manager-empty">No knowledge matches these filters.</p>
-          ) : (
-            <div className="manager-list-rows">
-              {visible.map((item) => (
-                <button
-                  className="manager-row"
-                  type="button"
-                  key={item.id}
-                  aria-current={selected?.id === item.id ? "true" : undefined}
-                  onClick={() => {
-                    setInlineReviewFailed(false);
-                    setSelectedId(item.id);
-                  }}
+        {view === "misconceptions" ? (
+          <MisconceptionManager
+            items={props.misconceptions}
+            error={props.error}
+            onReview={props.onMisconceptionReview}
+          />
+        ) : (
+          <>
+            <aside className="manager-filters" aria-label="Knowledge filters">
+              <h2>Find definitions</h2>
+              <label className="search">
+                <Search className="icon" aria-hidden="true" />
+                <span className="sr-only">Search knowledge</span>
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.currentTarget.value)}
+                  placeholder="Title or definition"
+                />
+              </label>
+              <label className="field-stack">
+                <span>Review status</span>
+                <select
+                  value={status}
+                  onChange={(event) => setStatus(event.currentTarget.value as StatusFilter)}
                 >
-                  <span className="manager-row-heading">{item.name}</span>
-                  <span className={`status-badge status-${item.reviewStatus.status}`}>
-                    {item.reviewStatus.status}
-                  </span>
-                  <span className="manager-row-summary">{item.semanticScope || item.kind}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </section>
-        <main className="manager-detail">
-          {pendingAction === null && inlineReviewFailed ? (
-            <div className="notice notice-error manager-empty" role="alert">
-              {props.error ?? "The review could not be saved. Try again."}
-            </div>
-          ) : null}
-          {selectedOutsideFilters ? (
-            <p className="notice manager-empty" role="status">
-              Selected definition is outside the current filters.
-            </p>
-          ) : null}
-          {selected === null ? (
-            <div className="manager-empty">
-              <h2>No definition selected</h2>
-              <p>Choose a definition to inspect its immutable history.</p>
-            </div>
-          ) : (
-            <KnowledgeManagerDetail
-              item={selected}
-              reviewing={reviewing}
-              onReviewed={() => void markReviewed()}
-              onAction={(action) => {
-                setInlineReviewFailed(false);
-                setPendingAction(action);
-              }}
-              onCorrect={() => props.onCorrect(selected)}
-              selectedRevision={
-                selected.id === props.initialSelectedId ? (props.initialRevision ?? null) : null
-              }
-            />
-          )}
-        </main>
+                  <option value="all">All statuses</option>
+                  <option value="unreviewed">Unreviewed</option>
+                  <option value="reviewed">Reviewed</option>
+                  <option value="incorrect">Incorrect</option>
+                  <option value="retired">Retired</option>
+                </select>
+              </label>
+              <label className="field-stack">
+                <span>Knowledge scope</span>
+                <select
+                  value={scope}
+                  onChange={(event) => setScope(event.currentTarget.value as ScopeFilter)}
+                >
+                  <option value="all">All scopes</option>
+                  <option value="canonical">Canonical</option>
+                  <option value="provisional">My provisional units</option>
+                </select>
+              </label>
+              <p className="muted">
+                Unreviewed definitions remain available to the tutor. Incorrect revisions and
+                retired units are excluded; review records accuracy, never mastery or authority.
+              </p>
+            </aside>
+            <section className="manager-list" aria-labelledby="manager-list-heading">
+              <div className="manager-section-heading">
+                <h2 id="manager-list-heading">Definitions</h2>
+                <span>{visible.length} shown</span>
+              </div>
+              {visible.length === 0 ? (
+                <p className="manager-empty">No knowledge matches these filters.</p>
+              ) : (
+                <div className="manager-list-rows">
+                  {visible.map((item) => (
+                    <button
+                      className="manager-row"
+                      type="button"
+                      key={item.id}
+                      aria-current={selected?.id === item.id ? "true" : undefined}
+                      onClick={() => {
+                        setInlineReviewFailed(false);
+                        setSelectedId(item.id);
+                      }}
+                    >
+                      <span className="manager-row-heading">{item.name}</span>
+                      <span className={`status-badge status-${item.reviewStatus.status}`}>
+                        {item.reviewStatus.status}
+                      </span>
+                      <span className="manager-row-summary">{item.semanticScope || item.kind}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
+            <main className="manager-detail">
+              {pendingAction === null && inlineReviewFailed ? (
+                <div className="notice notice-error manager-empty" role="alert">
+                  {props.error ?? "The review could not be saved. Try again."}
+                </div>
+              ) : null}
+              {selectedOutsideFilters ? (
+                <p className="notice manager-empty" role="status">
+                  Selected definition is outside the current filters.
+                </p>
+              ) : null}
+              {selected === null ? (
+                <div className="manager-empty">
+                  <h2>No definition selected</h2>
+                  <p>Choose a definition to inspect its immutable history.</p>
+                </div>
+              ) : (
+                <KnowledgeManagerDetail
+                  item={selected}
+                  reviewing={reviewing}
+                  onReviewed={() => void markReviewed()}
+                  onAction={(action) => {
+                    setInlineReviewFailed(false);
+                    setPendingAction(action);
+                  }}
+                  onCorrect={() => props.onCorrect(selected)}
+                  selectedRevision={
+                    selected.id === props.initialSelectedId ? (props.initialRevision ?? null) : null
+                  }
+                />
+              )}
+            </main>
+          </>
+        )}
       </div>
       {selected === null || pendingAction === null ? null : (
         <KnowledgeReviewDialog

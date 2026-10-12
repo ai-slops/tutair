@@ -115,6 +115,36 @@ const state = vi.hoisted(() => ({
           reviewHistory: [],
         },
       ],
+      misconceptions: [
+        {
+          id: "misconception-1",
+          revision: 1,
+          revisionId: "misconception-revision-1",
+          label: "States are events",
+          mistakenProposition: "A state is the event that causes a transition.",
+          correction: "A state persists; an event can trigger a transition.",
+          failureTask: "Trace a turnstile after a coin event.",
+          likelyError: "Labels coin as a state.",
+          discriminatingExample: {
+            scenario: "A locked turnstile receives a coin.",
+            mistakenResponse: "Coin is the new state.",
+            correctedResponse: "Unlocked is the new state.",
+            decisiveCue: "Unlocked persists after the trigger.",
+          },
+          reuseValueReason: "This confusion recurs across event-driven systems.",
+          definitionRevisionLinks: [
+            {
+              definitionRevisionId: "revision-2",
+              role: "subject",
+              learningValue: "Separates persistent configuration from the triggering event.",
+            },
+          ],
+          reviewStatus: "unreviewed",
+          reviewHistory: [],
+          eligibilityReason: null,
+          createdAt: "2026-10-02T00:00:00.000Z",
+        },
+      ],
       provider: { mode: "configured", label: "Tutor ready", guidance: "Ready" },
       chatgpt: {
         enabled: false,
@@ -144,6 +174,7 @@ const state = vi.hoisted(() => ({
     createSession: vi.fn(),
     correct: vi.fn(),
     review: vi.fn(() => Promise.resolve(true)),
+    reviewMisconception: vi.fn(() => Promise.resolve(true)),
     deleteAll: vi.fn(),
     selectChatGptModel: vi.fn(),
     beginChatGptManual: vi.fn(),
@@ -168,6 +199,8 @@ beforeEach(() => {
   state.workspace.review.mockResolvedValue(true);
   state.workspace.correct.mockReset();
   state.workspace.correct.mockResolvedValue(true);
+  state.workspace.reviewMisconception.mockReset();
+  state.workspace.reviewMisconception.mockResolvedValue(true);
 });
 afterEach(cleanup);
 
@@ -191,6 +224,24 @@ describe("knowledge manager", () => {
     await user.selectOptions(screen.getByLabelText("Review status"), "unreviewed");
     expect(screen.getByText("No knowledge matches these filters.")).toBeTruthy();
     expect(screen.getByRole("status").textContent).toContain("outside the current filters");
+  });
+
+  it("reviews separate misconception records without presenting them as learner diagnoses", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: "Manage knowledge" }));
+    await user.click(screen.getByRole("button", { name: "Misconceptions" }));
+
+    expect(screen.getAllByText("Potential general learning risk").length).toBeGreaterThan(0);
+    expect(screen.getByText("A state is the event that causes a transition.")).toBeTruthy();
+    expect(screen.getByText("A state persists; an event can trigger a transition.")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Mark reviewed" }));
+    expect(state.workspace.reviewMisconception).toHaveBeenCalledWith(
+      "misconception-1",
+      "reviewed",
+      "",
+      false,
+    );
   });
 
   it("reports an inline review failure without losing the selected definition", async () => {
