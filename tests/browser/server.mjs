@@ -9,6 +9,8 @@ import { createApp } from "../../dist/server/app.js";
 import { ChatGptAuth } from "../../dist/server/chatgpt-auth.js";
 import { ProtectedTokenStore } from "../../dist/server/chatgpt-token-store.js";
 import { createProvider } from "../../dist/server/provider-factory.js";
+import { KnowledgeRepository } from "../../dist/server/repository-knowledge.js";
+import { MisconceptionRepository } from "../../dist/server/repository-misconceptions.js";
 
 if (process.env.TUTOR_E2E_SERVER !== "1")
   throw new Error("This server is only for isolated browser tests");
@@ -92,6 +94,46 @@ app.post("/__test__/generation/release", (context) => {
   releasePausedStage?.();
   releasePausedStage = null;
   return context.body(null, 204);
+});
+app.post("/__test__/misconception", (context) => {
+  const learner = database.raw.prepare("SELECT id FROM learners ORDER BY rowid DESC LIMIT 1").get();
+  if (learner === undefined) return context.json({ error: "learner_required" }, 409);
+  const knowledge = new KnowledgeRepository(database);
+  const definition = knowledge.create(learner.id, {
+    title: "State",
+    statement: "A configuration that persists until an event causes a transition.",
+    kind: "concept",
+    riskScope: "stable",
+    confidence: 1,
+    sourceType: "learner_manual",
+  });
+  const misconception = new MisconceptionRepository(database).createOrReuse(learner.id, {
+    label: "States are events",
+    mistakenProposition: "A state is the event that causes a transition.",
+    correction: "A state persists; an event can trigger a transition to another state.",
+    failureTask: "Trace a locked turnstile after it receives a coin.",
+    likelyError: "Labels coin as the new state instead of the triggering event.",
+    discriminatingExample: {
+      scenario: "A locked turnstile receives a coin and unlocks.",
+      mistakenResponse: "Coin is the new state.",
+      correctedResponse: "Unlocked is the new state; coin is the event.",
+      decisiveCue: "The value that persists after the trigger is the state.",
+    },
+    reuseValueReason: "This confusion recurs across event-driven models.",
+    definitionRevisionLinks: [
+      {
+        definitionRevisionId: definition.revision.id,
+        role: "subject",
+        learningValue: "Separates persistent configuration from the event that changes it.",
+      },
+    ],
+    sourceRefs: [],
+    sourceType: "learner_manual",
+    extractionRunId: null,
+    resolutionRunId: null,
+    modelReview: null,
+  });
+  return context.json({ id: misconception.id });
 });
 app.post("/__test__/chatgpt", async (context) => {
   const body = await context.req.json();
