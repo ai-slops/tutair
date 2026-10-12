@@ -269,6 +269,7 @@ a production service.
 - [Real-provider quality evaluation and remaining validation](docs/quality-evaluation.md)
 - [Pipeline experiment readiness, improvements, and test plan](docs/pipeline-experiments.md)
 - [English source documents, localized expressions, and grounded composition contract](docs/knowledge-document-contract.md)
+- [Observable English intermediates, localized output, and incident diagnosis](docs/observable-language-contract.md)
 - [Knowledge document implementation milestones](docs/knowledge-document-roadmap.md)
 - [Design system](DESIGN.md)
 

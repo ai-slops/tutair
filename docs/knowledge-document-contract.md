@@ -25,6 +25,9 @@ See [implementation milestones](knowledge-document-roadmap.md).
 - Candidate resolution may use a bounded set of lexical/vector probes built from
   extracted labels, definitions, and semantic scopes. Retrieval proposes candidates;
   vector or title similarity alone never authorizes a merge.
+- Observable intermediate language, localization exceptions, deterministic final
+  rendering, and guarantee limits follow the
+  [observable language contract](observable-language-contract.md).
 
 ## Immutable documents and localized expressions
 
