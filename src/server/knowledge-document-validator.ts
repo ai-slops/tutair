@@ -12,7 +12,12 @@ type DocumentIdentity = {
 };
 
 const idRow = z.object({ id: z.string() });
-const ownerRow = z.object({ id: z.string(), learner_id: z.string().nullable() });
+const ownerRow = z.object({
+  id: z.string(),
+  learner_id: z.string().nullable(),
+  kind: z.string(),
+  artifact_type: z.string().nullable(),
+});
 const documentIdentityRow = z.object({
   id: z.string(),
   owner_learner_id: z.string().nullable(),
@@ -38,6 +43,20 @@ export class KnowledgeDocumentValidator {
         "shared_generated_document",
         "Generated canonical expressions must be learner-private",
       );
+    if (input.role === "english_base") {
+      const expected =
+        row.artifact_type === "claim"
+          ? "claim"
+          : row.artifact_type === "distinction"
+            ? "contrast"
+            : "definition";
+      if (input.blocks.filter((block) => block.type === expected).length !== 1)
+        throw new ApiError(
+          422,
+          "invalid_primary_document_block",
+          `English ${row.kind} material requires exactly one ${expected} block`,
+        );
+    }
   }
 
   assertBase(input: DocumentCreate, base: DocumentIdentity | null): void {
@@ -125,8 +144,9 @@ export class KnowledgeDocumentValidator {
 
   private revision(id: string) {
     return this.db.one(
-      `SELECT r.id,k.learner_id FROM knowledge_revisions r
-       JOIN knowledge_items k ON k.id=r.knowledge_id WHERE r.id=?`,
+      `SELECT r.id,k.learner_id,k.kind,c.artifact_type FROM knowledge_revisions r
+       JOIN knowledge_items k ON k.id=r.knowledge_id
+       LEFT JOIN typed_knowledge_contracts c ON c.knowledge_revision_id=r.id WHERE r.id=?`,
       [id],
       ownerRow,
     );

@@ -47,6 +47,19 @@ export class KnowledgeDocumentRepository {
     return this.db.transaction(work);
   }
 
+  primaryBlockType(revisionId: string): "definition" | "claim" | "contrast" {
+    const contract = this.db.one(
+      "SELECT artifact_type FROM typed_knowledge_contracts WHERE knowledge_revision_id=?",
+      [revisionId],
+      z.object({ artifact_type: z.string() }),
+    );
+    return contract?.artifact_type === "claim"
+      ? "claim"
+      : contract?.artifact_type === "distinction"
+        ? "contrast"
+        : "definition";
+  }
+
   create(raw: DocumentCreate) {
     const input = documentCreateSchema.parse(raw);
     this.validator.assertRevision(input);

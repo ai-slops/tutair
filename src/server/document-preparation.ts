@@ -55,7 +55,13 @@ export class DocumentPreparationService {
           ),
       );
       if (missing.length === 0) return { blocks: available, created };
-      const reusableEnglishDefinitionIds = new Set(
+      const primaryBlockByRevision = new Map(
+        knowledge.map((item) => [
+          item.revisionId,
+          this.documents.primaryBlockType(item.revisionId),
+        ]),
+      );
+      const reusableEnglishPrimaryIds = new Set(
         missing.flatMap((need) =>
           this.documents
             .forRevision(this.stages.input.owner, need.knowledgeRevisionId)
@@ -63,7 +69,11 @@ export class DocumentPreparationService {
               (document) =>
                 document.role === "english_base" &&
                 document.languageTag === "en" &&
-                document.blocks.some((block) => block.type === "definition"),
+                document.blocks.some(
+                  (block) =>
+                    block.type ===
+                    (primaryBlockByRevision.get(need.knowledgeRevisionId) ?? "definition"),
+                ),
             )
             ? [need.knowledgeRevisionId]
             : [],
@@ -71,7 +81,7 @@ export class DocumentPreparationService {
       );
       const prepared = await this.stages.stage({
         stage: "preparation",
-        schema: preparationSchemaFor(reusableEnglishDefinitionIds),
+        schema: preparationSchemaFor(reusableEnglishPrimaryIds, primaryBlockByRevision),
         data: {
           ...context,
           responseLanguage,
