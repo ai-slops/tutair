@@ -7,6 +7,7 @@ import { migrateKnowledgeDocuments } from "./knowledge-document-migration.js";
 import { migrateKnowledgeMetadata } from "./knowledge-migration.js";
 import { migrateKnowledgeReviews } from "./knowledge-review-migration.js";
 import { projectionVersion } from "./learner-projection.js";
+import { migrateMisconceptions } from "./misconception-migration.js";
 import { migrateModelContexts } from "./model-context-migration.js";
 import { migrateModelRunInspection } from "./model-run-inspection-migration.js";
 import { migrateThreads } from "./thread-migration.js";
@@ -97,6 +98,7 @@ export class Database {
       migrateThreads(this.raw);
       migrateTurnRequests(this.raw);
       migrateKnowledgeDocuments(this.raw);
+      migrateMisconceptions(this.raw);
       migrateAnswerCompositions(this.raw);
     } catch (error) {
       this.raw.close();
