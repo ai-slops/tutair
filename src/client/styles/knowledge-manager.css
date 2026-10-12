@@ -339,6 +339,20 @@
     min-block-size: auto;
     padding: var(--space-3) var(--space-4);
   }
+  .manager-title {
+    min-inline-size: 0;
+  }
+  .manager-title > div {
+    min-inline-size: 0;
+  }
+  .manager-title h1 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .manager-header > .cluster {
+    grid-column: 1 / -1;
+  }
   .manager-header .button span,
   .manager-title .eyebrow,
   .manager-count {

@@ -42,6 +42,10 @@ test("reviews a misconception lifecycle without responsive overflow", async ({
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
+    const titleBox = await page.getByRole("heading", { name: "Knowledge manager" }).boundingBox();
+    expect(titleBox).not.toBeNull();
+    expect(titleBox?.x).toBeGreaterThanOrEqual(0);
+    expect((titleBox?.x ?? 0) + (titleBox?.width ?? 0)).toBeLessThanOrEqual(width);
     await page.screenshot({
       path: testInfo.outputPath(`misconception-${width}.png`),
       fullPage: true,
