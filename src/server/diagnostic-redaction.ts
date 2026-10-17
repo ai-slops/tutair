@@ -2,7 +2,7 @@ const SECRET_KEY = /authorization|api[-_]?key|token|secret|password|cookie|crede
 const SECRET_TEXT = [
   /Bearer\s+[^\s"']+/gi,
   /\bsk-[A-Za-z0-9_-]+\b/g,
-  /\b(?:access|refresh|id)_token\b\s*[:=]\s*[^\s,}"']+/gi,
+  /\b(?:authorization|api[-_]?key|token|secret|password|cookie|credential|(?:access|refresh|id)_token)\b\s*[:=]\s*[^\s,}"']+/gi,
 ] as const;
 
 const redactText = (value: string): string =>
