@@ -91,7 +91,9 @@ entrypoint remains `node app/server.mjs`. At startup it:
 
 1. Sets the working directory to the repository root.
 2. Loads `.env` if present, without replacing values already supplied by the host.
-3. Installs the lockfile dependencies if absent and builds the runtime and UI.
+3. Hashes the root `package-lock.json`, runs `npm ci` when the owner-only
+   `node_modules/.tutair-package-lock.sha256` marker is absent or stale, writes the
+   marker only after a successful install, and builds the runtime and UI.
 4. Starts the server on `PORT` (default 3000), binding loopback by default.
 5. Registers the `tutair` development service with DIM's shared gateway and prints
    its HTTPS URL. Set `TUTOR_INGRESS` if the ingress is not named `https-ts`.
@@ -103,6 +105,11 @@ bind the application to the gateway's own port or stop the shared gateway.
 DIM's stop/start preserves its workspace. Discarding a workspace can remove its
 checkout and inner-engine data. Back up application data and model configuration
 before discarding. Git commits do not back up learning data.
+
+The entrypoint accepts Node.js 24.22.0 through 26.x. It rejects older runtimes and
+Node.js 27 or newer before loading dependencies. When DIM's system Node is too old,
+the entrypoint may re-execute once through `~/.local/bin/node`; that managed path is
+part of the persistent agent home and remains available across service restarts.
 
 ### Managed Git DNS
 

@@ -2,7 +2,8 @@
 
 Tutair uses PART `0.1.0` as its model wire and in-process operation runtime. The
 three packages are pinned exactly because PART is pre-1.0 and requires Node.js
-24.22.0 or newer.
+24.22.0 or newer. Tutair supports that runtime through Node.js 26.x and rejects
+Node.js 27 or newer until the package engine range is deliberately updated.
 
 | Concern | Owner | Contract |
 | --- | --- | --- |
