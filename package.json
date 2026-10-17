@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=24.0.0 <27"
+    "node": ">=24.22.0 <27"
   },
   "scripts": {
     "start": "node app/server.mjs",
@@ -23,6 +23,9 @@
   "dependencies": {
     "@hono/node-server": "^1.19.0",
     "@huggingface/transformers": "^4.3.0",
+    "@slop-lab/part": "0.1.0",
+    "@slop-lab/part-node": "0.1.0",
+    "@slop-lab/part-plugins": "0.1.0",
     "hono": "^4.9.0",
     "jose": "^6.2.12",
     "ky": "^1.10.0",
