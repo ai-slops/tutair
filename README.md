@@ -10,7 +10,7 @@ recognition, recall, explanation, application, discrimination, and transfer.
 
 ## Run
 
-Requirements: Node.js 24 or 26, npm, and a writable local directory. SQLite is
+Requirements: Node.js 24.22.0 through 26.x, npm, and a writable local directory. SQLite is
 built into Node; no database service is required. The SQLite experimental warning
 on some Node versions is expected.
 
@@ -25,9 +25,10 @@ loopback port with the shared development gateway and prints its external URL.
 The existing `.dim` lifecycle files are preserved.
 
 `npm start` builds the application before starting the server. DIM's original
-`node app/server.mjs` command also installs locked dependencies when absent, so a
-fresh agent can start without changes to its image. Initial installation and the
-first local embedding model download need network access.
+`node app/server.mjs` command also installs locked dependencies when its protected
+root-lock marker is absent or stale, so a fresh agent can start without changes to
+its image. Initial installation and the first local embedding model download need
+network access.
 
 ### Choose a tutor provider
 
