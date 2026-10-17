@@ -264,6 +264,7 @@ a production service.
 - [Phase 1 acceptance contract](docs/phase-one-contract.md)
 - [Backend API](docs/backend-api.md)
 - [Operation and privacy](docs/operations.md)
+- [PART runtime ownership and recovery limits](docs/part-runtime.md)
 - [Learner model and resolution policy](docs/learner-model.md)
 - [Verification record and environment limitations](docs/verification.md)
 - [Real-provider quality evaluation and remaining validation](docs/quality-evaluation.md)
