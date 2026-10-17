@@ -91,6 +91,36 @@ describe("PART provider persistence", () => {
     }
   });
 
+  it("persists raw output and known usage when completed output is invalid JSON", async () => {
+    const baseUrl = await listen((_request, response) => {
+      response.setHeader("content-type", "application/json");
+      response.end(completion("not-json", 1));
+    });
+    const fixture = createFixture(baseUrl);
+
+    try {
+      await expect(
+        fixture.stages.stage({
+          stage: "extraction",
+          data: { message: "invalid JSON" },
+          schema: z.object({ kind: z.literal("concept") }),
+        }),
+      ).rejects.toMatchObject({ code: "provider_invalid_json" });
+      const row = records(fixture.db)[0];
+
+      expect(row).toMatchObject({ status: "failed", effect_state: "applied" });
+      expect(JSON.parse(row?.output_json ?? "null")).toBe("not-json");
+      expect(JSON.parse(row?.usage_json ?? "null")).toEqual({
+        inputTokens: 3,
+        outputTokens: 1,
+        totalTokens: 4,
+      });
+    } finally {
+      await fixture.runtime.dispose();
+      fixture.db.close();
+    }
+  });
+
   function listen(handler: RequestListener): Promise<string> {
     server = createServer(handler);
     return new Promise((resolve) => {
