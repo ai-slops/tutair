@@ -125,9 +125,14 @@ export class PartRuntime {
     body: (context: OperationContext) => Promise<T>,
     onStarted?: (operationId: string) => void,
   ): Promise<{ readonly operationId: string; readonly value: T }> {
+    let releaseRegistration: (() => void) | undefined;
+    const registered = new Promise<void>((resolve) => {
+      releaseRegistration = resolve;
+    });
     const started = await operations.begin<OperationResult<T>>(
       spec,
       async (operationContext) => {
+        await registered;
         try {
           return {
             phase: "completed",
@@ -152,6 +157,7 @@ export class PartRuntime {
     const handle = started.value;
     this.active.set(handle.ref.id, handle);
     onStarted?.(handle.ref.id);
+    releaseRegistration?.();
     try {
       const outcome = await handle.done;
       if (outcome.phase !== "completed") {

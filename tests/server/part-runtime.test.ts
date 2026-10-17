@@ -18,6 +18,7 @@ describe("PART operation runtime", () => {
     const runtime = new PartRuntime(path);
     await runtime.ready;
     let stageId = "";
+    let bodyStageId = "";
 
     const turn = await runtime.turn({
       owner: "learner-1",
@@ -30,13 +31,18 @@ describe("PART operation runtime", () => {
           onStarted: (id) => {
             stageId = id;
           },
-          body: async () => "value",
+          body: async (stageContext) => {
+            bodyStageId = stageContext.scope.id;
+            expect(stageId).toBe(bodyStageId);
+            return "value";
+          },
         }),
     });
 
     expect(turn.value).toBe("value");
     expect(turn.operationId).toMatch(/^[0-9a-f-]{36}$/);
     expect(stageId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(bodyStageId).toBe(stageId);
     expect(existsSync(path)).toBe(true);
     expect(statSync(path).mode & 0o777).toBe(0o600);
     await runtime.dispose();
