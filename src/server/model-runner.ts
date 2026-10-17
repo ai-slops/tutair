@@ -13,6 +13,13 @@ import {
 } from "./model-context-version.js";
 import { modelInstruction } from "./model-instructions.js";
 import { modelLanguagePolicy } from "./model-language-policy.js";
+import {
+  markModelFallback,
+  parseProviderCall,
+  recordModelTrace,
+  recordProviderFailureEvidence,
+  recordProviderSuccessEvidence,
+} from "./model-run-provider-evidence.js";
 import { PartRuntime } from "./part-runtime.js";
 import type { Stage, TutorProvider } from "./provider.js";
 import { strictOutputSchema } from "./strict-output-schema.js";
@@ -46,24 +53,11 @@ export class ModelRunner {
     schema: z.ZodType<T>,
     parentContext: Contracts.InvocationContext = localContext(),
   ): Promise<{ readonly runId: string; readonly value: T }> {
-    let runtimeOperationId = "";
     return this.runtime.stage({
       parent: parentContext,
       kind: `tutair/stage/${stage}`,
-      onStarted: (operationId) => {
-        runtimeOperationId = operationId;
-      },
       body: (stageContext) =>
-        this.executeStage(
-          owner,
-          conversationId,
-          messageId,
-          stage,
-          data,
-          schema,
-          stageContext,
-          runtimeOperationId,
-        ),
+        this.executeStage(owner, conversationId, messageId, stage, data, schema, stageContext),
     });
   }
 
@@ -75,7 +69,6 @@ export class ModelRunner {
     data: Readonly<Record<string, unknown>>,
     schema: z.ZodType<T>,
     stageContext: Contracts.InvocationContext,
-    runtimeOperationId: string,
   ): Promise<{ readonly runId: string; readonly value: T }> {
     const runId = newId();
     const started = Date.now();
@@ -138,7 +131,7 @@ export class ModelRunner {
     );
     this.db.run(
       "UPDATE model_run_inspection SET runtime_operation_id=?,effect_state='not-attempted' WHERE run_id=?",
-      [runtimeOperationId, runId],
+      [stageContext.scope.id, runId],
     );
     try {
       const jsonSchema = z
@@ -162,51 +155,10 @@ export class ModelRunner {
         isoNow(),
       ]);
       const raw = await this.provider.call(call, owner, stageContext);
-      const result = z
-        .object({
-          value: z.unknown(),
-          usage: z
-            .object({
-              inputTokens: z.number().int().nonnegative(),
-              outputTokens: z.number().int().nonnegative(),
-              totalTokens: z.number().int().nonnegative(),
-            })
-            .nullable(),
-          resolvedModel: z.string().optional(),
-          reasoningSummary: z
-            .discriminatedUnion("state", [
-              z.object({ state: z.literal("disabled") }),
-              z.object({ state: z.literal("unavailable") }),
-              z.object({ state: z.literal("available"), text: z.string().min(1).max(10_000) }),
-            ])
-            .optional(),
-          runtime: z
-            .object({
-              operationId: z.string(),
-              attemptId: z.string().nullable(),
-              effect: z.string(),
-            })
-            .optional(),
-        })
-        .safeParse(raw);
+      const result = parseProviderCall(raw);
       const output = result.success ? result.data.value : raw;
-      const reasoningSummary = result.success ? result.data.reasoningSummary : undefined;
-      if (result.success && result.data.runtime !== undefined)
-        this.db.run(
-          `UPDATE model_run_inspection SET provider_operation_id=?,provider_attempt_id=?,
-           effect_state=? WHERE run_id=?`,
-          [
-            result.data.runtime.operationId,
-            result.data.runtime.attemptId,
-            result.data.runtime.effect,
-            runId,
-          ],
-        );
-      if (reasoningSummaryEnabled && reasoningSummary?.state === "available")
-        this.db.run(
-          "INSERT INTO model_run_reasoning_summaries(run_id,summary_text,created_at) VALUES(?,?,?)",
-          [runId, reasoningSummary.text, isoNow()],
-        );
+      if (result.success)
+        recordProviderSuccessEvidence(this.db, runId, result.data, reasoningSummaryEnabled);
       const parsed = schema.safeParse(output);
       if (!parsed.success) {
         this.db.run(
@@ -248,7 +200,7 @@ export class ModelRunner {
         "UPDATE model_run_inspection SET effect_state=COALESCE(effect_state,'unknown') WHERE run_id=?",
         [runId],
       );
-      this.trace(owner, runId, "stage_completed", {
+      recordModelTrace(this.db, owner, runId, "stage_completed", {
         stage,
         traceId: data["traceId"] ?? null,
         messageId,
@@ -259,6 +211,7 @@ export class ModelRunner {
       });
       return { runId, value };
     } catch (error) {
+      recordProviderFailureEvidence(this.db, runId, error);
       const code =
         error instanceof ApiError
           ? error.code
@@ -282,7 +235,7 @@ export class ModelRunner {
         "UPDATE model_run_inspection SET effect_state=COALESCE(effect_state,'unknown') WHERE run_id=?",
         [runId],
       );
-      this.trace(owner, runId, "stage_failed", {
+      recordModelTrace(this.db, owner, runId, "stage_failed", {
         stage,
         code,
         traceId: data["traceId"] ?? null,
@@ -295,26 +248,6 @@ export class ModelRunner {
   }
 
   markFallback(owner: LearnerId, messageId: string, stage: Stage): void {
-    this.db.run(
-      `UPDATE model_run_details SET fallback_status='used'
-       WHERE run_id=(SELECT id FROM model_runs WHERE learner_id=? AND input_message_id=? AND stage=? AND status='failed' ORDER BY created_at DESC LIMIT 1)`,
-      [owner, messageId, stage],
-    );
-  }
-
-  private trace(
-    owner: LearnerId,
-    runId: string,
-    event: string,
-    data: Readonly<Record<string, unknown>>,
-  ): void {
-    this.db.run("INSERT INTO traces VALUES(?,?,?,?,?,?)", [
-      newId(),
-      owner,
-      runId,
-      event,
-      JSON.stringify(data),
-      isoNow(),
-    ]);
+    markModelFallback(this.db, owner, messageId, stage);
   }
 }

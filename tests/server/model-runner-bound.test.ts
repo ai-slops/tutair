@@ -23,6 +23,7 @@ it("bounds final-review data at the common model-call boundary and hashes exactl
       .object({ id: z.string() })
       .parse(core.createMessage(owner, conversation.id, "learner", "Explain the idea"));
     const calls: StructuredCall[] = [];
+    let providerStageOperationId = "";
     const provider: TutorProvider = {
       embeddingProfile: "disabled:v1",
       state: {
@@ -32,8 +33,9 @@ it("bounds final-review data at the common model-call boundary and hashes exactl
         synthetic: true,
         embedding: "disabled",
       },
-      async call(call) {
+      async call(call, _owner, context) {
         calls.push(call);
+        providerStageOperationId = context?.scope.id ?? "";
         return { value: { safe: true }, usage: null };
       },
     };
@@ -58,11 +60,14 @@ it("bounds final-review data at the common model-call boundary and hashes exactl
     expect(JSON.stringify(sent).length).toBeLessThanOrEqual(MODEL_CONTEXT_JSON_BUDGET);
     expect(data.draft.length).toBe(20_000);
     const run = db.one(
-      "SELECT input_hash FROM model_run_details WHERE run_id=?",
+      `SELECT d.input_hash,i.runtime_operation_id FROM model_run_details d
+       JOIN model_run_inspection i ON i.run_id=d.run_id WHERE d.run_id=?`,
       [result.runId],
-      z.object({ input_hash: z.string() }),
+      z.object({ input_hash: z.string(), runtime_operation_id: z.string() }),
     );
     expect(run?.input_hash).toBe(createHash("sha256").update(JSON.stringify(sent)).digest("hex"));
+    expect(providerStageOperationId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(run?.runtime_operation_id).toBe(providerStageOperationId);
   } finally {
     db.close();
   }
