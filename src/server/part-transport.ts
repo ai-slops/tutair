@@ -1,24 +1,32 @@
 import type { Contracts, Model } from "@slop-lab/part/reference/index.js";
 import { z } from "zod";
+import { redactDiagnostic } from "./diagnostic-redaction.js";
 
-const diagnosticText = z.string().transform((value) =>
-  value
-    .replace(/[\r\n\t]+/g, " ")
-    .replace(/\s+/g, " ")
-    .slice(0, 300),
-);
 const errorBody = z
   .object({
     error: z
       .object({
         code: z.string().min(1),
-        message: diagnosticText.optional(),
+        message: z.string().optional(),
         param: z.string().min(1).max(100).optional(),
       })
       .loose(),
   })
   .loose();
-const admissionBody = z.object({ detail: diagnosticText }).loose();
+const admissionBody = z.object({ detail: z.string() }).loose();
+
+const diagnostic = (value: string | undefined, credential: string): string | undefined => {
+  if (value === undefined) return undefined;
+  const exactRedacted =
+    credential.length === 0 ? value : value.split(credential).join("[redacted]");
+  const redacted = redactDiagnostic(exactRedacted);
+  if (typeof redacted !== "string") return undefined;
+  const normalized = redacted
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return normalized.length === 0 ? undefined : normalized.slice(0, 300);
+};
 
 const failure = (
   code: string,
@@ -132,14 +140,18 @@ export const createTutorTransport = (
       const parsed = errorBody.safeParse(body);
       const admission = admissionBody.safeParse(body);
       const requestId = response.headers.get("x-request-id");
-      const param = parsed.success ? parsed.data.error.param : undefined;
-      return failure(
-        parsed.success ? parsed.data.error.code : "tutair.provider_http_error",
+      const message = diagnostic(
         parsed.success
-          ? (parsed.data.error.message ?? "Provider request failed")
+          ? parsed.data.error.message
           : admission.success
             ? admission.data.detail
-            : "Provider request failed",
+            : undefined,
+        auth.material,
+      );
+      const param = diagnostic(parsed.success ? parsed.data.error.param : undefined, auth.material);
+      return failure(
+        parsed.success ? parsed.data.error.code : "tutair.provider_http_error",
+        message ?? "Provider request failed",
         response.status === 429 ? "unavailable" : "validation",
         "unknown",
         {
