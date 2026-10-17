@@ -36,6 +36,15 @@ export const GenerationStageSchema = z.object({
     context: z.string().nullable(),
   }),
   contextHash: z.string().nullable(),
+  runtime: z
+    .object({
+      stageOperationId: z.string().nullable(),
+      providerOperationId: z.string().nullable(),
+      providerAttemptId: z.string().nullable(),
+      effect: z.string().nullable(),
+      cancellation: z.string().nullable(),
+    })
+    .optional(),
 });
 export const GenerationPipelineSchema = z.object({
   requestId: z.string(),
@@ -46,6 +55,13 @@ export const GenerationPipelineSchema = z.object({
   finishedAt: z.string().nullable(),
   error: z.object({ code: z.string(), message: z.string() }).nullable(),
   flags: z.record(z.string(), z.unknown()).nullable(),
+  runtime: z
+    .object({
+      operationId: z.string().nullable(),
+      phase: z.string().nullable(),
+      effect: z.string().nullable(),
+    })
+    .optional(),
   stages: z.array(GenerationStageSchema),
 });
 const RecordedCallSchema = z.discriminatedUnion("available", [

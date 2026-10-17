@@ -12,7 +12,7 @@ it("opts into streaming JSON without unsupported output or tool parameters", asy
     body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
     response.setHeader("content-type", "text/event-stream");
     response.end(
-      'data:{"choices":[{"delta":{"content":"{\\"ok\\":true}"}}]}\n\ndata:{"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata:[DONE]\n\n',
+      'data:{"choices":[{"index":0,"delta":{"content":"{\\"ok\\":true}"}}]}\n\ndata:{"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\ndata:[DONE]\n\n',
     );
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -41,7 +41,12 @@ it("opts into streaming JSON without unsupported output or tool parameters", asy
         data: { message: "Explain states" },
         jsonSchema: schema,
       }),
-    ).toEqual({ value: { ok: true }, usage: null });
+    ).toMatchObject({
+      value: { ok: true },
+      usage: null,
+      resolvedModel: "test-model",
+      runtime: { effect: "applied" },
+    });
     const sent = z
       .object({
         stream: z.literal(true),
@@ -53,6 +58,7 @@ it("opts into streaming JSON without unsupported output or tool parameters", asy
     expect(sent["response_format"]).toBeUndefined();
     expect(sent["tools"]).toBeUndefined();
     expect(sent["temperature"]).toBeUndefined();
+    expect(sent["stream_options"]).toBeUndefined();
     const policy = JSON.parse(
       sent.messages.find((message) => message.role === "user")?.content ?? "{}",
     );

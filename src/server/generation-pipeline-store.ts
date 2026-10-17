@@ -12,6 +12,9 @@ const requestRow = z.object({
   error_code: z.string().nullable(),
   error_message: z.string().nullable(),
   run_json: z.string().nullable(),
+  runtime_operation_id: z.string().nullable(),
+  runtime_phase: z.string().nullable(),
+  runtime_effect: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -38,6 +41,11 @@ const stageRow = z.object({
   context_hash: z.string().nullable(),
   reasoning_summary_enabled: z.number().int().nullable(),
   summary_text: z.string().nullable(),
+  runtime_operation_id: z.string().nullable(),
+  provider_operation_id: z.string().nullable(),
+  provider_attempt_id: z.string().nullable(),
+  effect_state: z.string().nullable(),
+  cancellation_state: z.string().nullable(),
 });
 const detailRow = stageRow.extend({
   output_json: z.string().nullable(),
@@ -75,6 +83,11 @@ export class GenerationPipelineStore {
           ? null
           : redactDiagnostic({ code: request.error_code, message: request.error_message }),
       flags,
+      runtime: {
+        operationId: request.runtime_operation_id,
+        phase: request.runtime_phase,
+        effect: request.runtime_effect,
+      },
       stages: stages.map(stageSummary),
     };
   }
@@ -134,7 +147,8 @@ export class GenerationPipelineStore {
   private request(key: TurnKey): z.infer<typeof requestRow> {
     const row = this.db.one(
       `SELECT request_id,user_message_id,tutor_message_id,state,error_code,error_message,
-       run_json,created_at,updated_at FROM tutor_turn_requests
+       run_json,runtime_operation_id,runtime_phase,runtime_effect,created_at,updated_at
+       FROM tutor_turn_requests
        WHERE learner_id=? AND conversation_id=? AND request_id=?`,
       [key.owner, key.conversationId, key.requestId],
       requestRow,
@@ -148,6 +162,8 @@ function stageSelect(extra = ""): string {
   return `SELECT r.id,r.stage,r.version,r.provider,r.status,r.error_code,r.created_at,
    d.model,d.prompt_version,d.schema_version,d.usage_json,d.latency_ms,d.fallback_status,
     i.trace_id,i.repair_of_run_id,i.attempt,i.output_mode,i.finished_at,i.reasoning_summary_enabled,
+    i.runtime_operation_id,i.provider_operation_id,i.provider_attempt_id,i.effect_state,
+    i.cancellation_state,
     s.summary_text,
     c.context_version,c.context_hash${extra} FROM model_runs r
    JOIN model_run_details d ON d.run_id=r.id
@@ -179,6 +195,13 @@ function stageSummary(row: z.infer<typeof stageRow>) {
       context: row.context_version,
     },
     contextHash: row.context_hash,
+    runtime: {
+      stageOperationId: row.runtime_operation_id,
+      providerOperationId: row.provider_operation_id,
+      providerAttemptId: row.provider_attempt_id,
+      effect: row.effect_state,
+      cancellation: row.cancellation_state,
+    },
   };
 }
 

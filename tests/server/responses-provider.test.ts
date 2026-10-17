@@ -1,6 +1,7 @@
 import { createServer, type RequestListener, type Server, type ServerResponse } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
-import { ResponsesProvider } from "../../src/server/responses-provider.js";
+import { PartModelProvider } from "../../src/server/part-model-provider.js";
+import { PartRuntime } from "../../src/server/part-runtime.js";
 
 describe("Responses tutor provider", () => {
   let server: Server | undefined;
@@ -16,11 +17,7 @@ describe("Responses tutor provider", () => {
         response.writeHead(200, { "content-type": "text/event-stream" });
         response.end(
           events(
-            { type: "response.output_text.delta", delta: '{"claims":[]}' },
-            {
-              type: "response.completed",
-              response: { usage: { input_tokens: 9, output_tokens: 4, total_tokens: 13 } },
-            },
+            completed('{"claims":[]}', { input_tokens: 9, output_tokens: 4, total_tokens: 13 }),
           ),
         );
       });
@@ -29,7 +26,7 @@ describe("Responses tutor provider", () => {
 
     const result = await provider.call(call(false), "learner-1");
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       value: { claims: [] },
       usage: { inputTokens: 9, outputTokens: 4, totalTokens: 13 },
       resolvedModel: "gpt-fixture",
@@ -37,6 +34,7 @@ describe("Responses tutor provider", () => {
     });
     expect(authorization).toBe("Bearer learner-token");
     expect(body).toMatchObject({ model: "gpt-fixture", stream: true, store: false });
+    expect(body).toMatchObject({ include: [] });
     expect(body).toMatchObject({
       input: [{ role: "user", content: JSON.stringify({ message: "data" }) }],
     });
@@ -72,19 +70,14 @@ describe("Responses tutor provider", () => {
         response.writeHead(200, { "content-type": "text/event-stream" });
         response.end(
           events(
-            { type: "response.output_text.delta", delta: '{"claims":[]}' },
-            {
-              type: "response.completed",
-              response: {
-                usage: null,
-                output: [
-                  {
-                    type: "reasoning",
-                    summary: [{ type: "summary_text", text: "Checked the supplied definition." }],
-                  },
-                ],
+            completed('{"claims":[]}', null, [
+              {
+                id: "reasoning_fixture",
+                type: "reasoning",
+                status: "completed",
+                summary: [{ type: "summary_text", text: "Checked the supplied definition." }],
               },
-            },
+            ]),
           ),
         );
       });
@@ -104,12 +97,7 @@ describe("Responses tutor provider", () => {
     // Given
     const baseUrl = await fixture((_request, response) => {
       response.writeHead(200, { "content-type": "text/event-stream" });
-      response.end(
-        events(
-          { type: "response.output_text.delta", delta: '{"claims":[]}' },
-          { type: "response.completed", response: { usage: null, output: [] } },
-        ),
-      );
+      response.end(events(completed('{"claims":[]}', null)));
     });
 
     // When
@@ -122,7 +110,13 @@ describe("Responses tutor provider", () => {
   it.each([
     ["response.failed", { type: "response.failed", response: { error: { code: "usage_limit" } } }],
     ["response.incomplete", { type: "response.incomplete", response: { incomplete_details: {} } }],
-    ["truncated", { type: "response.output_text.delta", delta: '{"claims":[]}' }],
+    [
+      "truncated",
+      {
+        type: "response.created",
+        response: { id: "resp_fixture", status: "in_progress", error: null },
+      },
+    ],
   ])("rejects %s streams", async (_name, terminal) => {
     const baseUrl = await fixture((_request, response) => {
       response.writeHead(200, { "content-type": "text/event-stream" });
@@ -139,7 +133,12 @@ describe("Responses tutor provider", () => {
     const baseUrl = await fixture((_request, response) => {
       openResponse = response;
       response.writeHead(200, { "content-type": "text/event-stream" });
-      response.write(events({ type: "response.output_text.delta", delta: '{"claims":' }));
+      response.write(
+        events({
+          type: "response.created",
+          response: { id: "resp_fixture", status: "in_progress", error: null },
+        }),
+      );
     });
     const request = providerFor(baseUrl, 25).call(call(), "learner-1");
     const observed = await Promise.race([
@@ -221,10 +220,12 @@ describe("Responses tutor provider", () => {
   }
 });
 
-function providerFor(baseUrl: string, requestTimeoutMs?: number): ResponsesProvider {
-  return new ResponsesProvider({
+function providerFor(baseUrl: string, requestTimeoutMs?: number): PartModelProvider {
+  return new PartModelProvider({
+    runtime: new PartRuntime(null),
     stateProvider: "chatgpt",
     stateModel: null,
+    outputMode: "responses",
     ...(requestTimeoutMs === undefined ? {} : { requestTimeoutMs }),
     resolve: async (owner) => {
       if (owner !== "learner-1") throw new Error("cross-learner credential request");
@@ -253,6 +254,38 @@ function call(reasoningSummaryEnabled = false) {
 
 function events(...values: readonly unknown[]): string {
   return values.map((value) => `data: ${JSON.stringify(value)}\n\n`).join("");
+}
+
+function completed(
+  text: string,
+  usage: {
+    readonly input_tokens: number;
+    readonly output_tokens: number;
+    readonly total_tokens: number;
+  } | null,
+  extraOutput: readonly unknown[] = [],
+) {
+  return {
+    type: "response.completed",
+    response: {
+      id: "resp_fixture",
+      object: "response",
+      status: "completed",
+      error: null,
+      incomplete_details: null,
+      output: [
+        {
+          id: "message_fixture",
+          type: "message",
+          role: "assistant",
+          status: "completed",
+          content: [{ type: "output_text", text, annotations: [] }],
+        },
+        ...extraOutput,
+      ],
+      usage,
+    },
+  };
 }
 
 async function readJson(

@@ -106,10 +106,42 @@ export class TurnRequestStore {
     );
   }
 
+  attachRuntime(input: RequestKey & { readonly operationId: string }): void {
+    this.db.run(
+      `UPDATE tutor_turn_requests SET runtime_operation_id=?,runtime_phase='running',
+       runtime_effect='not-attempted',updated_at=?
+       WHERE learner_id=? AND conversation_id=? AND request_id=?`,
+      [input.operationId, isoNow(), input.owner, input.conversationId, input.requestId],
+    );
+  }
+
+  reconcileUnsettled(): void {
+    this.db.run(
+      `UPDATE tutor_turn_requests SET state='failed',runtime_phase='abandoned',
+       runtime_effect='unknown',error_status=503,error_code='runtime_effect_unknown',
+       error_message='Interrupted tutor turn requires reconciliation before retry',updated_at=?
+       WHERE state='running'`,
+      [isoNow()],
+    );
+    this.db.run(
+      `UPDATE model_runs SET status='failed',error_code='runtime_effect_unknown'
+       WHERE status='running'`,
+    );
+    this.db.run(
+      `UPDATE model_run_inspection SET effect_state='unknown',cancellation_state='abandoned',
+       finished_at=COALESCE(finished_at,?) WHERE run_id IN(
+         SELECT id FROM model_runs WHERE error_code='runtime_effect_unknown'
+       )`,
+      [isoNow()],
+    );
+  }
+
   complete(input: CompletedTurnRequest): void {
     this.db.run(
       `UPDATE tutor_turn_requests SET state='completed',response_json=?,tutor_message_id=?,
-       run_json=?,updated_at=? WHERE learner_id=? AND conversation_id=? AND request_id=?`,
+       runtime_phase='completed',runtime_effect='applied',
+       run_json=?,updated_at=? WHERE learner_id=? AND conversation_id=? AND request_id=?
+       AND state='running'`,
       [
         JSON.stringify(input.response),
         input.tutorMessageId,
@@ -125,7 +157,9 @@ export class TurnRequestStore {
   fail(input: FailedTurnRequest): void {
     this.db.run(
       `UPDATE tutor_turn_requests SET state=?,error_status=?,error_code=?,error_message=?,
-       error_details_json=?,updated_at=? WHERE learner_id=? AND conversation_id=? AND request_id=?`,
+       runtime_phase='failed',runtime_effect=COALESCE(runtime_effect,'unknown'),
+        error_details_json=?,updated_at=? WHERE learner_id=? AND conversation_id=? AND request_id=?
+        AND state='running'`,
       [
         input.state,
         input.error.status,

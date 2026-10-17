@@ -5,6 +5,7 @@ import type { ChatGptAuth } from "./chatgpt-auth.js";
 import { createChatGptAuth } from "./chatgpt-config.js";
 import { Database } from "./database.js";
 import { KnowledgeDocumentRepository } from "./knowledge-document-repository.js";
+import { PartRuntime } from "./part-runtime.js";
 import { presentJson } from "./presentation.js";
 import type { TutorProvider } from "./provider.js";
 import { createProvider } from "./provider-factory.js";
@@ -16,6 +17,7 @@ import { coreRoutes } from "./routes-core.js";
 import { exportRoutes } from "./routes-export.js";
 import { knowledgeRoutes } from "./routes-knowledge.js";
 import { qualityRoutes } from "./routes-quality.js";
+import { TurnRequestStore } from "./turn-request-store.js";
 import { TutorPipeline } from "./tutor.js";
 import { ApiError } from "./types.js";
 
@@ -24,14 +26,35 @@ export type AppOptions = {
   readonly provider?: TutorProvider;
   readonly env?: NodeJS.ProcessEnv;
   readonly chatgptAuth?: ChatGptAuth | null;
+  readonly runtime?: PartRuntime;
+  readonly runtimePath?: string | null;
 };
 
 export const createApp = (
   options: AppOptions = {},
-): { readonly app: Hono; readonly database: Database } => {
-  const database = new Database(options.databasePath ?? process.env["TUTOR_DB_PATH"] ?? "tutor.db");
+): {
+  readonly app: Hono;
+  readonly database: Database;
+  readonly runtime: PartRuntime;
+  readonly ready: Promise<void>;
+} => {
+  const databasePath = options.databasePath ?? process.env["TUTOR_DB_PATH"] ?? "tutor.db";
+  const database = new Database(databasePath);
+  const runtime =
+    options.runtime ??
+    new PartRuntime(
+      options.runtimePath === undefined
+        ? databasePath === ":memory:"
+          ? null
+          : `${databasePath}.part-runtime.sqlite`
+        : options.runtimePath,
+    );
+  const ready = runtime.ready.then(() => {
+    new TurnRequestStore(database).reconcileUnsettled();
+  });
   const chatgptAuth = options.chatgptAuth ?? createChatGptAuth(options.env ?? process.env);
-  const provider = options.provider ?? createProvider(options.env ?? process.env, chatgptAuth);
+  const provider =
+    options.provider ?? createProvider(options.env ?? process.env, chatgptAuth, runtime);
   const core = new CoreRepository(database);
   const knowledge = new KnowledgeRepository(database);
   const documents = new KnowledgeDocumentRepository(database);
@@ -46,7 +69,9 @@ export const createApp = (
     knowledge,
     misconceptions: new MisconceptionRepository(database),
     documents,
-    tutor: new TutorPipeline(database, core, knowledge, provider),
+    tutor: new TutorPipeline(database, core, knowledge, provider, runtime),
+    runtime,
+    ready,
     turnLocks: new Set<string>(),
     turnAttempts: new Map<string, number[]>(),
     canonicalImportToken: configuredImportToken.trim() === "" ? null : configuredImportToken,
@@ -122,5 +147,5 @@ export const createApp = (
     console.error("Unhandled tutor API error", { name: error.name });
     return c.json({ error: { code: "internal_error", message: "Internal server error" } }, 500);
   });
-  return { app, database };
+  return { app, database, runtime, ready };
 };

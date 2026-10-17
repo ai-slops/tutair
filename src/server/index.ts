@@ -23,7 +23,8 @@ const databasePath =
   config.TUTOR_DB_PATH ?? join(homedir(), ".local", "share", "tutair", "tutair.sqlite");
 mkdirSync(dirname(databasePath), { recursive: true, mode: 0o700 });
 
-const { app, database } = createApp({ databasePath });
+const { app, database, runtime, ready } = createApp({ databasePath });
+await ready;
 app.use(
   "*",
   secureHeaders({
@@ -86,12 +87,14 @@ const server = serve(
 
 let stopping = false;
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.on(signal, () => {
+  process.on(signal, async () => {
     if (stopping) return;
     stopping = true;
-    server.close(() => {
-      database.close();
-      console.info(JSON.stringify({ event: "server.stopped" }));
+    const closed = new Promise<void>((resolve) => {
+      server.close(() => resolve());
     });
+    await Promise.all([closed, runtime.dispose()]);
+    database.close();
+    console.info(JSON.stringify({ event: "server.stopped" }));
   });
 }

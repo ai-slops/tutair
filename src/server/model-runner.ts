@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { localContext } from "@slop-lab/part";
+import type { Contracts } from "@slop-lab/part/reference/index.js";
 import { z } from "zod";
 import type { Database } from "./database.js";
 import { DebugSettingsStore } from "./debug-settings-store.js";
@@ -11,6 +13,7 @@ import {
 } from "./model-context-version.js";
 import { modelInstruction } from "./model-instructions.js";
 import { modelLanguagePolicy } from "./model-language-policy.js";
+import { PartRuntime } from "./part-runtime.js";
 import type { Stage, TutorProvider } from "./provider.js";
 import { strictOutputSchema } from "./strict-output-schema.js";
 import { boundModelContext } from "./tutor-model-context.js";
@@ -31,6 +34,7 @@ export class ModelRunner {
   constructor(
     readonly db: Database,
     readonly provider: TutorProvider,
+    readonly runtime: PartRuntime = new PartRuntime(null),
   ) {}
 
   async stage<T>(
@@ -40,6 +44,38 @@ export class ModelRunner {
     stage: Stage,
     data: Readonly<Record<string, unknown>>,
     schema: z.ZodType<T>,
+    parentContext: Contracts.InvocationContext = localContext(),
+  ): Promise<{ readonly runId: string; readonly value: T }> {
+    let runtimeOperationId = "";
+    return this.runtime.stage({
+      parent: parentContext,
+      kind: `tutair/stage/${stage}`,
+      onStarted: (operationId) => {
+        runtimeOperationId = operationId;
+      },
+      body: (stageContext) =>
+        this.executeStage(
+          owner,
+          conversationId,
+          messageId,
+          stage,
+          data,
+          schema,
+          stageContext,
+          runtimeOperationId,
+        ),
+    });
+  }
+
+  private async executeStage<T>(
+    owner: LearnerId,
+    conversationId: string,
+    messageId: string,
+    stage: Stage,
+    data: Readonly<Record<string, unknown>>,
+    schema: z.ZodType<T>,
+    stageContext: Contracts.InvocationContext,
+    runtimeOperationId: string,
   ): Promise<{ readonly runId: string; readonly value: T }> {
     const runId = newId();
     const started = Date.now();
@@ -100,6 +136,10 @@ export class ModelRunner {
         reasoningSummaryEnabled ? 1 : 0,
       ],
     );
+    this.db.run(
+      "UPDATE model_run_inspection SET runtime_operation_id=?,effect_state='not-attempted' WHERE run_id=?",
+      [runtimeOperationId, runId],
+    );
     try {
       const jsonSchema = z
         .record(z.string(), z.unknown())
@@ -121,7 +161,7 @@ export class ModelRunner {
         snapshot.hash,
         isoNow(),
       ]);
-      const raw = await this.provider.call(call, owner);
+      const raw = await this.provider.call(call, owner, stageContext);
       const result = z
         .object({
           value: z.unknown(),
@@ -140,10 +180,28 @@ export class ModelRunner {
               z.object({ state: z.literal("available"), text: z.string().min(1).max(10_000) }),
             ])
             .optional(),
+          runtime: z
+            .object({
+              operationId: z.string(),
+              attemptId: z.string().nullable(),
+              effect: z.string(),
+            })
+            .optional(),
         })
         .safeParse(raw);
       const output = result.success ? result.data.value : raw;
       const reasoningSummary = result.success ? result.data.reasoningSummary : undefined;
+      if (result.success && result.data.runtime !== undefined)
+        this.db.run(
+          `UPDATE model_run_inspection SET provider_operation_id=?,provider_attempt_id=?,
+           effect_state=? WHERE run_id=?`,
+          [
+            result.data.runtime.operationId,
+            result.data.runtime.attemptId,
+            result.data.runtime.effect,
+            runId,
+          ],
+        );
       if (reasoningSummaryEnabled && reasoningSummary?.state === "available")
         this.db.run(
           "INSERT INTO model_run_reasoning_summaries(run_id,summary_text,created_at) VALUES(?,?,?)",
@@ -186,6 +244,10 @@ export class ModelRunner {
         isoNow(),
         runId,
       ]);
+      this.db.run(
+        "UPDATE model_run_inspection SET effect_state=COALESCE(effect_state,'unknown') WHERE run_id=?",
+        [runId],
+      );
       this.trace(owner, runId, "stage_completed", {
         stage,
         traceId: data["traceId"] ?? null,
@@ -216,6 +278,10 @@ export class ModelRunner {
         isoNow(),
         runId,
       ]);
+      this.db.run(
+        "UPDATE model_run_inspection SET effect_state=COALESCE(effect_state,'unknown') WHERE run_id=?",
+        [runId],
+      );
       this.trace(owner, runId, "stage_failed", {
         stage,
         code,

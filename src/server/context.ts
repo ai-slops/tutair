@@ -3,6 +3,7 @@ import { getCookie } from "hono/cookie";
 import type { ChatGptAuth } from "./chatgpt-auth.js";
 import type { Database } from "./database.js";
 import type { KnowledgeDocumentRepository } from "./knowledge-document-repository.js";
+import type { PartRuntime } from "./part-runtime.js";
 import type { TutorProvider } from "./provider.js";
 import type { CoreRepository } from "./repository-core.js";
 import type { KnowledgeRepository } from "./repository-knowledge.js";
@@ -19,6 +20,8 @@ export type Services = {
   readonly documents: KnowledgeDocumentRepository;
   readonly provider: TutorProvider;
   readonly tutor: TutorPipeline;
+  readonly runtime?: PartRuntime;
+  readonly ready?: Promise<void>;
   readonly turnLocks: Set<string>;
   readonly turnAttempts: Map<string, number[]>;
   readonly canonicalImportToken?: string | null;

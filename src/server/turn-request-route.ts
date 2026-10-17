@@ -63,6 +63,9 @@ const sourceFor = (
 
 export const registerTutorTurnRoute = (app: Hono, services: Services): void => {
   app.post("/conversations/:id/tutor-turn", async (c) => {
+    await services.ready;
+    if (services.runtime === undefined)
+      throw new ApiError(500, "runtime_unavailable", "Execution runtime is unavailable");
     const owner = ownerFor(c, services);
     const conversationId = c.req.param("id");
     services.core.conversation(owner, conversationId);
@@ -101,20 +104,37 @@ export const registerTutorTurnRoute = (app: Hono, services: Services): void => {
         content: body.content,
       });
       sourceId = source.id;
-      const result = await services.tutor.turn({
+      const managed = await services.runtime.turn({
         owner,
-        conversationId,
-        messageId: source.id,
-        content: source.content,
-        assistance: body.assistance,
-        selfReport: body.selfReport,
-        ...(body.confidence === undefined ? {} : { confidence: body.confidence }),
-        ...(body.threadId === undefined ? {} : { threadId: body.threadId }),
-        ...(body.newThread === undefined ? {} : { newThread: body.newThread }),
-        ...(body.origin === undefined ? {} : { origin: body.origin }),
-        ...(body.whyNow === undefined ? {} : { whyNow: body.whyNow }),
-        ...(body.desiredOutcome === undefined ? {} : { desiredOutcome: body.desiredOutcome }),
+        requestId: identity.requestId,
+        deadlineMs: 300_000,
+        onStarted: (operationId) =>
+          store.attachRuntime({
+            owner,
+            conversationId,
+            requestId: identity.requestId,
+            operationId,
+          }),
+        body: (runtimeContext) =>
+          services.tutor.turn(
+            {
+              owner,
+              conversationId,
+              messageId: source.id,
+              content: source.content,
+              assistance: body.assistance,
+              selfReport: body.selfReport,
+              ...(body.confidence === undefined ? {} : { confidence: body.confidence }),
+              ...(body.threadId === undefined ? {} : { threadId: body.threadId }),
+              ...(body.newThread === undefined ? {} : { newThread: body.newThread }),
+              ...(body.origin === undefined ? {} : { origin: body.origin }),
+              ...(body.whyNow === undefined ? {} : { whyNow: body.whyNow }),
+              ...(body.desiredOutcome === undefined ? {} : { desiredOutcome: body.desiredOutcome }),
+            },
+            runtimeContext,
+          ),
       });
+      const result = managed.value;
       const response = {
         requestId: identity.requestId,
         userMessage: source.userMessage,

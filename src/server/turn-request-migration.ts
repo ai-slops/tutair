@@ -1,4 +1,18 @@
 import type { DatabaseSync } from "node:sqlite";
+import { z } from "zod";
+
+const countRow = z.object({ count: z.number() });
+
+const addColumn = (raw: DatabaseSync, name: string, definition: string): void => {
+  const row = countRow.parse(
+    raw
+      .prepare(
+        "SELECT COUNT(*) AS count FROM pragma_table_info('tutor_turn_requests') WHERE name=?",
+      )
+      .get(name),
+  );
+  if (row.count === 0) raw.exec(`ALTER TABLE tutor_turn_requests ADD COLUMN ${name} ${definition}`);
+};
 
 export const migrateTurnRequests = (raw: DatabaseSync): void => {
   raw.exec(`
@@ -24,4 +38,7 @@ export const migrateTurnRequests = (raw: DatabaseSync): void => {
     CREATE INDEX IF NOT EXISTS tutor_turn_requests_outcomes
       ON tutor_turn_requests(learner_id,conversation_id,state,created_at);
   `);
+  addColumn(raw, "runtime_operation_id", "TEXT");
+  addColumn(raw, "runtime_phase", "TEXT");
+  addColumn(raw, "runtime_effect", "TEXT");
 };

@@ -1,7 +1,10 @@
+import { localContext } from "@slop-lab/part";
+import type { Contracts } from "@slop-lab/part/reference/index.js";
 import { z } from "zod";
 import type { Database } from "./database.js";
 import { KnowledgeDocumentRepository } from "./knowledge-document-repository.js";
 import { ModelRunner } from "./model-runner.js";
+import { PartRuntime } from "./part-runtime.js";
 import type { TutorProvider } from "./provider.js";
 import type { CoreRepository } from "./repository-core.js";
 import type { KnowledgeRepository } from "./repository-knowledge.js";
@@ -40,11 +43,15 @@ export class TutorPipeline {
     readonly core: CoreRepository,
     readonly knowledge: KnowledgeRepository,
     readonly provider: TutorProvider,
+    readonly runtime: PartRuntime = new PartRuntime(null),
   ) {
-    this.runner = new ModelRunner(db, provider);
+    this.runner = new ModelRunner(db, provider, runtime);
   }
 
-  async turn(request: TurnInput): Promise<{
+  async turn(
+    request: TurnInput,
+    runtimeContext: Contracts.InvocationContext = localContext(),
+  ): Promise<{
     readonly tutorMessage: unknown;
     readonly run: unknown;
     readonly thread: unknown;
@@ -73,7 +80,7 @@ export class TutorPipeline {
     );
     const selectedThread = selectTutorThread(this.core, request, retrieval.results);
     const input = { ...request, threadId: selectedThread.id, messageEventId: source.id };
-    const stages = new TutorStageRunner(this.runner, input);
+    const stages = new TutorStageRunner(this.runner, input, runtimeContext);
     const store = new TutorTurnStore(this.db, this.core, this.knowledge);
     const context = loadTutorContext(this.db, this.core, input, retrieval.results);
     const immutableKnowledge = knowledgeContext(

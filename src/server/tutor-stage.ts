@@ -1,3 +1,5 @@
+import { localContext } from "@slop-lab/part";
+import type { Contracts } from "@slop-lab/part/reference/index.js";
 import type { z } from "zod";
 import { type ModelRunner, StructuredOutputError } from "./model-runner.js";
 import type { TurnInput } from "./tutor-schemas.js";
@@ -15,6 +17,7 @@ export class TutorStageRunner {
   constructor(
     readonly runner: ModelRunner,
     readonly input: TurnInput,
+    readonly runtimeContext: Contracts.InvocationContext = localContext(),
   ) {}
 
   async stage<T>(request: RunRequest<T>): Promise<StageResult<T>> {
@@ -26,6 +29,7 @@ export class TutorStageRunner {
         request.stage,
         data,
         request.schema,
+        this.runtimeContext,
       );
     let result: StageResult<T>;
     try {

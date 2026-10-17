@@ -206,7 +206,7 @@ export const canonicalPost = (body: unknown): RequestInit => ({
 
 export const createBackendHarness = () => {
   let directory = "";
-  let close: (() => void) | undefined;
+  let close: (() => Promise<void>) | undefined;
   return {
     setup(provider = scripted()) {
       directory = mkdtempSync(join(tmpdir(), "tutair-test-"));
@@ -215,15 +215,18 @@ export const createBackendHarness = () => {
         provider,
         env: { ...process.env, TUTOR_CANONICAL_IMPORT_TOKEN: "test-canonical-token" },
       });
-      close = () => created.database.close();
+      close = async () => {
+        await created.runtime.dispose();
+        created.database.close();
+      };
       return { client: makeClient(created.app), app: created.app, database: created.database };
     },
     reset() {
       directory = "";
       close = undefined;
     },
-    cleanup() {
-      close?.();
+    async cleanup() {
+      await close?.();
       if (directory !== "") rmSync(directory, { recursive: true, force: true });
     },
   };

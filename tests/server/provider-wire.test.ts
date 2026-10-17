@@ -32,7 +32,13 @@ describe("OpenAI-compatible provider wire seam", () => {
       response.setHeader("content-type", "application/json");
       response.end(
         JSON.stringify({
-          choices: [{ message: { content: JSON.stringify({ claims: [] }) } }],
+          choices: [
+            {
+              index: 0,
+              message: { content: JSON.stringify({ claims: [] }) },
+              finish_reason: "stop",
+            },
+          ],
           usage: { prompt_tokens: 11, completion_tokens: 3, total_tokens: 14 },
         }),
       );
@@ -57,9 +63,15 @@ describe("OpenAI-compatible provider wire seam", () => {
       },
       "learner-1",
     );
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       value: { claims: [] },
       usage: { inputTokens: 11, outputTokens: 3, totalTokens: 14 },
+      resolvedModel: "fake-model",
+      runtime: {
+        operationId: expect.any(String),
+        attemptId: expect.any(String),
+        effect: "applied",
+      },
     });
     expect(authorization).toBe("Bearer secret");
     expect(requestSchema.parse(requestBody).response_format.json_schema.name).toBe(
