@@ -15,7 +15,14 @@ import {
 import { tutorRequestTransform } from "./part-request-transform.js";
 import type { PartRuntime } from "./part-runtime.js";
 import { createTutorTransport } from "./part-transport.js";
-import type { ProviderCallResult, StructuredCall, TutorProvider } from "./provider.js";
+import {
+  ProviderCallError,
+  type ProviderCallResult,
+  type ProviderRuntimeEvidence,
+  type ProviderUsage,
+  type StructuredCall,
+  type TutorProvider,
+} from "./provider.js";
 import { ApiError } from "./types.js";
 
 export type PartCredential = {
@@ -95,27 +102,59 @@ export class PartModelProvider implements TutorProvider {
     if (!invoked.ok) throw toProviderApiError(invoked.error);
     const operationId = invoked.value.ref.id;
     const outcome = await invoked.value.done;
+    const runtime = {
+      operationId,
+      attemptId: attemptId ?? null,
+      phase: outcome.phase,
+      effect: outcome.effect,
+    } satisfies ProviderRuntimeEvidence;
     if (outcome.phase !== "completed") {
       if (context.deadline !== undefined && Date.parse(context.deadline) <= Date.now())
-        throw new ApiError(503, "provider_timeout", "Provider request timed out");
+        throw new ProviderCallError(
+          new ApiError(503, "provider_timeout", "Provider request timed out"),
+          runtime,
+          null,
+          undefined,
+          credential.model,
+        );
       if ("error" in outcome && outcome.error !== undefined)
-        throw toProviderApiError(outcome.error);
-      throw new ApiError(503, "provider_cancelled", "Provider request was cancelled");
+        throw new ProviderCallError(
+          toProviderApiError(outcome.error),
+          runtime,
+          null,
+          undefined,
+          credential.model,
+        );
+      throw new ProviderCallError(
+        new ApiError(503, "provider_cancelled", "Provider request was cancelled"),
+        runtime,
+        null,
+        undefined,
+        credential.model,
+      );
     }
     const response = outcome.result;
+    const usage = providerUsage(response.usage.inputTokens, response.usage.outputTokens);
+    const rawOutput = responseText(response);
     if (["length", "content_filter"].includes(response.finish.normalized))
-      throw new ApiError(502, "provider_truncated_output", "Provider did not finish normally");
-    const inputTokens = response.usage.inputTokens;
-    const outputTokens = response.usage.outputTokens;
+      throw new ProviderCallError(
+        new ApiError(502, "provider_truncated_output", "Provider did not finish normally"),
+        runtime,
+        usage,
+        rawOutput,
+        credential.model,
+      );
+    let value: unknown;
+    try {
+      value = parseProviderValue(rawOutput, this.options.outputMode === "compatibility");
+    } catch (error) {
+      if (error instanceof ApiError)
+        throw new ProviderCallError(error, runtime, usage, rawOutput, credential.model);
+      throw error;
+    }
     return {
-      value: parseProviderValue(
-        responseText(response),
-        this.options.outputMode === "compatibility",
-      ),
-      usage:
-        inputTokens === undefined || outputTokens === undefined
-          ? null
-          : { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens },
+      value,
+      usage,
       resolvedModel: credential.model,
       ...(this.options.outputMode === "responses"
         ? {
@@ -125,11 +164,15 @@ export class PartModelProvider implements TutorProvider {
             ),
           }
         : {}),
-      runtime: {
-        operationId,
-        attemptId: attemptId ?? null,
-        effect: outcome.effect as NonNullable<ProviderCallResult["runtime"]>["effect"],
-      },
+      runtime,
     };
   }
 }
+
+const providerUsage = (
+  inputTokens: number | undefined,
+  outputTokens: number | undefined,
+): ProviderUsage | null =>
+  inputTokens === undefined || outputTokens === undefined
+    ? null
+    : { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens };

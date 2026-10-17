@@ -34,23 +34,37 @@ export type ProviderUsage = {
   readonly outputTokens: number;
   readonly totalTokens: number;
 };
+export type ProviderRuntimeEvidence = {
+  readonly operationId: string;
+  readonly attemptId: string | null;
+  readonly phase: string;
+  readonly effect:
+    | "not-applicable"
+    | "not-attempted"
+    | "not-applied"
+    | "applied"
+    | "partially-applied"
+    | "unknown";
+};
 export type ProviderCallResult = {
   readonly value: unknown;
   readonly usage: ProviderUsage | null;
   readonly resolvedModel?: string;
   readonly reasoningSummary?: ProviderReasoningSummary;
-  readonly runtime?: {
-    readonly operationId: string;
-    readonly attemptId: string | null;
-    readonly effect:
-      | "not-applicable"
-      | "not-attempted"
-      | "not-applied"
-      | "applied"
-      | "partially-applied"
-      | "unknown";
-  };
+  readonly runtime?: ProviderRuntimeEvidence;
 };
+
+export class ProviderCallError extends ApiError {
+  constructor(
+    error: ApiError,
+    readonly runtime: ProviderRuntimeEvidence,
+    readonly usage: ProviderUsage | null = null,
+    readonly rawOutput?: string,
+    readonly resolvedModel?: string,
+  ) {
+    super(error.status, error.code, error.message, error.details);
+  }
+}
 
 export interface TutorProvider {
   readonly state: ProviderState;
@@ -135,8 +149,12 @@ export class LocalEmbeddingProvider implements TutorProvider {
   constructor(readonly generation: TutorProvider) {
     this.state = { ...generation.state, embedding: "configured" };
   }
-  call(call: StructuredCall, owner?: string): Promise<unknown> {
-    return this.generation.call(call, owner);
+  call(
+    call: StructuredCall,
+    owner?: string,
+    context?: Contracts.InvocationContext,
+  ): Promise<unknown> {
+    return this.generation.call(call, owner, context);
   }
   embed(texts: readonly string[]): Promise<readonly (readonly number[])[]> {
     return embedLocal(texts);
